@@ -1,0 +1,146 @@
+<script lang="ts">
+  import ConceptList from "./ConceptList.svelte";
+  import FacetControls from "./FacetControls.svelte";
+  import IsolateControl from "./IsolateControl.svelte";
+  import Legend from "./Legend.svelte";
+  import Search from "./Search.svelte";
+  import type { VizState } from "./state.svelte";
+
+  const { viz }: { viz: VizState } = $props();
+</script>
+
+<aside id="side">
+  <div class="top">
+    <h1>
+      {viz.model.displayName} <span class="okf">{viz.model.cfg.display.badge}</span>
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex -- ARIA tooltip pattern:
+           focusable trigger, and a <button> can't host the bubble's link -->
+      <span class="help" tabindex="0" aria-label="What is this?">?<span class="bubble" role="tooltip">
+          {@html viz.model.cfg.display.aboutHtml}
+        </span></span>
+    </h1>
+    <div class="sub" id="counts">
+      {#if viz.hidden.size > 0 || viz.query.trim() || viz.neighborIds || viz.facetActive}
+        {viz.visibleSorted.length} of {viz.model.nodes.length} concepts · {viz.model.edges.length} links
+      {:else}
+        {viz.model.nodes.length} concepts · {viz.model.edges.length} links
+      {/if}
+    </div>
+    <Search {viz} />
+    <Legend {viz} />
+  </div>
+  <div class="scroll">
+    <ConceptList {viz} />
+  </div>
+  <div class="bottom">
+    <FacetControls {viz} />
+    <IsolateControl {viz} />
+  </div>
+</aside>
+
+<style>
+  #side {
+    /* Overlays the full-bleed canvas (Stage.svelte's SIDEBAR_WIDTH constant
+       must match this). */
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 260px;
+    border-right: 1px solid var(--grid);
+    /* Outside (left, screen edge) is fully opaque; inside (right, canvas
+       edge) eases to 90% so the scene reads through faintly at the seam. */
+    background: linear-gradient(
+      to right,
+      var(--surface-1),
+      color-mix(in srgb, var(--surface-1) 90%, transparent)
+    );
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 2;
+  }
+  .top {
+    flex: none;
+    padding: 14px 14px 6px;
+  }
+  .scroll {
+    flex: 1;
+    min-height: 0; /* required: without it a flex column child with overflow
+                      won't actually shrink/scroll — it'll push .bottom out
+                      of the visible area instead */
+    overflow-y: auto;
+    padding: 0 14px 6px;
+  }
+  .bottom {
+    /* No border-top of its own — FacetControls' .facet rule already draws
+       one, which now sits right at this panel's top edge. */
+    flex: none;
+    padding: 0 14px 14px;
+  }
+  #side h1 {
+    position: relative;
+    font-size: 15px;
+    margin-bottom: 2px;
+  }
+  #side h1 .okf {
+    color: var(--ink-muted);
+    font-weight: 500;
+  }
+  .help {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 15px;
+    height: 15px;
+    border: 1px solid var(--grid);
+    border-radius: 50%;
+    color: var(--ink-muted);
+    font-size: 10px;
+    font-weight: 600;
+    vertical-align: 2px;
+    cursor: help;
+  }
+  .help:hover,
+  .help:focus-visible {
+    color: var(--ink-1);
+    border-color: var(--ink-muted);
+    outline: none;
+  }
+  .bubble {
+    display: none;
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(100% + 6px);
+    background: var(--surface-1);
+    border: 1px solid var(--grid);
+    border-radius: 8px;
+    padding: 8px 10px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    z-index: 4;
+    color: var(--ink-2);
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.45;
+  }
+  /* Invisible bridge over the gap (6px + the icon's line-box descent) so
+     hover survives the transit from the (?) down into the bubble. */
+  .bubble::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: -18px;
+    height: 18px;
+  }
+  .help:hover .bubble,
+  .help:focus-within .bubble {
+    display: block;
+  }
+  #side .sub {
+    color: var(--ink-muted);
+    font-size: 12px;
+    margin-bottom: 12px;
+  }
+</style>

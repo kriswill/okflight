@@ -2,14 +2,15 @@
 // npm/bunx entry point. okf runs on Bun — Bun.TOML, Bun.build (+ the Svelte
 // plugin at `okf viz` time), and Bun.Glob are used at CLI runtime, so node
 // cannot host it directly. The node shebang is deliberate: bunx respects it,
-// so both `bunx okflight` and `npx okflight` land here under node and we
-// re-exec through a bun; `bunx --bun okflight` (or a bun-run invocation)
-// hits the typeof-Bun fast path and imports the CLI in-process.
+// so both `bunx @kriswill/okflight` and `npx @kriswill/okflight` land here
+// under node and we re-exec through a bun; `bunx --bun @kriswill/okflight`
+// (or a bun-run invocation) hits the typeof-Bun fast path and imports the
+// CLI in-process.
 //
 // Bun lookup order: the PATH (the common case — bunx users by definition,
 // and any machine with bun installed), then the `bun` optionalDependency
 // npm brings alongside this package (flat and nested install layouts), so
-// plain `npx okflight` works with no prerequisites. A machine with none of
+// plain `npx @kriswill/okflight` works with no prerequisites. A machine with none of
 // these gets an explanation instead of a cryptic ENOENT.
 //
 // OKF_PROG makes usage/help print the name the user actually typed

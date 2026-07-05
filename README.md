@@ -61,9 +61,11 @@ then re-export `inputs.okf.packages.${system}.okf` from the parent's packages
 module. `follows` makes the parent build against the parent's nixpkgs; the
 lock here only governs standalone builds (`nix build .#okf`), so drv paths
 may legitimately differ between the two. Advance the parent's pin with
-`nix flake update okf`. While this repository is private, every nix consumer
-needs a GitHub token for the fetch — `access-tokens = github.com=<token>`
-in `nix.conf`.
+`nix flake update okf`. While this repository is private, either consume it
+as `git+ssh://git@github.com/kriswill/okflight.git` with an SSH key
+authorized for the repo (auth rides the SSH agent — e.g. 1Password,
+enclave-gated, no token at rest), or keep the `github:` form and set
+`access-tokens = github.com=<token>` in `nix.conf`.
 
 A vendored copy (or in-tree checkout) works too via a relative-path input
 (`url = "./path/to/okflight"`) — edits then flow through on the next

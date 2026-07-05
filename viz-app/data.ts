@@ -1,5 +1,5 @@
 // Immutable data model built once from the #data JSON blob baked in by
-// flakes/okf/viz.ts. Everything here is pure and framework-free.
+// ../viz.ts. Everything here is pure and framework-free.
 
 import { displayName, normalizeVizConfig, type FacetConfig, type VizConfig } from "./config";
 

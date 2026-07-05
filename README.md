@@ -1,6 +1,6 @@
-# okf
+# okflight
 
-CLI for maintaining an [OKF v0.1](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md)
+`okf` — a CLI for maintaining an [OKF v0.1](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md)
 knowledge bundle: `scaffold` stubs catalog docs from the repo sources, `index`
 regenerates progressive-disclosure `index.md` listings, `validate` checks
 spec/profile conformance and links, and `viz` renders the bundle as a
@@ -49,12 +49,9 @@ project run from source — no compile step.
 
 ## Consuming from a parent flake
 
-While in-tree, the parent consumes it as a relative-path input — edits flow
-through on the next evaluation, no lock bump needed:
-
 ```nix
 inputs.okf = {
-  url = "./flakes/okf";
+  url = "github:kriswill/okflight";
   inputs.nixpkgs.follows = "nixpkgs";
   inputs.flake-parts.follows = "flake-parts";
 };
@@ -62,20 +59,26 @@ inputs.okf = {
 
 then re-export `inputs.okf.packages.${system}.okf` from the parent's packages
 module. `follows` makes the parent build against the parent's nixpkgs; the
-lock here only governs standalone builds (`nix build ./flakes/okf#okf`), so
-drv paths may legitimately differ between the two. Promoting okf to its own
-repository is a one-line swap to `github:owner/okf` — consumers change
-nothing else.
+lock here only governs standalone builds (`nix build .#okf`), so drv paths
+may legitimately differ between the two. Advance the parent's pin with
+`nix flake update okf`. While this repository is private, every nix consumer
+needs a GitHub token for the fetch — `access-tokens = github.com=<token>`
+in `nix.conf`.
+
+A vendored copy (or in-tree checkout) works too via a relative-path input
+(`url = "./path/to/okflight"`) — edits then flow through on the next
+evaluation, no lock bump needed.
 
 ## Adopting okf in any repo (no Nix required)
 
-okf is plain bun — copy or clone this directory anywhere (or vendor it), then:
+okf is plain bun — clone this repository anywhere (or vendor it), then:
 
 ```sh
-cd path/to/okf && bun install    # once; vendors the viz viewer deps
+git clone https://github.com/kriswill/okflight ~/src/okflight
+cd ~/src/okflight && bun install      # once; vendors the viz viewer deps
 cd ~/src/your-project
-bun path/to/okf/okf.ts init      # starter okf.toml + bundle skeleton
-bun path/to/okf/okf.ts validate && bun path/to/okf/okf.ts viz
+bun ~/src/okflight/okf.ts init        # starter okf.toml + bundle skeleton
+bun ~/src/okflight/okf.ts validate && bun ~/src/okflight/okf.ts viz
 ```
 
 Any language, any domain, git or no VCS at all (`[vcs] provider = "none"`).
@@ -93,16 +96,16 @@ nixpkgs bump changes bun and the install layout shifts — the failure is a loud
 hash mismatch), refresh it:
 
 1. In `package.nix`, set the FOD's `outputHash = lib.fakeHash;`
-2. `nix build ./flakes/okf#okf.node_modules` — copy the `got:` sha256 back in.
+2. `nix build .#okf.node_modules` — copy the `got:` sha256 back in.
 
 ## Development
 
-A parent repo's dev shell may provide `okf` as an impure wrapper over this
-working tree (this repo does, via its dev module) — edits are live, no
-rebuild. Standalone:
+A consuming repo can wrap a checkout of this working tree
+(`bun path/to/okflight/okf.ts`) for live edits with no rebuild; nix
+consumers get the pinned store build. Standalone:
 
 ```sh
-nix develop ./flakes/okf   # or rely on the parent dev shell's bun
+nix develop            # or any ambient bun
 bun install
 bun test
 bun okf.ts help

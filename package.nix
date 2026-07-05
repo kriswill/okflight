@@ -16,6 +16,8 @@ let
   # Explicit include-list: nix plumbing stays out (nix-only edits don't rebuild
   # the package) and node_modules can never leak in however the source reaches us.
   sources = lib.fileset.unions [
+    # okf viz embeds the LICENSE (copyright + full text) into generated pages.
+    ./LICENSE
     ./okf.ts
     ./init.ts
     ./setup.ts

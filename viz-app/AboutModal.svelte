@@ -76,7 +76,7 @@
               stroke-linecap="round"
             />
           </svg>
-          Third-party licenses
+          Licenses
         </button>
       </div>
     {/if}
@@ -103,8 +103,23 @@
         </table>
         <p class="gen">Everything above is baked into this single HTML file — it works offline, straight from disk. Generated {generated}.</p>
       {/if}
+      {#if m.generator}
+        <p class="tool">
+          Built with <a href={m.generator.url} target="_blank" rel="noopener">{m.generator.name}</a>{m.generator.version
+            ? ` v${m.generator.version}`
+            : ""}{m.generator.license ? ` · ${m.generator.license} license` : ""}{m.generator.copyright
+            ? ` · ${m.generator.copyright}`
+            : ""}
+        </p>
+      {/if}
     {:else}
-      <p class="lic-note">The viewer embeds minified copies of these libraries; the notices below accompany them as their licenses require.</p>
+      <p class="lic-note">This page embeds the minified viewer app and these libraries; the notices below accompany them as their licenses require.</p>
+      {#if m.generator?.text}
+        <details class="lic">
+          <summary>{m.generator.name} {m.generator.version}{m.generator.license ? ` · ${m.generator.license}` : ""} — this viewer</summary>
+          <pre>{m.generator.text}</pre>
+        </details>
+      {/if}
       {#each m.licenses as l (l.name)}
         <details class="lic">
           <summary>{l.name} {l.version}{l.license ? ` · ${l.license}` : ""}</summary>
@@ -223,6 +238,17 @@
     color: var(--ink-muted);
     font-size: 11.5px;
     margin-top: 10px;
+  }
+  .tool {
+    color: var(--ink-muted);
+    font-size: 11.5px;
+    margin-top: 6px;
+  }
+  .tool a {
+    color: var(--ink-2);
+  }
+  .tool a:hover {
+    color: var(--ink-1);
   }
   /* .seg is a global primitive (viz.ts) shared with the sidebar controls. */
   .tabs {

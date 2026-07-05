@@ -9,7 +9,9 @@ around Three.js glow spheres, bundled at generation time by `Bun.build`).
 Since minification strips the bundled libraries' copyright headers and their
 MIT/zlib terms require notices to accompany redistributed copies, `viz` embeds
 each runtime dependency's LICENSE text (collected from `node_modules` at build
-time) in the page — see "Third-party licenses" in the viewer's About modal.
+time) in the page — see the "Licenses" tab in the viewer's About modal, which
+also carries okflight's own MIT notice (the embedded viewer app is okflight
+code) and links back to this project.
 
 okf operates on a **workspace**: the nearest directory at or above cwd holding
 an `okflight.toml` (the pre-rebrand name `okf.toml` is still discovered, with a

@@ -10,7 +10,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { BUILD_ONLY, collectLicenses } from "../licenses";
+import { BUILD_ONLY, collectLicenses, generatorInfo } from "../licenses";
 
 const okflight = join(import.meta.dir, "..");
 
@@ -73,6 +73,29 @@ describe("collectLicenses", () => {
   });
 });
 
+describe("generatorInfo", () => {
+  test("this checkout self-identifies: version, MIT, copyright line, full LICENSE text, fragment-free URL", () => {
+    const pkg = JSON.parse(readFileSync(join(okflight, "package.json"), "utf8"));
+    const g = generatorInfo(okflight);
+    expect(g.name).toBe("OKFlight");
+    expect(g.version).toBe(pkg.version);
+    expect(g.license).toBe("MIT");
+    expect(g.url).toBe("https://github.com/kriswill/okflight");
+    expect(g.copyright).toBe("© 2026 Kris Williams");
+    expect(g.text).toContain("MIT License");
+    expect(g.text).toContain("Copyright (c) 2026 Kris Williams");
+  });
+
+  test("a trimmed copy without a LICENSE degrades to nulls instead of failing the build", () => {
+    const root = mkdtempSync(join(tmpdir(), "okf-gen-"));
+    writeFileSync(join(root, "package.json"), JSON.stringify({ version: "9.9.9", license: "MIT" }));
+    const g = generatorInfo(root);
+    expect(g.version).toBe("9.9.9");
+    expect(g.copyright).toBeNull();
+    expect(g.text).toBeNull();
+  });
+});
+
 describe("okf viz output", () => {
   test(
     "the generated page embeds every runtime dep's license notice",
@@ -104,6 +127,14 @@ describe("okf viz output", () => {
       expect(html).toContain("three.js authors"); // three (MIT)
       expect(html).toContain("Permission is hereby granted"); // MIT grant (three + svelte)
       expect(html).toContain("Raoul van Rüschen"); // postprocessing (zlib)
+
+      // The page identifies its generator: project link + license + copyright
+      // (the embedded viewer app is okflight code).
+      const gen = JSON.parse(blob).generator;
+      expect(gen.url).toBe("https://github.com/kriswill/okflight");
+      expect(gen.license).toBe("MIT");
+      expect(gen.copyright).toBe("© 2026 Kris Williams");
+      expect(html).toContain("Copyright (c) 2026 Kris Williams"); // full own-LICENSE text embedded
     },
     30_000, // spawns a full Bun.build of the viewer
   );

@@ -13,7 +13,7 @@ import { extname, join } from "node:path";
 import { loadContext } from "./config-cli";
 import { extractLinks, isExternal, nowISO, parseDoc, resolveLink, walkMd } from "./lib";
 import { layout3d } from "./layout3d";
-import { collectLicenses } from "./licenses";
+import { collectLicenses, generatorInfo } from "./licenses";
 import { displayName } from "./viz-app/config";
 import { parsePackagePlatforms, repoNameFromUrl, type BuildStats, type DepLicense } from "./viz-app/data";
 import { esc } from "./viz-app/markdown";
@@ -377,6 +377,10 @@ try {
   console.error(`viz: ${e instanceof Error ? e.message : e}`);
   process.exit(1);
 }
+// The page also identifies its generator: the About modal links back to the
+// okflight project and shows its license + copyright (the viewer app baked
+// into this page is okflight code).
+const generator = generatorInfo(import.meta.dir);
 lap("bundle");
 
 // --- Build-time size breakdown (About modal) ---------------------------------
@@ -406,7 +410,7 @@ const themeCss = (name: string) =>
 
 const assemble = (totalBytes: number) => {
   const stats: BuildStats = { generatedAt, totalBytes, bytes: sectionBytes };
-  const data = JSON.stringify({ nodes, edges: dedupedEdges, files, dirs, repoUrl, commitUrl, commits, facetMaps, cfg, stats, licenses }).replace(
+  const data = JSON.stringify({ nodes, edges: dedupedEdges, files, dirs, repoUrl, commitUrl, commits, facetMaps, cfg, stats, licenses, generator }).replace(
     /<\//g,
     "<\\/",
   );

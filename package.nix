@@ -171,6 +171,7 @@ stdenvNoCC.mkDerivation {
     description = "CLI for maintaining OKF knowledge bundles (scaffold/index/validate/viz)";
     # TODO(extraction): flips to the standalone repo URL when okf moves out.
     homepage = "https://github.com/kriswill/okflight";
+    license = lib.licenses.mit;
     mainProgram = "okf";
     platforms = [
       "aarch64-darwin"

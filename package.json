@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "CLI for maintaining OKF knowledge bundles: scaffold/index/validate/viz (self-contained 3D graph), plus a guided setup wizard",
   "type": "module",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/kriswill/okflight.git"

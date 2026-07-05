@@ -1,6 +1,6 @@
 // Shared viz configuration: schema, generic defaults, and normalization.
 // Browser-safe (no bun/node imports). The build side (config-cli.ts) parses
-// the repo-root okf.toml with Bun.TOML.parse, normalizes STRICTLY (misconfig
+// the repo-root okflight.toml with Bun.TOML.parse, normalizes STRICTLY (misconfig
 // fails the build), and embeds the normalized result in the #data blob; the
 // app re-normalizes LENIENTLY in buildModel (defaults-fill, never throws),
 // which is also what gives test fixtures and no-config bundles a working
@@ -195,7 +195,7 @@ export function normalizeVizConfig(raw: unknown, opts?: { strict?: boolean; warn
 
   if (raw !== undefined && raw !== null) {
     if (!isObj(raw)) {
-      if (strict) throw new VizConfigError("okf.toml: top level must be a table");
+      if (strict) throw new VizConfigError("okflight.toml: top level must be a table");
     } else {
       const top = { ...raw };
       const section = (name: string, fill: (s: Record<string, unknown>) => void) => {
@@ -382,7 +382,7 @@ export function normalizeVizConfig(raw: unknown, opts?: { strict?: boolean; warn
       errors.push('vcs.commit-url-template: must contain "{hash}"');
     if (cfg.taxonomy.types.length > 12)
       warn(`taxonomy.types: ${cfg.taxonomy.types.length} entries but only 12 palette slots — overflow types get generated colors`);
-    if (errors.length) throw new VizConfigError("invalid okf.toml:\n  " + errors.join("\n  "));
+    if (errors.length) throw new VizConfigError("invalid okflight.toml:\n  " + errors.join("\n  "));
   }
 
   return cfg;

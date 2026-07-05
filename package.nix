@@ -16,8 +16,13 @@ let
   # Explicit include-list: nix plumbing stays out (nix-only edits don't rebuild
   # the package) and node_modules can never leak in however the source reaches us.
   sources = lib.fileset.unions [
+    # okf viz embeds the LICENSE (copyright + full text) into generated pages.
+    ./LICENSE
     ./okf.ts
     ./init.ts
+    ./setup.ts
+    ./bootstrap.ts
+    ./templates
     ./lib.ts
     ./config-cli.ts
     ./vcs
@@ -58,8 +63,12 @@ let
 
   # The lock is pure JS — no os/cpu-conditional packages, no install scripts —
   # so one hash serves every platform; --cpu/--os="*" keeps that true if a
-  # future dep adds conditionals. NOT --production: `okf viz` needs svelte +
-  # bun-plugin-svelte (devDependencies) at CLI runtime, the tests happy-dom.
+  # future dep adds conditionals. --omit=optional: the only optional dep is
+  # the `bun` npm package (the npx/bunx fallback runtime — see bin/okf.mjs);
+  # the nix wrapper provides the real bun, and vendoring every platform's
+  # ~90MB binary into the store would be pure bloat. NOT --production:
+  # `okf viz` needs svelte + bun-plugin-svelte at CLI runtime, the tests
+  # happy-dom.
   # Refresh the hash (bun.lock or nixpkgs bun changes): set lib.fakeHash, then
   # `nix build ./flakes/okf#okf.node_modules` and copy the "got:" value.
   node_modules = stdenvNoCC.mkDerivation {
@@ -86,6 +95,7 @@ let
         --frozen-lockfile \
         --ignore-scripts \
         --no-progress \
+        --omit=optional \
         --cpu="*" \
         --os="*"
       runHook postBuild
@@ -163,6 +173,7 @@ stdenvNoCC.mkDerivation {
     description = "CLI for maintaining OKF knowledge bundles (scaffold/index/validate/viz)";
     # TODO(extraction): flips to the standalone repo URL when okf moves out.
     homepage = "https://github.com/kriswill/okflight";
+    license = lib.licenses.mit;
     mainProgram = "okf";
     platforms = [
       "aarch64-darwin"

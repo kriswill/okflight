@@ -6,14 +6,14 @@
 // simulates or jiggles at runtime. The viewer app (viz-app/) is bundled by
 // Bun.build with three + postprocessing and inlined, so the output is still
 // one offline file:// page. Repo-specific strings/settings come from an
-// optional ./okf.toml at the repo root (config-cli.ts); absent -> generic.
+// optional ./okflight.toml at the repo root (config-cli.ts); absent -> generic.
 
 import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { extname, join } from "node:path";
 import { loadContext } from "./config-cli";
 import { extractLinks, isExternal, nowISO, parseDoc, resolveLink, walkMd } from "./lib";
 import { layout3d } from "./layout3d";
-import { collectLicenses } from "./licenses";
+import { collectLicenses, generatorInfo } from "./licenses";
 import { displayName } from "./viz-app/config";
 import { parsePackagePlatforms, repoNameFromUrl, type BuildStats, type DepLicense } from "./viz-app/data";
 import { esc } from "./viz-app/markdown";
@@ -323,7 +323,20 @@ for (const n of nodes) Object.assign(n, positions.get(n.id));
 lap("layout");
 
 // --- Bundle the viewer app (Svelte 5 via bun-plugin-svelte) ---------------------
-if (!existsSync(join(import.meta.dir, "node_modules", "svelte"))) {
+// Missing-deps check via actual resolution, not a node_modules path probe:
+// an npm/bunx install lays the deps flat in the CONSUMER'S node_modules (a
+// parent of this file), where they resolve fine — a beside-viz.ts existence
+// check would trigger a spurious nested `bun install` of the full dev tree.
+// Only a genuinely fresh checkout (nothing resolvable) self-heals here.
+const unresolvable = ["svelte", "bun-plugin-svelte"].some((dep) => {
+  try {
+    Bun.resolveSync(dep, import.meta.dir);
+    return false;
+  } catch {
+    return true;
+  }
+});
+if (unresolvable) {
   console.log("viz: installing viewer dependencies (bun install)…");
   const r = Bun.spawnSync(["bun", "install"], { cwd: import.meta.dir, stdout: "inherit", stderr: "inherit" });
   if (r.exitCode !== 0) process.exit(r.exitCode ?? 1);
@@ -364,6 +377,10 @@ try {
   console.error(`viz: ${e instanceof Error ? e.message : e}`);
   process.exit(1);
 }
+// The page also identifies its generator: the About modal links back to the
+// okflight project and shows its license + copyright (the viewer app baked
+// into this page is okflight code).
+const generator = generatorInfo(import.meta.dir);
 lap("bundle");
 
 // --- Build-time size breakdown (About modal) ---------------------------------
@@ -393,7 +410,7 @@ const themeCss = (name: string) =>
 
 const assemble = (totalBytes: number) => {
   const stats: BuildStats = { generatedAt, totalBytes, bytes: sectionBytes };
-  const data = JSON.stringify({ nodes, edges: dedupedEdges, files, dirs, repoUrl, commitUrl, commits, facetMaps, cfg, stats, licenses }).replace(
+  const data = JSON.stringify({ nodes, edges: dedupedEdges, files, dirs, repoUrl, commitUrl, commits, facetMaps, cfg, stats, licenses, generator }).replace(
     /<\//g,
     "<\\/",
   );

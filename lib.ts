@@ -21,7 +21,7 @@ interface ConceptDoc {
 }
 
 // Reserved filenames and required/recommended frontmatter fields are profile
-// policy, configured via okf.toml's [profile] section (defaults in
+// policy, configured via okflight.toml's [profile] section (defaults in
 // config-cli.ts) — commands read them from the loaded context.
 
 /** All .md files under root, as sorted bundle-relative paths. */

@@ -6,7 +6,7 @@
 // (Perforce, …) implement this same surface.
 
 export interface VcsProvider {
-  /** Provider id, as configured via okf.toml `[vcs] provider`. */
+  /** Provider id, as configured via okflight.toml `[vcs] provider`. */
   readonly name: string;
   /** Absolute workspace root. */
   readonly root: string;

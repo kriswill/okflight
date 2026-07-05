@@ -9,12 +9,16 @@ around Three.js glow spheres, bundled at generation time by `Bun.build`).
 Since minification strips the bundled libraries' copyright headers and their
 MIT/zlib terms require notices to accompany redistributed copies, `viz` embeds
 each runtime dependency's LICENSE text (collected from `node_modules` at build
-time) in the page — see "Third-party licenses" in the viewer's About modal.
+time) in the page — see the "Licenses" tab in the viewer's About modal, which
+also carries okflight's own MIT notice (the embedded viewer app is okflight
+code) and links back to this project.
 
 okf operates on a **workspace**: the nearest directory at or above cwd holding
-an `okf.toml`, else the git toplevel (zero-config mode). `okf init [--dir=<d>]`
-bootstraps a fresh workspace — a commented starter `okf.toml` plus the bundle
-skeleton (`<d>/index.md`, `<d>/log.md`); it never overwrites. **Git is optional** —
+an `okflight.toml` (the pre-rebrand name `okf.toml` is still discovered, with a
+rename nudge), else the git toplevel (zero-config mode). `okf init [--dir=<d>]`
+bootstraps a fresh workspace — a commented starter `okflight.toml` plus the
+bundle skeleton (`<d>/index.md`, `<d>/log.md`); it never overwrites. `okf setup`
+is the guided superset — see "Integrating into a repo" below. **Git is optional** —
 `[vcs] provider = "auto"|"git"|"none"` selects the version-control adapter
 (auto = git when the root is a git toplevel); the `none` provider walks the
 filesystem (minus `[vcs] ignore` globs), stamps mtime dates, and skips commit
@@ -75,15 +79,60 @@ A vendored copy (or in-tree checkout) works too via a relative-path input
 (`url = "./path/to/okflight"`) — edits then flow through on the next
 evaluation, no lock bump needed.
 
+## Integrating into a repo (`okf setup`)
+
+`okf setup` is the guided wizard that makes a repository receive okflight —
+interactive on a TTY (Enter accepts every default), flag-driven for agents
+and CI (`--yes` plus `--dir=`/`--title=`/`--skills-dir=`/`--no-skill`/
+`--no-scripts`/`--no-gitignore`). It writes, and never overwrites:
+
+- `okflight.toml` — the commented starter config (as `init` does), with
+  `[scaffold] script` pre-wired when the scripts starter is chosen;
+- the bundle skeleton — `<dir>/index.md`, `<dir>/log.md`;
+- `.agent/skills/knowledge-bundle/SKILL.md` — an agent skill teaching the
+  bundle-maintenance loop (when to scaffold/index/validate, entry quality
+  bar, decision-record template), with the bundle dir substituted in; point
+  `--skills-dir=` at `.claude/skills` (or symlink) for Claude Code;
+- `<dir>/_okflight/scripts/` — the repo-owned metadata pass: a starter
+  `main.ts` (run by `okf scaffold` with the injected `ScaffoldContext`) plus
+  the vendored `scaffold-api.d.ts` type surface, so the scripts typecheck
+  with no okflight checkout at runtime. The `_` prefix keeps the directory
+  out of the bundle walk;
+- a `.gitignore` entry for the generated `<dir>/viz.html`.
+
+The installed templates live in this repo's `templates/`; a test keeps the
+vendored `scaffold-api.d.ts` member-for-member in sync with
+`scaffold-api.ts`. If setup finds a `flake.nix` it prints the
+`inputs.okf` wiring as a next step (it never edits your flake).
+
 ## Adopting okf in any repo (no Nix required)
 
-okf is plain bun — clone this repository anywhere (or vendor it), then:
+okf is published to npm as [`okflight`](https://www.npmjs.com/package/okflight),
+shipping these TypeScript sources as-is plus one node-compatible launcher
+(`bin/okf.mjs` — the only non-`.ts` code in the package):
+
+```sh
+bunx okflight setup       # guided integration (or `init` for the bare skeleton)
+npx okflight setup        # identical — no bun preinstalled required, see below
+```
+
+okf runs on Bun (`Bun.TOML`, `Bun.Glob`, and `okf viz` invokes `Bun.build` +
+the Svelte plugin at generation time), so the launcher re-execs through a
+bun: first the one on `PATH`, else the [`bun` npm
+package](https://www.npmjs.com/package/bun) that installs alongside as an
+`optionalDependency` — which is what makes plain `npx okflight` work with no
+prerequisites (`--no-optional` skips the ~90 MB and the launcher then
+explains itself). Under `bunx --bun` it imports the CLI in-process with no
+re-exec at all. Publishing is `npm publish` from a clean checkout — there is
+no build step.
+
+Working from a clone works the same way (also how nix consumers hack on it):
 
 ```sh
 git clone https://github.com/kriswill/okflight ~/src/okflight
 cd ~/src/okflight && bun install      # once; vendors the viz viewer deps
 cd ~/src/your-project
-bun ~/src/okflight/okf.ts init        # starter okf.toml + bundle skeleton
+bun ~/src/okflight/okf.ts setup       # guided integration
 bun ~/src/okflight/okf.ts validate && bun ~/src/okflight/okf.ts viz
 ```
 
@@ -95,9 +144,12 @@ Wire your own metadata pass via `[scaffold]` (script with the injected
 ## Dependency vendoring (the FOD hash)
 
 `node_modules` is a fixed-output derivation running `bun install
---frozen-lockfile` (no bun packaging helper exists in nixpkgs; this mirrors its
-`opencode`/`helix-gpt` packages). The lock is pure JS with no os/cpu-conditional
-packages, so **one hash serves all platforms**. When `bun.lock` changes (or a
+--frozen-lockfile --omit=optional` (no bun packaging helper exists in nixpkgs;
+this mirrors its `opencode`/`helix-gpt` packages). With optionals omitted —
+the only one is the `bun` npm package backing the npx fallback, which the nix
+wrapper has no use for — the installed tree is pure JS with no
+os/cpu-conditional packages, so **one hash serves all platforms**. When
+`bun.lock` changes (or a
 nixpkgs bump changes bun and the install layout shifts — the failure is a loud
 hash mismatch), refresh it:
 

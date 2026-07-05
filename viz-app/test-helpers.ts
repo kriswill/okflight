@@ -19,7 +19,7 @@ export const node = (id: string, type: string, title = id, extra: Partial<Concep
 
 /** Repo-shaped raw viz config (TOML kebab spelling) for RawData.cfg —
  *  reproduces the pre-config-file hardcoded taxonomy/platform behavior,
- *  now as a single `platform` facet mirroring the repo's okf.toml. */
+ *  now as a single `platform` facet mirroring the repo's okflight.toml. */
 export const cfg = (over: Record<string, unknown> = {}) => ({
   taxonomy: {
     types: [

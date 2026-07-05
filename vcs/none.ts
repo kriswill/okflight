@@ -1,5 +1,5 @@
 // The no-VCS provider: plain-filesystem workspaces (any directory with an
-// okf.toml). Tracked files = an fs walk minus junk dirs and the configured
+// okflight.toml). Tracked files = an fs walk minus junk dirs and the configured
 // `[vcs] ignore` globs; timestamps = file mtime; no revision citations, no
 // remote. Symlinks are skipped entirely (cycle safety, determinism).
 

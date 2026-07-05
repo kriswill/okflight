@@ -72,6 +72,26 @@ export interface DepLicense {
   text: string;
 }
 
+/** okflight's own identity, embedded at generation time (../licenses.ts):
+ *  the viewer app minified into this page IS okflight code, so its notice
+ *  rides along with the bundled deps' under the same MIT rationale, and the
+ *  About modal links back to the project. Absent on embeds generated before
+ *  this existed. */
+export interface GeneratorInfo {
+  /** Display brand ("OKFlight"). */
+  name: string;
+  version: string;
+  /** Project URL for the About modal link. */
+  url: string;
+  /** SPDX id from okflight's package.json; "" if undeclared. */
+  license: string;
+  /** "© 2026 Kris Williams", from the LICENSE file's copyright line (null:
+   *  no LICENSE beside the generating checkout). */
+  copyright: string | null;
+  /** Verbatim LICENSE text (null: no LICENSE beside the generating checkout). */
+  text: string | null;
+}
+
 export interface RawData {
   nodes: ConceptNode[];
   edges: { s: string; t: string }[];
@@ -93,6 +113,8 @@ export interface RawData {
   stats?: BuildStats;
   /** Bundled deps' license notices (absent: pre-licenses embed). */
   licenses?: DepLicense[];
+  /** The generating okflight's identity (absent: pre-generator embed). */
+  generator?: GeneratorInfo;
 }
 
 export interface VizModel {
@@ -140,6 +162,9 @@ export interface VizModel {
   stats: BuildStats | null;
   /** Bundled deps' license notices for the About modal ([] on pre-licenses embeds). */
   licenses: DepLicense[];
+  /** The generating okflight's identity (null: pre-generator embed — the
+   *  About modal hides the Built-with line and own-license entry). */
+  generator: GeneratorInfo | null;
 }
 
 // A concept's id is its bundle-relative path minus ".md" (viz.ts) — the
@@ -329,6 +354,7 @@ export function buildModel(raw: RawData): VizModel {
     radii,
     stats: raw.stats ?? null,
     licenses: raw.licenses ?? [],
+    generator: raw.generator ?? null,
   };
 }
 

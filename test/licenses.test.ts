@@ -10,17 +10,21 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { collectLicenses } from "../licenses";
+import { BUILD_ONLY, collectLicenses, generatorInfo } from "../licenses";
 
 const okflight = join(import.meta.dir, "..");
 
 describe("collectLicenses", () => {
-  test("every runtime dependency yields a notice with version, id, and real text", () => {
+  test("every embedded runtime dependency yields a notice with version, id, and real text", () => {
     const pkg = JSON.parse(readFileSync(join(okflight, "package.json"), "utf8"));
     const got = collectLicenses(okflight);
-    // Driven by package.json `dependencies` — a new runtime dep is picked up
-    // automatically, and its missing LICENSE would throw here.
-    expect(got.map((l) => l.name)).toEqual(Object.keys(pkg.dependencies).sort());
+    // Driven by package.json `dependencies` minus the BUILD_ONLY tooling —
+    // a new runtime dep is picked up automatically, and its missing LICENSE
+    // would throw here. Every exclusion must still BE a dependency, so a
+    // removed dep can't leave a stale entry silently masking a future one.
+    for (const name of BUILD_ONLY) expect(Object.keys(pkg.dependencies)).toContain(name);
+    const embedded = Object.keys(pkg.dependencies).filter((d: string) => !BUILD_ONLY.has(d));
+    expect(got.map((l) => l.name)).toEqual(embedded.sort());
     for (const l of got) {
       expect(l.version).toMatch(/^\d+\./);
       expect(l.license.length).toBeGreaterThan(0);
@@ -69,12 +73,35 @@ describe("collectLicenses", () => {
   });
 });
 
+describe("generatorInfo", () => {
+  test("this checkout self-identifies: version, MIT, copyright line, full LICENSE text, fragment-free URL", () => {
+    const pkg = JSON.parse(readFileSync(join(okflight, "package.json"), "utf8"));
+    const g = generatorInfo(okflight);
+    expect(g.name).toBe("OKFlight");
+    expect(g.version).toBe(pkg.version);
+    expect(g.license).toBe("MIT");
+    expect(g.url).toBe("https://github.com/kriswill/okflight");
+    expect(g.copyright).toBe("© 2026 Kris Williams");
+    expect(g.text).toContain("MIT License");
+    expect(g.text).toContain("Copyright (c) 2026 Kris Williams");
+  });
+
+  test("a trimmed copy without a LICENSE degrades to nulls instead of failing the build", () => {
+    const root = mkdtempSync(join(tmpdir(), "okf-gen-"));
+    writeFileSync(join(root, "package.json"), JSON.stringify({ version: "9.9.9", license: "MIT" }));
+    const g = generatorInfo(root);
+    expect(g.version).toBe("9.9.9");
+    expect(g.copyright).toBeNull();
+    expect(g.text).toBeNull();
+  });
+});
+
 describe("okf viz output", () => {
   test(
     "the generated page embeds every runtime dep's license notice",
     () => {
       const root = mkdtempSync(join(tmpdir(), "okf-viz-"));
-      writeFileSync(join(root, "okf.toml"), '[vcs]\nprovider = "none"\n');
+      writeFileSync(join(root, "okflight.toml"), '[vcs]\nprovider = "none"\n');
       mkdirSync(join(root, "knowledge"));
       writeFileSync(join(root, "knowledge", "index.md"), "# Index\n");
       writeFileSync(
@@ -92,13 +119,22 @@ describe("okf viz output", () => {
       const blob = html.match(/<script id="data" type="application\/json">(.*?)<\/script>/s)![1]!;
       const pkg = JSON.parse(readFileSync(join(okflight, "package.json"), "utf8"));
       const licenses: { name: string; text: string }[] = JSON.parse(blob).licenses;
-      expect(licenses.map((l) => l.name)).toEqual(Object.keys(pkg.dependencies).sort());
+      const embedded = Object.keys(pkg.dependencies).filter((d: string) => !BUILD_ONLY.has(d));
+      expect(licenses.map((l) => l.name)).toEqual(embedded.sort());
       for (const l of licenses) expect(l.text).toContain("Copyright");
 
       // Compliance: the notice texts are physically present in the shipped file.
       expect(html).toContain("three.js authors"); // three (MIT)
       expect(html).toContain("Permission is hereby granted"); // MIT grant (three + svelte)
       expect(html).toContain("Raoul van Rüschen"); // postprocessing (zlib)
+
+      // The page identifies its generator: project link + license + copyright
+      // (the embedded viewer app is okflight code).
+      const gen = JSON.parse(blob).generator;
+      expect(gen.url).toBe("https://github.com/kriswill/okflight");
+      expect(gen.license).toBe("MIT");
+      expect(gen.copyright).toBe("© 2026 Kris Williams");
+      expect(html).toContain("Copyright (c) 2026 Kris Williams"); // full own-LICENSE text embedded
     },
     30_000, // spawns a full Bun.build of the viewer
   );

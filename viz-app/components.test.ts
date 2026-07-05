@@ -727,6 +727,14 @@ const licenses = [
   { name: "svelte", version: "5.0.0", license: "MIT", text: "Permission is hereby granted, free of charge…" },
   { name: "three", version: "0.183.0", license: "MIT", text: "The MIT License\n\nCopyright © 2010-2026 three.js authors" },
 ];
+const generator = {
+  name: "OKFlight",
+  version: "0.1.0",
+  url: "https://github.com/kriswill/okflight",
+  license: "MIT",
+  copyright: "© 2026 Kris Williams",
+  text: "MIT License\n\nCopyright (c) 2026 Kris Williams",
+};
 const statsModel = (over: Record<string, unknown> = {}) =>
   buildModel({
     nodes: [node("a", "Decision", "Alpha"), node("b", "Pattern", "Beta")],
@@ -734,6 +742,7 @@ const statsModel = (over: Record<string, unknown> = {}) =>
     files: { "x.ts": { html: "", lines: 1, size: 10, date: "2026-01-01", lang: "ts", refs: ["a"] } },
     stats,
     licenses,
+    generator,
     ...over,
   });
 
@@ -781,7 +790,7 @@ describe("AboutModal", () => {
   test("tabs switch between the app info and the license notices", () => {
     mountC(AboutModal, { viz: createVizState(statsModel()), onClose: () => {} });
     // Opens on the info pane: size table shown, notices not mounted.
-    expect(tabs().map((t) => t.textContent!.trim())).toEqual(["About", "Third-party licenses"]);
+    expect(tabs().map((t) => t.textContent!.trim())).toEqual(["About", "Licenses"]);
     expect(tabs().map((t) => t.getAttribute("aria-selected"))).toEqual(["true", "false"]);
     // Each tab carries its decorative icon (hidden from the a11y tree).
     for (const t of tabs()) expect(t.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
@@ -800,25 +809,37 @@ describe("AboutModal", () => {
     expect(document.querySelector("details.lic")).toBeNull();
   });
 
-  test("third-party license notices render, one collapsible entry per bundled dep", () => {
+  test("license notices render: the viewer's own entry first, then one collapsible entry per bundled dep", () => {
     mountC(AboutModal, { viz: createVizState(statsModel()), onClose: () => {} });
     tabs()[1]!.click();
     flushSync();
     const details = [...document.querySelectorAll("details.lic")];
     expect(details.map((d) => d.querySelector("summary")!.textContent!.trim())).toEqual([
+      "OKFlight 0.1.0 · MIT — this viewer",
       "postprocessing 6.0.0 · Zlib",
       "svelte 5.0.0 · MIT",
       "three 0.183.0 · MIT",
     ]);
     // The verbatim notice text is in the DOM (the compliance surface), just collapsed.
-    expect(details[2]!.querySelector("pre")!.textContent).toContain("Copyright © 2010-2026 three.js authors");
-    expect(details[0]!.querySelector("pre")!.textContent).toContain("This software is provided 'as-is'");
+    expect(details[0]!.querySelector("pre")!.textContent).toContain("Copyright (c) 2026 Kris Williams");
+    expect(details[3]!.querySelector("pre")!.textContent).toContain("Copyright © 2010-2026 three.js authors");
+    expect(details[1]!.querySelector("pre")!.textContent).toContain("This software is provided 'as-is'");
+  });
+
+  test("the info pane's Built-with line links the project and shows license + copyright", () => {
+    mountC(AboutModal, { viz: createVizState(statsModel()), onClose: () => {} });
+    const tool = document.querySelector(".tool")!;
+    expect(tool.textContent).toContain("Built with OKFlight v0.1.0 · MIT license · © 2026 Kris Williams");
+    const a = tool.querySelector("a")!;
+    expect(a.getAttribute("href")).toBe("https://github.com/kriswill/okflight");
+    expect(a.getAttribute("target")).toBe("_blank");
   });
 
   test("an embed without license data (pre-licenses build) gets the untabbed info layout", () => {
-    mountC(AboutModal, { viz: createVizState(statsModel({ licenses: undefined })), onClose: () => {} });
+    mountC(AboutModal, { viz: createVizState(statsModel({ licenses: undefined, generator: undefined })), onClose: () => {} });
     expect(document.querySelector(".tabs")).toBeNull();
     expect(document.querySelector("details.lic")).toBeNull();
+    expect(document.querySelector(".tool")).toBeNull(); // pre-generator: no Built-with line
     expect(document.querySelector("table")).not.toBeNull(); // info pane still renders
   });
 

@@ -1,6 +1,6 @@
 // CLI for maintaining an OKF knowledge bundle. Run `okf help` for usage;
-// workspace settings live in the repo-root okf.toml (see init). A wrapper
-// may set OKF_PROG so usage shows the name the user actually typed.
+// workspace settings live in the repo-root okflight.toml (see init/setup).
+// A wrapper may set OKF_PROG so usage shows the name the user actually typed.
 
 import { c } from "./lib";
 
@@ -16,15 +16,30 @@ const commands: Record<string, Cmd> = {
   init: {
     file: "./init.ts",
     args: "[--dir=<dir>]",
-    brief: "create a starter okf.toml + bundle skeleton here",
-    summary: "Bootstrap an okf workspace in the current directory: a commented starter okf.toml (this directory becomes the workspace root) plus the bundle skeleton (<dir>/index.md with okf_version frontmatter, <dir>/log.md). Never overwrites — re-running on an initialized workspace is a no-op.",
+    brief: "create a starter okflight.toml + skeleton here",
+    summary: "Bootstrap an okf workspace in the current directory: a commented starter okflight.toml (this directory becomes the workspace root) plus the bundle skeleton (<dir>/index.md with okf_version frontmatter, <dir>/log.md). Never overwrites — re-running on an initialized workspace is a no-op. For the full guided integration (agent skill, scaffold scripts, gitignore) use setup.",
     flags: [["--dir=<dir>", "bundle directory for the new workspace (default: knowledge)"]],
+  },
+  setup: {
+    file: "./setup.ts",
+    args: "[--dir=<dir>] [--yes] …",
+    brief: "guided integration: config, skill, scaffolding",
+    summary: "Integrate okflight into the current directory, wizard-style (interactive on a TTY — Enter accepts defaults; every question also has a flag, so agents/CI run it non-interactively): everything init writes, plus the knowledge-bundle agent skill (<skills-dir>/knowledge-bundle/SKILL.md), a repo-owned scaffold-scripts starter (<dir>/_okflight/scripts/ wired into [scaffold] script), and a .gitignore entry for the generated viz. Never overwrites — re-running reports what already exists.",
+    flags: [
+      ["--dir=<dir>", "bundle directory (default: knowledge)"],
+      ["--title=<t>", 'viz display title (default: "OKF knowledge graph")'],
+      ["--skills-dir=<d>", "agent-skill install dir (default: .agent/skills)"],
+      ["--no-skill", "skip installing the knowledge-bundle agent skill"],
+      ["--no-scripts", "skip the scaffold-scripts starter"],
+      ["--no-gitignore", "leave .gitignore untouched"],
+      ["--yes", "accept every default without prompting"],
+    ],
   },
   scaffold: {
     file: "./scaffold.ts",
     args: "[--force]",
     brief: "stub concept docs from the workspace sources",
-    summary: "Run the workspace's scaffold hooks from okf.toml [scaffold]: a repo-owned script (dynamically imported with the ScaffoldContext API) and/or command (spawned with OKF_* env), then the declarative [[scaffold.collect]] entries (glob + templates). Idempotent: existing docs are never touched, so hand enrichment survives re-runs.",
+    summary: "Run the workspace's scaffold hooks from okflight.toml [scaffold]: a repo-owned script (dynamically imported with the ScaffoldContext API) and/or command (spawned with OKF_* env), then the declarative [[scaffold.collect]] entries (glob + templates). Idempotent: existing docs are never touched, so hand enrichment survives re-runs.",
     flags: [["--force", "overwrite existing docs with fresh stubs (discards enrichment)"]],
   },
   index: {
@@ -38,14 +53,14 @@ const commands: Record<string, Cmd> = {
     file: "./validate.ts",
     args: "[--strict]",
     brief: "check conformance + links; exit 1 on errors",
-    summary: "Check OKF v0.1 + profile conformance: frontmatter, required fields, reserved files, link style, dangling links. The profile policy comes from okf.toml [profile]. Exits 1 on errors.",
+    summary: "Check OKF v0.1 + profile conformance: frontmatter, required fields, reserved files, link style, dangling links. The profile policy comes from okflight.toml [profile]. Exits 1 on errors.",
     flags: [["--strict", "treat warnings (missing recommended fields, dangling links) as errors"]],
   },
   viz: {
     file: "./viz.ts",
     args: "[--check] [--perf]",
     brief: "render the 3D graph at {viz-out}",
-    summary: "Render the bundle as a self-contained interactive 3D graph at {viz-out} (gitignored) — a Svelte 5 viewer around Three.js glow spheres with bloom, orbit camera with fly-to, frozen generation-time layout. Referenced source files are embedded with syntax highlighting; resource paths and file links open an in-panel preview, referenced directories open a browsable listing of their tracked files, and revision citations verified against the workspace link out to the forge (vcs.commit-url-template). Workspace strings and settings (header/title, facet filters, type taxonomy and legend groups, embed cap, bundle dir) come from the optional okf.toml; without it the viewer builds with generic fallbacks. Build-phase timings print on every run; the page records startup marks on window.__okf.perf.",
+    summary: "Render the bundle as a self-contained interactive 3D graph at {viz-out} (gitignored) — a Svelte 5 viewer around Three.js glow spheres with bloom, orbit camera with fly-to, frozen generation-time layout. Referenced source files are embedded with syntax highlighting; resource paths and file links open an in-panel preview, referenced directories open a browsable listing of their tracked files, and revision citations verified against the workspace link out to the forge (vcs.commit-url-template). Workspace strings and settings (header/title, facet filters, type taxonomy and legend groups, embed cap, bundle dir) come from the optional okflight.toml; without it the viewer builds with generic fallbacks. Build-phase timings print on every run; the page records startup marks on window.__okf.perf.",
     flags: [
       ["--check", "typecheck the viewer app (svelte-check) instead of building"],
       ["--perf", "after building, measure viewer startup in headless Chrome and print a timing table"],
@@ -96,7 +111,7 @@ async function usage() {
       ...rows,
       "",
       `${c.bold("Loop:")}  ${c.cyan("scaffold && index")} ${c.dim("after adding components")} · ${c.cyan("validate")} ${c.dim("before committing")}`,
-      `${c.bold("Config:")} okf.toml ${c.dim("at the workspace root (all sections optional; see the okf README)")}${
+      `${c.bold("Config:")} okflight.toml ${c.dim("at the workspace root (all sections optional; see the okflight README)")}${
         profileDoc ? ` ${c.dim("·")} ${profileDoc}` : ""
       }`,
     ].join("\n"),

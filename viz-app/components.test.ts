@@ -750,8 +750,32 @@ describe("AboutModal", () => {
     expect(document.querySelector("table")).toBeNull();
   });
 
+  const tabs = () => [...document.querySelectorAll<HTMLElement>("[role=tab]")];
+
+  test("tabs switch between the app info and the license notices", () => {
+    mountC(AboutModal, { viz: createVizState(statsModel()), onClose: () => {} });
+    // Opens on the info pane: size table shown, notices not mounted.
+    expect(tabs().map((t) => t.textContent!.trim())).toEqual(["About", "Third-party licenses"]);
+    expect(tabs().map((t) => t.getAttribute("aria-selected"))).toEqual(["true", "false"]);
+    expect(document.querySelector("table")).not.toBeNull();
+    expect(document.querySelector("details.lic")).toBeNull();
+
+    tabs()[1]!.click();
+    flushSync();
+    expect(tabs().map((t) => t.getAttribute("aria-selected"))).toEqual(["false", "true"]);
+    expect(document.querySelector("table")).toBeNull();
+    expect(document.querySelector("details.lic")).not.toBeNull();
+
+    tabs()[0]!.click();
+    flushSync();
+    expect(document.querySelector("table")).not.toBeNull();
+    expect(document.querySelector("details.lic")).toBeNull();
+  });
+
   test("third-party license notices render, one collapsible entry per bundled dep", () => {
     mountC(AboutModal, { viz: createVizState(statsModel()), onClose: () => {} });
+    tabs()[1]!.click();
+    flushSync();
     const details = [...document.querySelectorAll("details.lic")];
     expect(details.map((d) => d.querySelector("summary")!.textContent!.trim())).toEqual([
       "postprocessing 6.0.0 · Zlib",
@@ -763,10 +787,11 @@ describe("AboutModal", () => {
     expect(details[0]!.querySelector("pre")!.textContent).toContain("This software is provided 'as-is'");
   });
 
-  test("an embed without license data (pre-licenses build) omits the section", () => {
+  test("an embed without license data (pre-licenses build) gets the untabbed info layout", () => {
     mountC(AboutModal, { viz: createVizState(statsModel({ licenses: undefined })), onClose: () => {} });
-    expect(document.querySelector(".lic-h")).toBeNull();
+    expect(document.querySelector(".tabs")).toBeNull();
     expect(document.querySelector("details.lic")).toBeNull();
+    expect(document.querySelector("table")).not.toBeNull(); // info pane still renders
   });
 
   test("close button and backdrop dismiss; clicks inside the dialog don't", () => {

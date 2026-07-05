@@ -6,6 +6,13 @@
   const m = $derived(viz.model);
   const stats = $derived(viz.model.stats);
 
+  // Two panes: the app info shown since the modal existed, and the bundled
+  // deps' license notices. The tab bar only renders when there are notices
+  // to show (pre-licenses embeds keep the untabbed layout), and the modal
+  // remounts per open (Sidebar's {#if aboutOpen}), so it always opens on
+  // the info pane.
+  let tab: "info" | "licenses" = $state("info");
+
   const fmtBytes = (n: number) => (n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(2)} MB` : `${(n / 1024).toFixed(1)} KB`);
   const pct = (n: number, total: number) => {
     const p = (n / total) * 100;
@@ -46,30 +53,40 @@
       <h2>{m.displayName} <span class="badge">{m.cfg.display.badge}</span></h2>
       <button class="close" aria-label="Close" onclick={onClose}>×</button>
     </header>
-    <p class="about">{@html m.cfg.display.aboutHtml}</p>
-    <p class="counts">{m.nodes.length} concepts · {m.edges.length} links · {Object.keys(m.files).length} embedded files</p>
-    {#if stats}
-      <h3>What's in this file</h3>
-      <table>
-        <thead><tr><th>Section</th><th class="num">Count</th><th class="num">Size</th><th class="num">%</th></tr></thead>
-        <tbody>
-          {#each rows as r (r.label)}
-            <tr>
-              <td>{r.label}</td>
-              <td class="num">{r.count ?? ""}</td>
-              <td class="num">{fmtBytes(r.bytes)}</td>
-              <td class="num pct">{pct(r.bytes, stats.totalBytes)}</td>
-            </tr>
-          {/each}
-        </tbody>
-        <tfoot>
-          <tr><td>Total</td><td></td><td class="num">{fmtBytes(stats.totalBytes)}</td><td></td></tr>
-        </tfoot>
-      </table>
-      <p class="gen">Everything above is baked into this single HTML file — it works offline, straight from disk. Generated {generated}.</p>
-    {/if}
     {#if m.licenses.length}
-      <h3 class="lic-h">Third-party licenses</h3>
+      <div class="tabs" role="tablist" aria-label="About sections">
+        <button class="seg" class:active={tab === "info"} role="tab" aria-selected={tab === "info"} onclick={() => (tab = "info")}>
+          About
+        </button>
+        <button class="seg" class:active={tab === "licenses"} role="tab" aria-selected={tab === "licenses"} onclick={() => (tab = "licenses")}>
+          Third-party licenses
+        </button>
+      </div>
+    {/if}
+    {#if tab === "info"}
+      <p class="about">{@html m.cfg.display.aboutHtml}</p>
+      <p class="counts">{m.nodes.length} concepts · {m.edges.length} links · {Object.keys(m.files).length} embedded files</p>
+      {#if stats}
+        <h3>What's in this file</h3>
+        <table>
+          <thead><tr><th>Section</th><th class="num">Count</th><th class="num">Size</th><th class="num">%</th></tr></thead>
+          <tbody>
+            {#each rows as r (r.label)}
+              <tr>
+                <td>{r.label}</td>
+                <td class="num">{r.count ?? ""}</td>
+                <td class="num">{fmtBytes(r.bytes)}</td>
+                <td class="num pct">{pct(r.bytes, stats.totalBytes)}</td>
+              </tr>
+            {/each}
+          </tbody>
+          <tfoot>
+            <tr><td>Total</td><td></td><td class="num">{fmtBytes(stats.totalBytes)}</td><td></td></tr>
+          </tfoot>
+        </table>
+        <p class="gen">Everything above is baked into this single HTML file — it works offline, straight from disk. Generated {generated}.</p>
+      {/if}
+    {:else}
       <p class="lic-note">The viewer embeds minified copies of these libraries; the notices below accompany them as their licenses require.</p>
       {#each m.licenses as l (l.name)}
         <details class="lic">
@@ -88,13 +105,17 @@
     inset: 0;
     z-index: 5; /* above the sidebar help bubble (4) */
     display: flex;
-    align-items: center;
+    /* Top-anchored, not centered: the panes differ in height, and a centered
+       box would recenter on every tab switch — the tab strip must stay put
+       under the pointer while only the bottom edge moves. */
+    align-items: flex-start;
     justify-content: center;
     background: color-mix(in srgb, var(--page) 45%, transparent);
     backdrop-filter: blur(2px);
   }
   .modal {
     width: min(430px, calc(100vw - 32px));
+    margin-top: 13vh;
     max-height: min(80vh, 640px);
     overflow-y: auto;
     background: var(--surface-1);
@@ -186,8 +207,13 @@
     font-size: 11.5px;
     margin-top: 10px;
   }
-  .lic-h {
-    margin-top: 14px;
+  /* .seg is a global primitive (viz.ts) shared with the sidebar controls. */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    padding-bottom: 8px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid var(--grid);
   }
   .lic-note {
     color: var(--ink-muted);

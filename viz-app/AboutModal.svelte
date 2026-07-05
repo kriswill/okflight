@@ -10,7 +10,7 @@
   // Two panes: the app info shown since the modal existed, and the bundled
   // deps' license notices. The tab bar only renders when there are notices
   // to show (pre-licenses embeds keep the untabbed layout), and the modal
-  // remounts per open (Sidebar's {#if aboutOpen}), so it always opens on
+  // remounts per open (AboutBadge's {#if aboutOpen}), so it always opens on
   // the info pane.
   let tab: "info" | "licenses" = $state("info");
 

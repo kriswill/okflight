@@ -37,7 +37,7 @@ dir = "${dir}" # OKF bundle root, workspace-relative
 
 [display]
 title = "OKF knowledge graph"    # <title> = "<name> — <title>"
-# badge = "OKFlight"             # sidebar h1 suffix label
+# badge = "OKFlight"             # brand label (stage About button + modal title)
 # name = ""                      # header name override ("" = derive owner/repo)
 # date-format = "iso"            # "iso" | "us" | "international"
 # about-html = """Help-bubble text (trusted HTML)."""

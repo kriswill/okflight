@@ -2,6 +2,7 @@
 // there — see docs/svelt/learnings.md 2026-07-02).
 import { afterEach, describe, expect, test } from "bun:test";
 import { flushSync, mount, unmount } from "svelte";
+import AboutBadge from "./AboutBadge.svelte";
 import AboutModal from "./AboutModal.svelte";
 import ConceptList from "./ConceptList.svelte";
 import { buildModel, type BuildStats } from "./data";
@@ -633,32 +634,22 @@ describe("DetailPanel", () => {
 });
 
 describe("Sidebar", () => {
-  test("header names the repo's OKFlight; the (?) opens the modal with the explainer", () => {
+  test("header names the repo — brand and (?) live on the stage's AboutBadge, not here", () => {
     const state = createVizState(
       buildModel({ nodes: [node("a", "Decision", "Alpha")], edges: [], repoUrl: "https://github.com/acme/widgets" }),
     );
     mountC(Sidebar, { viz: state });
     const h1 = document.querySelector("#side h1")!;
-    expect(h1.textContent!.replace(/\s+/g, " ")).toContain("acme/widgets OKFlight");
-    (h1.querySelector(".help") as HTMLElement).click();
-    flushSync();
-    expect(document.querySelector("[role=dialog] .about")!.textContent).toContain("Open Knowledge Format");
+    expect(h1.textContent!.trim()).toBe("acme/widgets");
+    expect(document.querySelector("#side .help")).toBeNull();
   });
 
-  test("header name, badge, and the modal's about text come from the config", () => {
+  test("a configured display name shows in the header", () => {
     const state = createVizState(
-      buildModel({
-        nodes: [node("a", "Decision", "Alpha")],
-        edges: [],
-        cfg: { display: { name: "my/kb", badge: "KB map", "about-html": "custom <b>about</b>" } },
-      }),
+      buildModel({ nodes: [node("a", "Decision", "Alpha")], edges: [], cfg: { display: { name: "my/kb" } } }),
     );
     mountC(Sidebar, { viz: state });
-    const h1 = document.querySelector("#side h1")!;
-    expect(h1.textContent!.replace(/\s+/g, " ")).toContain("my/kb KB map");
-    (h1.querySelector(".help") as HTMLElement).click();
-    flushSync();
-    expect(document.querySelector("[role=dialog] .about")!.innerHTML).toContain("custom <b>about</b>");
+    expect(document.querySelector("#side h1")!.textContent!.trim()).toBe("my/kb");
   });
 
   test("header falls back to the configured fallback-name, else the generic one", () => {
@@ -666,22 +657,24 @@ describe("Sidebar", () => {
       buildModel({ nodes: [node("a", "Decision", "Alpha")], edges: [], cfg: { display: { "fallback-name": "knowledge/" } } }),
     );
     mountC(Sidebar, { viz: configured });
-    expect(document.querySelector("#side h1")!.textContent!.replace(/\s+/g, " ")).toContain("knowledge/ OKFlight");
+    expect(document.querySelector("#side h1")!.textContent!.trim()).toBe("knowledge/");
     cleanup?.();
     cleanup = null;
     document.body.innerHTML = "";
 
     const generic = createVizState(buildModel({ nodes: [node("a", "Decision", "Alpha")], edges: [] }));
     mountC(Sidebar, { viz: generic });
-    expect(document.querySelector("#side h1")!.textContent!.replace(/\s+/g, " ")).toContain("OKF bundle OKFlight");
+    expect(document.querySelector("#side h1")!.textContent!.trim()).toBe("OKF bundle");
   });
+});
 
+describe("AboutBadge", () => {
   test("the stock badge renders as the two-tone OKFlight wordmark; a custom badge stays plain", () => {
     const stock = createVizState(buildModel({ nodes: [node("a", "Decision", "Alpha")], edges: [] }));
-    mountC(Sidebar, { viz: stock });
-    const badge = document.querySelector("#side h1 .okf")!;
-    expect(badge.textContent).toBe("OKFlight"); // no stray whitespace between the tone spans
-    expect([...badge.querySelectorAll("span")].map((s) => s.textContent)).toEqual(["OKF", "light"]);
+    mountC(AboutBadge, { viz: stock });
+    const brand = document.querySelector("#about-badge .brand")!;
+    expect(brand.textContent).toBe("OKFlight"); // no stray whitespace between the tone spans
+    expect([...brand.querySelectorAll("span")].map((s) => s.textContent)).toEqual(["OKF", "light"]);
     cleanup?.();
     cleanup = null;
     document.body.innerHTML = "";
@@ -689,22 +682,36 @@ describe("Sidebar", () => {
     const custom = createVizState(
       buildModel({ nodes: [node("a", "Decision", "Alpha")], edges: [], cfg: { display: { badge: "KB map" } } }),
     );
-    mountC(Sidebar, { viz: custom });
-    const customBadge = document.querySelector("#side h1 .okf")!;
-    expect(customBadge.textContent).toBe("KB map");
-    expect(customBadge.querySelector("span")).toBeNull();
+    mountC(AboutBadge, { viz: custom });
+    const customBrand = document.querySelector("#about-badge .brand")!;
+    expect(customBrand.textContent).toBe("KB map");
+    expect(customBrand.querySelector("span")).toBeNull();
   });
 
-  test("clicking the (?) opens the About modal; Escape closes it", () => {
+  test("clicking it opens the About modal with the explainer; Escape closes it", () => {
     const state = createVizState(statsModel());
-    mountC(Sidebar, { viz: state });
+    mountC(AboutBadge, { viz: state });
     expect(document.querySelector("[role=dialog]")).toBeNull();
-    (document.querySelector(".help") as HTMLElement).click();
+    (document.querySelector("#about-badge") as HTMLElement).click();
     flushSync();
-    expect(document.querySelector("[role=dialog]")).not.toBeNull();
+    expect(document.querySelector("[role=dialog] .about")!.textContent).toContain("Open Knowledge Format");
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     flushSync();
     expect(document.querySelector("[role=dialog]")).toBeNull();
+  });
+
+  test("the modal's about text comes from the config", () => {
+    const state = createVizState(
+      buildModel({
+        nodes: [node("a", "Decision", "Alpha")],
+        edges: [],
+        cfg: { display: { name: "my/kb", "about-html": "custom <b>about</b>" } },
+      }),
+    );
+    mountC(AboutBadge, { viz: state });
+    (document.querySelector("#about-badge") as HTMLElement).click();
+    flushSync();
+    expect(document.querySelector("[role=dialog] .about")!.innerHTML).toContain("custom <b>about</b>");
   });
 });
 

@@ -1,6 +1,9 @@
 {
-  "name": "okflight",
+  "name": "@kriswill/okflight",
   "version": "0.1.0",
+  "publishConfig": {
+    "access": "public"
+  },
   "description": "CLI for maintaining OKF knowledge bundles: scaffold/index/validate/viz (self-contained 3D graph), plus a guided setup wizard",
   "type": "module",
   "license": "MIT",

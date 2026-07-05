@@ -107,24 +107,28 @@ vendored `scaffold-api.d.ts` member-for-member in sync with
 
 ## Adopting okf in any repo (no Nix required)
 
-okf is published to npm as [`okflight`](https://www.npmjs.com/package/okflight),
-shipping these TypeScript sources as-is plus one node-compatible launcher
-(`bin/okf.mjs` — the only non-`.ts` code in the package):
+okf is published to npm as
+[`@kriswill/okflight`](https://www.npmjs.com/package/@kriswill/okflight) —
+scoped because the registry's typosquat guard reserves the bare name's
+neighborhood for `inflight` — shipping these TypeScript sources as-is plus
+one node-compatible launcher (`bin/okf.mjs`, the only non-`.ts` code in the
+package):
 
 ```sh
-bunx okflight setup       # guided integration (or `init` for the bare skeleton)
-npx okflight setup        # identical — no bun preinstalled required, see below
+bunx @kriswill/okflight setup   # guided integration (or `init` for the bare skeleton)
+npx @kriswill/okflight setup    # identical — no bun preinstalled required, see below
 ```
 
 okf runs on Bun (`Bun.TOML`, `Bun.Glob`, and `okf viz` invokes `Bun.build` +
 the Svelte plugin at generation time), so the launcher re-execs through a
 bun: first the one on `PATH`, else the [`bun` npm
 package](https://www.npmjs.com/package/bun) that installs alongside as an
-`optionalDependency` — which is what makes plain `npx okflight` work with no
-prerequisites (`--no-optional` skips the ~90 MB and the launcher then
-explains itself). Under `bunx --bun` it imports the CLI in-process with no
-re-exec at all. Publishing is `npm publish` from a clean checkout — there is
-no build step.
+`optionalDependency` — which is what makes plain `npx @kriswill/okflight`
+work with no prerequisites (`--no-optional` skips the ~90 MB and the launcher
+then explains itself). Under `bunx --bun` it imports the CLI in-process with
+no re-exec at all. Installed commands are unscoped either way: `okf` and
+`okflight` both land on PATH. Publishing is `npm publish` from a clean
+checkout — there is no build step (publishConfig pins public access).
 
 Working from a clone works the same way (also how nix consumers hack on it):
 

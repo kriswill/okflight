@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AboutBadge from "./AboutBadge.svelte";
   import DetailPanel from "./DetailPanel.svelte";
   import { GraphScene, type CreateScene, type SceneApi, type SceneNode } from "./scene";
   import type { VizState } from "./state.svelte";
@@ -102,6 +103,7 @@
   <Tooltip {viz} />
   <DetailPanel {viz} stageEl={el} {resizeSeq} />
   <ThemeToggle {viz} stageEl={el} {resizeSeq} />
+  <AboutBadge {viz} />
 </main>
 
 <style>

@@ -13,8 +13,9 @@ import { extname, join } from "node:path";
 import { loadContext } from "./config-cli";
 import { extractLinks, isExternal, nowISO, parseDoc, resolveLink, walkMd } from "./lib";
 import { layout3d } from "./layout3d";
+import { collectLicenses } from "./licenses";
 import { displayName } from "./viz-app/config";
-import { parsePackagePlatforms, repoNameFromUrl, type BuildStats } from "./viz-app/data";
+import { parsePackagePlatforms, repoNameFromUrl, type BuildStats, type DepLicense } from "./viz-app/data";
 import { esc } from "./viz-app/markdown";
 import { THEMES } from "./viz-app/themes";
 
@@ -351,6 +352,18 @@ const appJs = (await jsOut.text()).replace(/<\/script/gi, "<\\/script");
 let appCss = "";
 for (const o of build.outputs) if (o.path.endsWith(".css")) appCss += await o.text();
 appCss = appCss.replace(/<\/style/gi, "<\\/style");
+// Minification just stripped the bundled deps' copyright headers, and MIT/
+// zlib both require the notice to accompany every redistributed copy — ride
+// each runtime dependency's LICENSE text along in the data blob (About
+// modal, "Third-party licenses"). A dep whose license file can't be found
+// fails the build rather than shipping notice-less.
+let licenses: DepLicense[] = [];
+try {
+  licenses = collectLicenses(import.meta.dir);
+} catch (e) {
+  console.error(`viz: ${e instanceof Error ? e.message : e}`);
+  process.exit(1);
+}
 lap("bundle");
 
 // --- Build-time size breakdown (About modal) ---------------------------------
@@ -380,7 +393,7 @@ const themeCss = (name: string) =>
 
 const assemble = (totalBytes: number) => {
   const stats: BuildStats = { generatedAt, totalBytes, bytes: sectionBytes };
-  const data = JSON.stringify({ nodes, edges: dedupedEdges, files, dirs, repoUrl, commitUrl, commits, facetMaps, cfg, stats }).replace(
+  const data = JSON.stringify({ nodes, edges: dedupedEdges, files, dirs, repoUrl, commitUrl, commits, facetMaps, cfg, stats, licenses }).replace(
     /<\//g,
     "<\\/",
   );

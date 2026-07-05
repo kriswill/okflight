@@ -1,5 +1,4 @@
 <script lang="ts">
-  import AboutModal from "./AboutModal.svelte";
   import ConceptList from "./ConceptList.svelte";
   import FacetControls from "./FacetControls.svelte";
   import IsolateControl from "./IsolateControl.svelte";
@@ -8,14 +7,14 @@
   import type { VizState } from "./state.svelte";
 
   const { viz }: { viz: VizState } = $props();
-  let aboutOpen = $state(false);
 </script>
 
 <aside id="side">
   <div class="top">
+    <!-- Just the workspace name — the brand wordmark and the (?) About
+         opener live on the stage's bottom-left AboutBadge. -->
     <h1>
-      <span class="name">{viz.model.displayName} <span class="okf">{viz.model.cfg.display.badge}</span></span>
-      <button class="help" aria-label="About this page" aria-haspopup="dialog" onclick={() => (aboutOpen = true)}>?</button>
+      <span class="name">{viz.model.displayName}</span>
     </h1>
     <div class="sub" id="counts">
       {#if viz.hidden.size > 0 || viz.query.trim() || viz.neighborIds || viz.facetActive}
@@ -35,10 +34,6 @@
     <IsolateControl {viz} />
   </div>
 </aside>
-
-{#if aboutOpen}
-  <AboutModal {viz} onClose={() => (aboutOpen = false)} />
-{/if}
 
 <style>
   #side {
@@ -83,8 +78,6 @@
   #side h1 {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 8px;
     font-size: 15px;
     margin-bottom: 2px;
   }
@@ -92,34 +85,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-  #side h1 .okf {
-    color: var(--ink-muted);
-    font-weight: 500;
-  }
-  .help {
-    flex: none;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    padding: 0;
-    border: 1px solid var(--grid);
-    border-radius: 50%;
-    background: none;
-    color: var(--ink-muted);
-    font: inherit;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-  .help:hover,
-  .help:focus-visible {
-    color: var(--ink-1);
-    border-color: var(--ink-muted);
-    background: color-mix(in srgb, var(--ink-muted) 12%, transparent);
-    outline: none;
   }
   #side .sub {
     color: var(--ink-muted);

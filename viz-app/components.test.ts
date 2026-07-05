@@ -2,6 +2,7 @@
 // there — see docs/svelt/learnings.md 2026-07-02).
 import { afterEach, describe, expect, test } from "bun:test";
 import { flushSync, mount, unmount } from "svelte";
+import AboutBadge from "./AboutBadge.svelte";
 import AboutModal from "./AboutModal.svelte";
 import ConceptList from "./ConceptList.svelte";
 import { buildModel, type BuildStats } from "./data";
@@ -633,32 +634,22 @@ describe("DetailPanel", () => {
 });
 
 describe("Sidebar", () => {
-  test("header names the repo's OKF viz; the (?) opens the modal with the explainer", () => {
+  test("header names the repo — brand and (?) live on the stage's AboutBadge, not here", () => {
     const state = createVizState(
       buildModel({ nodes: [node("a", "Decision", "Alpha")], edges: [], repoUrl: "https://github.com/acme/widgets" }),
     );
     mountC(Sidebar, { viz: state });
     const h1 = document.querySelector("#side h1")!;
-    expect(h1.textContent!.replace(/\s+/g, " ")).toContain("acme/widgets OKF viz");
-    (h1.querySelector(".help") as HTMLElement).click();
-    flushSync();
-    expect(document.querySelector("[role=dialog] .about")!.textContent).toContain("Open Knowledge Format");
+    expect(h1.textContent!.trim()).toBe("acme/widgets");
+    expect(document.querySelector("#side .help")).toBeNull();
   });
 
-  test("header name, badge, and the modal's about text come from the config", () => {
+  test("a configured display name shows in the header", () => {
     const state = createVizState(
-      buildModel({
-        nodes: [node("a", "Decision", "Alpha")],
-        edges: [],
-        cfg: { display: { name: "my/kb", badge: "KB map", "about-html": "custom <b>about</b>" } },
-      }),
+      buildModel({ nodes: [node("a", "Decision", "Alpha")], edges: [], cfg: { display: { name: "my/kb" } } }),
     );
     mountC(Sidebar, { viz: state });
-    const h1 = document.querySelector("#side h1")!;
-    expect(h1.textContent!.replace(/\s+/g, " ")).toContain("my/kb KB map");
-    (h1.querySelector(".help") as HTMLElement).click();
-    flushSync();
-    expect(document.querySelector("[role=dialog] .about")!.innerHTML).toContain("custom <b>about</b>");
+    expect(document.querySelector("#side h1")!.textContent!.trim()).toBe("my/kb");
   });
 
   test("header falls back to the configured fallback-name, else the generic one", () => {
@@ -666,26 +657,61 @@ describe("Sidebar", () => {
       buildModel({ nodes: [node("a", "Decision", "Alpha")], edges: [], cfg: { display: { "fallback-name": "knowledge/" } } }),
     );
     mountC(Sidebar, { viz: configured });
-    expect(document.querySelector("#side h1")!.textContent!.replace(/\s+/g, " ")).toContain("knowledge/ OKF viz");
+    expect(document.querySelector("#side h1")!.textContent!.trim()).toBe("knowledge/");
     cleanup?.();
     cleanup = null;
     document.body.innerHTML = "";
 
     const generic = createVizState(buildModel({ nodes: [node("a", "Decision", "Alpha")], edges: [] }));
     mountC(Sidebar, { viz: generic });
-    expect(document.querySelector("#side h1")!.textContent!.replace(/\s+/g, " ")).toContain("OKF bundle OKF viz");
+    expect(document.querySelector("#side h1")!.textContent!.trim()).toBe("OKF bundle");
+  });
+});
+
+describe("AboutBadge", () => {
+  test("the stock badge renders as the two-tone OKFlight wordmark; a custom badge stays plain", () => {
+    const stock = createVizState(buildModel({ nodes: [node("a", "Decision", "Alpha")], edges: [] }));
+    mountC(AboutBadge, { viz: stock });
+    const brand = document.querySelector("#about-badge .brand")!;
+    expect(brand.textContent).toBe("OKFlight"); // no stray whitespace between the tone spans
+    expect([...brand.querySelectorAll("span")].map((s) => s.textContent)).toEqual(["OKF", "light"]);
+    cleanup?.();
+    cleanup = null;
+    document.body.innerHTML = "";
+
+    const custom = createVizState(
+      buildModel({ nodes: [node("a", "Decision", "Alpha")], edges: [], cfg: { display: { badge: "KB map" } } }),
+    );
+    mountC(AboutBadge, { viz: custom });
+    const customBrand = document.querySelector("#about-badge .brand")!;
+    expect(customBrand.textContent).toBe("KB map");
+    expect(customBrand.querySelector("span")).toBeNull();
   });
 
-  test("clicking the (?) opens the About modal; Escape closes it", () => {
+  test("clicking it opens the About modal with the explainer; Escape closes it", () => {
     const state = createVizState(statsModel());
-    mountC(Sidebar, { viz: state });
+    mountC(AboutBadge, { viz: state });
     expect(document.querySelector("[role=dialog]")).toBeNull();
-    (document.querySelector(".help") as HTMLElement).click();
+    (document.querySelector("#about-badge") as HTMLElement).click();
     flushSync();
-    expect(document.querySelector("[role=dialog]")).not.toBeNull();
+    expect(document.querySelector("[role=dialog] .about")!.textContent).toContain("Open Knowledge Format");
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     flushSync();
     expect(document.querySelector("[role=dialog]")).toBeNull();
+  });
+
+  test("the modal's about text comes from the config", () => {
+    const state = createVizState(
+      buildModel({
+        nodes: [node("a", "Decision", "Alpha")],
+        edges: [],
+        cfg: { display: { name: "my/kb", "about-html": "custom <b>about</b>" } },
+      }),
+    );
+    mountC(AboutBadge, { viz: state });
+    (document.querySelector("#about-badge") as HTMLElement).click();
+    flushSync();
+    expect(document.querySelector("[role=dialog] .about")!.innerHTML).toContain("custom <b>about</b>");
   });
 });
 
@@ -696,12 +722,18 @@ const stats: BuildStats = {
   totalBytes: 2_900_000,
   bytes: { nodes: 300_000, edges: 30_000, files: 1_600_000, dirs: 8_000, appJs: 700_000, appCss: 40_000 },
 };
+const licenses = [
+  { name: "postprocessing", version: "6.0.0", license: "Zlib", text: "This software is provided 'as-is'…" },
+  { name: "svelte", version: "5.0.0", license: "MIT", text: "Permission is hereby granted, free of charge…" },
+  { name: "three", version: "0.183.0", license: "MIT", text: "The MIT License\n\nCopyright © 2010-2026 three.js authors" },
+];
 const statsModel = (over: Record<string, unknown> = {}) =>
   buildModel({
     nodes: [node("a", "Decision", "Alpha"), node("b", "Pattern", "Beta")],
     edges: [{ s: "a", t: "b" }],
     files: { "x.ts": { html: "", lines: 1, size: 10, date: "2026-01-01", lang: "ts", refs: ["a"] } },
     stats,
+    licenses,
     ...over,
   });
 
@@ -742,6 +774,52 @@ describe("AboutModal", () => {
     expect(document.querySelector(".about")!.textContent).toContain("Open Knowledge Format");
     expect(document.querySelector(".counts")!.textContent).toContain("1 concepts");
     expect(document.querySelector("table")).toBeNull();
+  });
+
+  const tabs = () => [...document.querySelectorAll<HTMLElement>("[role=tab]")];
+
+  test("tabs switch between the app info and the license notices", () => {
+    mountC(AboutModal, { viz: createVizState(statsModel()), onClose: () => {} });
+    // Opens on the info pane: size table shown, notices not mounted.
+    expect(tabs().map((t) => t.textContent!.trim())).toEqual(["About", "Third-party licenses"]);
+    expect(tabs().map((t) => t.getAttribute("aria-selected"))).toEqual(["true", "false"]);
+    // Each tab carries its decorative icon (hidden from the a11y tree).
+    for (const t of tabs()) expect(t.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+    expect(document.querySelector("table")).not.toBeNull();
+    expect(document.querySelector("details.lic")).toBeNull();
+
+    tabs()[1]!.click();
+    flushSync();
+    expect(tabs().map((t) => t.getAttribute("aria-selected"))).toEqual(["false", "true"]);
+    expect(document.querySelector("table")).toBeNull();
+    expect(document.querySelector("details.lic")).not.toBeNull();
+
+    tabs()[0]!.click();
+    flushSync();
+    expect(document.querySelector("table")).not.toBeNull();
+    expect(document.querySelector("details.lic")).toBeNull();
+  });
+
+  test("third-party license notices render, one collapsible entry per bundled dep", () => {
+    mountC(AboutModal, { viz: createVizState(statsModel()), onClose: () => {} });
+    tabs()[1]!.click();
+    flushSync();
+    const details = [...document.querySelectorAll("details.lic")];
+    expect(details.map((d) => d.querySelector("summary")!.textContent!.trim())).toEqual([
+      "postprocessing 6.0.0 · Zlib",
+      "svelte 5.0.0 · MIT",
+      "three 0.183.0 · MIT",
+    ]);
+    // The verbatim notice text is in the DOM (the compliance surface), just collapsed.
+    expect(details[2]!.querySelector("pre")!.textContent).toContain("Copyright © 2010-2026 three.js authors");
+    expect(details[0]!.querySelector("pre")!.textContent).toContain("This software is provided 'as-is'");
+  });
+
+  test("an embed without license data (pre-licenses build) gets the untabbed info layout", () => {
+    mountC(AboutModal, { viz: createVizState(statsModel({ licenses: undefined })), onClose: () => {} });
+    expect(document.querySelector(".tabs")).toBeNull();
+    expect(document.querySelector("details.lic")).toBeNull();
+    expect(document.querySelector("table")).not.toBeNull(); // info pane still renders
   });
 
   test("close button and backdrop dismiss; clicks inside the dialog don't", () => {

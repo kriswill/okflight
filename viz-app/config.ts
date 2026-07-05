@@ -125,7 +125,7 @@ const defaults = (): VizConfig => ({
   bundle: { dir: DEFAULT_BUNDLE_DIR, out: "viz.html" },
   display: {
     title: "OKF knowledge graph",
-    badge: "OKF viz",
+    badge: "OKFlight",
     fallbackName: "OKF bundle",
     name: null,
     aboutHtml: GENERIC_ABOUT,

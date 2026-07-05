@@ -323,7 +323,20 @@ for (const n of nodes) Object.assign(n, positions.get(n.id));
 lap("layout");
 
 // --- Bundle the viewer app (Svelte 5 via bun-plugin-svelte) ---------------------
-if (!existsSync(join(import.meta.dir, "node_modules", "svelte"))) {
+// Missing-deps check via actual resolution, not a node_modules path probe:
+// an npm/bunx install lays the deps flat in the CONSUMER'S node_modules (a
+// parent of this file), where they resolve fine — a beside-viz.ts existence
+// check would trigger a spurious nested `bun install` of the full dev tree.
+// Only a genuinely fresh checkout (nothing resolvable) self-heals here.
+const unresolvable = ["svelte", "bun-plugin-svelte"].some((dep) => {
+  try {
+    Bun.resolveSync(dep, import.meta.dir);
+    return false;
+  } catch {
+    return true;
+  }
+});
+if (unresolvable) {
   console.log("viz: installing viewer dependencies (bun install)…");
   const r = Bun.spawnSync(["bun", "install"], { cwd: import.meta.dir, stdout: "inherit", stderr: "inherit" });
   if (r.exitCode !== 0) process.exit(r.exitCode ?? 1);

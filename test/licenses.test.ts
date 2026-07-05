@@ -10,17 +10,21 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { collectLicenses } from "../licenses";
+import { BUILD_ONLY, collectLicenses } from "../licenses";
 
 const okflight = join(import.meta.dir, "..");
 
 describe("collectLicenses", () => {
-  test("every runtime dependency yields a notice with version, id, and real text", () => {
+  test("every embedded runtime dependency yields a notice with version, id, and real text", () => {
     const pkg = JSON.parse(readFileSync(join(okflight, "package.json"), "utf8"));
     const got = collectLicenses(okflight);
-    // Driven by package.json `dependencies` — a new runtime dep is picked up
-    // automatically, and its missing LICENSE would throw here.
-    expect(got.map((l) => l.name)).toEqual(Object.keys(pkg.dependencies).sort());
+    // Driven by package.json `dependencies` minus the BUILD_ONLY tooling —
+    // a new runtime dep is picked up automatically, and its missing LICENSE
+    // would throw here. Every exclusion must still BE a dependency, so a
+    // removed dep can't leave a stale entry silently masking a future one.
+    for (const name of BUILD_ONLY) expect(Object.keys(pkg.dependencies)).toContain(name);
+    const embedded = Object.keys(pkg.dependencies).filter((d: string) => !BUILD_ONLY.has(d));
+    expect(got.map((l) => l.name)).toEqual(embedded.sort());
     for (const l of got) {
       expect(l.version).toMatch(/^\d+\./);
       expect(l.license.length).toBeGreaterThan(0);
@@ -92,7 +96,8 @@ describe("okf viz output", () => {
       const blob = html.match(/<script id="data" type="application\/json">(.*?)<\/script>/s)![1]!;
       const pkg = JSON.parse(readFileSync(join(okflight, "package.json"), "utf8"));
       const licenses: { name: string; text: string }[] = JSON.parse(blob).licenses;
-      expect(licenses.map((l) => l.name)).toEqual(Object.keys(pkg.dependencies).sort());
+      const embedded = Object.keys(pkg.dependencies).filter((d: string) => !BUILD_ONLY.has(d));
+      expect(licenses.map((l) => l.name)).toEqual(embedded.sort());
       for (const l of licenses) expect(l.text).toContain("Copyright");
 
       // Compliance: the notice texts are physically present in the shipped file.

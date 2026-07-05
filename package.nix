@@ -61,8 +61,12 @@ let
 
   # The lock is pure JS — no os/cpu-conditional packages, no install scripts —
   # so one hash serves every platform; --cpu/--os="*" keeps that true if a
-  # future dep adds conditionals. NOT --production: `okf viz` needs svelte +
-  # bun-plugin-svelte (devDependencies) at CLI runtime, the tests happy-dom.
+  # future dep adds conditionals. --omit=optional: the only optional dep is
+  # the `bun` npm package (the npx/bunx fallback runtime — see bin/okf.mjs);
+  # the nix wrapper provides the real bun, and vendoring every platform's
+  # ~90MB binary into the store would be pure bloat. NOT --production:
+  # `okf viz` needs svelte + bun-plugin-svelte at CLI runtime, the tests
+  # happy-dom.
   # Refresh the hash (bun.lock or nixpkgs bun changes): set lib.fakeHash, then
   # `nix build ./flakes/okf#okf.node_modules` and copy the "got:" value.
   node_modules = stdenvNoCC.mkDerivation {
@@ -89,6 +93,7 @@ let
         --frozen-lockfile \
         --ignore-scripts \
         --no-progress \
+        --omit=optional \
         --cpu="*" \
         --os="*"
       runHook postBuild

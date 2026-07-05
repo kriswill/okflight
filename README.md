@@ -105,13 +105,32 @@ vendored `scaffold-api.d.ts` member-for-member in sync with
 
 ## Adopting okf in any repo (no Nix required)
 
-okf is plain bun — clone this repository anywhere (or vendor it), then:
+okf is published to npm as [`okflight`](https://www.npmjs.com/package/okflight),
+shipping these TypeScript sources as-is plus one node-compatible launcher
+(`bin/okf.mjs` — the only non-`.ts` code in the package):
+
+```sh
+bunx okflight setup       # guided integration (or `init` for the bare skeleton)
+npx okflight setup        # identical — no bun preinstalled required, see below
+```
+
+okf runs on Bun (`Bun.TOML`, `Bun.Glob`, and `okf viz` invokes `Bun.build` +
+the Svelte plugin at generation time), so the launcher re-execs through a
+bun: first the one on `PATH`, else the [`bun` npm
+package](https://www.npmjs.com/package/bun) that installs alongside as an
+`optionalDependency` — which is what makes plain `npx okflight` work with no
+prerequisites (`--no-optional` skips the ~90 MB and the launcher then
+explains itself). Under `bunx --bun` it imports the CLI in-process with no
+re-exec at all. Publishing is `npm publish` from a clean checkout — there is
+no build step.
+
+Working from a clone works the same way (also how nix consumers hack on it):
 
 ```sh
 git clone https://github.com/kriswill/okflight ~/src/okflight
 cd ~/src/okflight && bun install      # once; vendors the viz viewer deps
 cd ~/src/your-project
-bun ~/src/okflight/okf.ts setup       # guided integration (or `init` for the bare skeleton)
+bun ~/src/okflight/okf.ts setup       # guided integration
 bun ~/src/okflight/okf.ts validate && bun ~/src/okflight/okf.ts viz
 ```
 
@@ -123,9 +142,12 @@ Wire your own metadata pass via `[scaffold]` (script with the injected
 ## Dependency vendoring (the FOD hash)
 
 `node_modules` is a fixed-output derivation running `bun install
---frozen-lockfile` (no bun packaging helper exists in nixpkgs; this mirrors its
-`opencode`/`helix-gpt` packages). The lock is pure JS with no os/cpu-conditional
-packages, so **one hash serves all platforms**. When `bun.lock` changes (or a
+--frozen-lockfile --omit=optional` (no bun packaging helper exists in nixpkgs;
+this mirrors its `opencode`/`helix-gpt` packages). With optionals omitted —
+the only one is the `bun` npm package backing the npx fallback, which the nix
+wrapper has no use for — the installed tree is pure JS with no
+os/cpu-conditional packages, so **one hash serves all platforms**. When
+`bun.lock` changes (or a
 nixpkgs bump changes bun and the install layout shifts — the failure is a loud
 hash mismatch), refresh it:
 

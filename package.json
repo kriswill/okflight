@@ -1,17 +1,62 @@
 {
-  "name": "okf-tools",
-  "private": true,
+  "name": "okflight",
+  "version": "0.1.0",
+  "description": "CLI for maintaining OKF knowledge bundles: scaffold/index/validate/viz (self-contained 3D graph), plus a guided setup wizard",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kriswill/okflight.git"
+  },
+  "homepage": "https://github.com/kriswill/okflight#readme",
+  "keywords": [
+    "okf",
+    "knowledge-graph",
+    "documentation",
+    "cli",
+    "bun"
+  ],
+  "bin": {
+    "okflight": "bin/okf.mjs",
+    "okf": "bin/okf.mjs"
+  },
+  "files": [
+    "bin/",
+    "okf.ts",
+    "init.ts",
+    "setup.ts",
+    "bootstrap.ts",
+    "lib.ts",
+    "config-cli.ts",
+    "vcs/",
+    "scaffold.ts",
+    "scaffold-api.ts",
+    "index-gen.ts",
+    "validate.ts",
+    "viz.ts",
+    "viz-perf.ts",
+    "layout3d.ts",
+    "licenses.ts",
+    "viz-app/",
+    "!viz-app/*.test.ts",
+    "templates/",
+    "tsconfig.json"
+  ],
+  "engines": {
+    "bun": ">=1.2"
+  },
   "dependencies": {
+    "bun-plugin-svelte": "^0.0.6",
     "postprocessing": "^6.38.3",
     "svelte": "^5.56.4",
     "three": "~0.183.0"
+  },
+  "optionalDependencies": {
+    "bun": "^1.2.0"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.10.6",
     "@types/bun": "^1.3.14",
     "@types/three": "^0.185.0",
-    "bun-plugin-svelte": "^0.0.6",
     "happy-dom": "^20.10.6",
     "puppeteer-core": "^25.3.0",
     "svelte-check": "^4.7.1",

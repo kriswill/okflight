@@ -13,8 +13,8 @@
   };
 
   // Largest-first; the remainder up to totalBytes (template markup/CSS, repo
-  // and commit metadata, facet maps, embedded config, the stats blob itself)
-  // closes the table so the rows always sum to the total.
+  // and commit metadata, facet maps, embedded config, license notices, the
+  // stats blob itself) closes the table so the rows always sum to the total.
   const rows = $derived.by(() => {
     if (!stats) return [];
     const b = stats.bytes;
@@ -67,6 +67,16 @@
         </tfoot>
       </table>
       <p class="gen">Everything above is baked into this single HTML file — it works offline, straight from disk. Generated {generated}.</p>
+    {/if}
+    {#if m.licenses.length}
+      <h3 class="lic-h">Third-party licenses</h3>
+      <p class="lic-note">The viewer embeds minified copies of these libraries; the notices below accompany them as their licenses require.</p>
+      {#each m.licenses as l (l.name)}
+        <details class="lic">
+          <summary>{l.name} {l.version}{l.license ? ` · ${l.license}` : ""}</summary>
+          <pre>{l.text}</pre>
+        </details>
+      {/each}
     {/if}
   </div>
 </div>
@@ -175,5 +185,35 @@
     color: var(--ink-muted);
     font-size: 11.5px;
     margin-top: 10px;
+  }
+  .lic-h {
+    margin-top: 14px;
+  }
+  .lic-note {
+    color: var(--ink-muted);
+    font-size: 11.5px;
+    margin-bottom: 6px;
+  }
+  details.lic {
+    margin: 2px 0;
+    font-size: 12px;
+  }
+  details.lic summary {
+    cursor: pointer;
+    color: var(--ink-2);
+  }
+  details.lic summary:hover {
+    color: var(--ink-1);
+  }
+  details.lic pre {
+    margin: 6px 0 10px;
+    padding: 8px 10px;
+    font: 10.5px/1.5 ui-monospace, Menlo, monospace;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    color: var(--ink-2);
+    background: var(--page);
+    border: 1px solid var(--grid);
+    border-radius: 6px;
   }
 </style>

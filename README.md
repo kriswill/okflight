@@ -6,6 +6,10 @@ regenerates progressive-disclosure `index.md` listings, `validate` checks
 spec/profile conformance and links, and `viz` renders the bundle as a
 self-contained interactive 3D graph (single offline HTML file — Svelte 5 viewer
 around Three.js glow spheres, bundled at generation time by `Bun.build`).
+Since minification strips the bundled libraries' copyright headers and their
+MIT/zlib terms require notices to accompany redistributed copies, `viz` embeds
+each runtime dependency's LICENSE text (collected from `node_modules` at build
+time) in the page — see "Third-party licenses" in the viewer's About modal.
 
 okf operates on a **workspace**: the nearest directory at or above cwd holding
 an `okf.toml`, else the git toplevel (zero-config mode). `okf init [--dir=<d>]`

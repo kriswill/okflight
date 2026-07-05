@@ -696,12 +696,18 @@ const stats: BuildStats = {
   totalBytes: 2_900_000,
   bytes: { nodes: 300_000, edges: 30_000, files: 1_600_000, dirs: 8_000, appJs: 700_000, appCss: 40_000 },
 };
+const licenses = [
+  { name: "postprocessing", version: "6.0.0", license: "Zlib", text: "This software is provided 'as-is'…" },
+  { name: "svelte", version: "5.0.0", license: "MIT", text: "Permission is hereby granted, free of charge…" },
+  { name: "three", version: "0.183.0", license: "MIT", text: "The MIT License\n\nCopyright © 2010-2026 three.js authors" },
+];
 const statsModel = (over: Record<string, unknown> = {}) =>
   buildModel({
     nodes: [node("a", "Decision", "Alpha"), node("b", "Pattern", "Beta")],
     edges: [{ s: "a", t: "b" }],
     files: { "x.ts": { html: "", lines: 1, size: 10, date: "2026-01-01", lang: "ts", refs: ["a"] } },
     stats,
+    licenses,
     ...over,
   });
 
@@ -742,6 +748,25 @@ describe("AboutModal", () => {
     expect(document.querySelector(".about")!.textContent).toContain("Open Knowledge Format");
     expect(document.querySelector(".counts")!.textContent).toContain("1 concepts");
     expect(document.querySelector("table")).toBeNull();
+  });
+
+  test("third-party license notices render, one collapsible entry per bundled dep", () => {
+    mountC(AboutModal, { viz: createVizState(statsModel()), onClose: () => {} });
+    const details = [...document.querySelectorAll("details.lic")];
+    expect(details.map((d) => d.querySelector("summary")!.textContent!.trim())).toEqual([
+      "postprocessing 6.0.0 · Zlib",
+      "svelte 5.0.0 · MIT",
+      "three 0.183.0 · MIT",
+    ]);
+    // The verbatim notice text is in the DOM (the compliance surface), just collapsed.
+    expect(details[2]!.querySelector("pre")!.textContent).toContain("Copyright © 2010-2026 three.js authors");
+    expect(details[0]!.querySelector("pre")!.textContent).toContain("This software is provided 'as-is'");
+  });
+
+  test("an embed without license data (pre-licenses build) omits the section", () => {
+    mountC(AboutModal, { viz: createVizState(statsModel({ licenses: undefined })), onClose: () => {} });
+    expect(document.querySelector(".lic-h")).toBeNull();
+    expect(document.querySelector("details.lic")).toBeNull();
   });
 
   test("close button and backdrop dismiss; clicks inside the dialog don't", () => {

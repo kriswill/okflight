@@ -46,7 +46,8 @@ export interface BuildStats {
   totalBytes: number;
   /** Bytes each section occupies in the file, as written (post-escaping).
    *  The remainder up to totalBytes is page shell: template CSS/markup,
-   *  repo/commit metadata, facet maps, embedded config, and this blob. */
+   *  repo/commit metadata, facet maps, embedded config, license notices,
+   *  and this blob. */
   bytes: {
     nodes: number;
     edges: number;
@@ -55,6 +56,20 @@ export interface BuildStats {
     appJs: number;
     appCss: number;
   };
+}
+
+/** One bundled runtime dependency's license notice, read from its
+ *  node_modules license file at generation time (../licenses.ts) — Bun.build
+ *  minification strips the in-source copyright headers, and MIT/zlib terms
+ *  require the notice to accompany every redistributed copy, so the page
+ *  carries the verbatim texts itself. */
+export interface DepLicense {
+  name: string;
+  version: string;
+  /** SPDX id from the dep's package.json ("MIT", "Zlib"); "" if undeclared. */
+  license: string;
+  /** Verbatim license/notice text. */
+  text: string;
 }
 
 export interface RawData {
@@ -76,6 +91,8 @@ export interface RawData {
   cfg?: unknown;
   /** Build-time size breakdown (absent: pre-stats embed). */
   stats?: BuildStats;
+  /** Bundled deps' license notices (absent: pre-licenses embed). */
+  licenses?: DepLicense[];
 }
 
 export interface VizModel {
@@ -121,6 +138,8 @@ export interface VizModel {
   radii: number[];
   /** Build-time size breakdown (null: pre-stats embed — About modal hides it). */
   stats: BuildStats | null;
+  /** Bundled deps' license notices for the About modal ([] on pre-licenses embeds). */
+  licenses: DepLicense[];
 }
 
 // A concept's id is its bundle-relative path minus ".md" (viz.ts) — the
@@ -309,6 +328,7 @@ export function buildModel(raw: RawData): VizModel {
     facetById,
     radii,
     stats: raw.stats ?? null,
+    licenses: raw.licenses ?? [],
   };
 }
 

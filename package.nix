@@ -28,6 +28,7 @@ let
     ./viz.ts
     ./viz-perf.ts
     ./layout3d.ts
+    ./licenses.ts
     ./tsconfig.json
     ./package.json
     ./bun.lock

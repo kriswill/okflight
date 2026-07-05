@@ -576,7 +576,7 @@ describe("generic (no-config) mode", () => {
 
   test("display falls back to the git-derived name and generic strings", () => {
     expect(m.displayName).toBe("acme/widgets");
-    expect(m.cfg.display.badge).toBe("OKF viz");
+    expect(m.cfg.display.badge).toBe("OKFlight");
     expect(buildModel({ nodes: [], edges: [] }).displayName).toBe("OKF bundle");
   });
 });

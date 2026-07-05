@@ -633,13 +633,13 @@ describe("DetailPanel", () => {
 });
 
 describe("Sidebar", () => {
-  test("header names the repo's OKF viz; the (?) opens the modal with the explainer", () => {
+  test("header names the repo's OKFlight; the (?) opens the modal with the explainer", () => {
     const state = createVizState(
       buildModel({ nodes: [node("a", "Decision", "Alpha")], edges: [], repoUrl: "https://github.com/acme/widgets" }),
     );
     mountC(Sidebar, { viz: state });
     const h1 = document.querySelector("#side h1")!;
-    expect(h1.textContent!.replace(/\s+/g, " ")).toContain("acme/widgets OKF viz");
+    expect(h1.textContent!.replace(/\s+/g, " ")).toContain("acme/widgets OKFlight");
     (h1.querySelector(".help") as HTMLElement).click();
     flushSync();
     expect(document.querySelector("[role=dialog] .about")!.textContent).toContain("Open Knowledge Format");
@@ -666,14 +666,33 @@ describe("Sidebar", () => {
       buildModel({ nodes: [node("a", "Decision", "Alpha")], edges: [], cfg: { display: { "fallback-name": "knowledge/" } } }),
     );
     mountC(Sidebar, { viz: configured });
-    expect(document.querySelector("#side h1")!.textContent!.replace(/\s+/g, " ")).toContain("knowledge/ OKF viz");
+    expect(document.querySelector("#side h1")!.textContent!.replace(/\s+/g, " ")).toContain("knowledge/ OKFlight");
     cleanup?.();
     cleanup = null;
     document.body.innerHTML = "";
 
     const generic = createVizState(buildModel({ nodes: [node("a", "Decision", "Alpha")], edges: [] }));
     mountC(Sidebar, { viz: generic });
-    expect(document.querySelector("#side h1")!.textContent!.replace(/\s+/g, " ")).toContain("OKF bundle OKF viz");
+    expect(document.querySelector("#side h1")!.textContent!.replace(/\s+/g, " ")).toContain("OKF bundle OKFlight");
+  });
+
+  test("the stock badge renders as the two-tone OKFlight wordmark; a custom badge stays plain", () => {
+    const stock = createVizState(buildModel({ nodes: [node("a", "Decision", "Alpha")], edges: [] }));
+    mountC(Sidebar, { viz: stock });
+    const badge = document.querySelector("#side h1 .okf")!;
+    expect(badge.textContent).toBe("OKFlight"); // no stray whitespace between the tone spans
+    expect([...badge.querySelectorAll("span")].map((s) => s.textContent)).toEqual(["OKF", "light"]);
+    cleanup?.();
+    cleanup = null;
+    document.body.innerHTML = "";
+
+    const custom = createVizState(
+      buildModel({ nodes: [node("a", "Decision", "Alpha")], edges: [], cfg: { display: { badge: "KB map" } } }),
+    );
+    mountC(Sidebar, { viz: custom });
+    const customBadge = document.querySelector("#side h1 .okf")!;
+    expect(customBadge.textContent).toBe("KB map");
+    expect(customBadge.querySelector("span")).toBeNull();
   });
 
   test("clicking the (?) opens the About modal; Escape closes it", () => {

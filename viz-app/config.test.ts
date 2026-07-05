@@ -44,7 +44,7 @@ describe("normalizeVizConfig", () => {
     for (const raw of [undefined, null, {}]) {
       const c = normalizeVizConfig(raw);
       expect(c.bundle).toEqual({ dir: "knowledge", out: "viz.html" });
-      expect(c.display.badge).toBe("OKF viz");
+      expect(c.display.badge).toBe("OKFlight");
       expect(c.display.fallbackName).toBe("OKF bundle");
       expect(c.display.name).toBeNull();
       expect(c.display.aboutHtml).toContain("Open Knowledge Format");

@@ -1,5 +1,6 @@
 <script lang="ts">
   import AboutModal from "./AboutModal.svelte";
+  import Badge from "./Badge.svelte";
   import ConceptList from "./ConceptList.svelte";
   import FacetControls from "./FacetControls.svelte";
   import IsolateControl from "./IsolateControl.svelte";
@@ -14,7 +15,7 @@
 <aside id="side">
   <div class="top">
     <h1>
-      <span class="name">{viz.model.displayName} <span class="okf">{viz.model.cfg.display.badge}</span></span>
+      <span class="name">{viz.model.displayName} <span class="okf"><Badge text={viz.model.cfg.display.badge} /></span></span>
       <button class="help" aria-label="About this page" aria-haspopup="dialog" onclick={() => (aboutOpen = true)}>?</button>
     </h1>
     <div class="sub" id="counts">

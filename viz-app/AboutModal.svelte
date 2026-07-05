@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Badge from "./Badge.svelte";
   import { formatDate } from "./dates";
   import type { VizState } from "./state.svelte";
 
@@ -50,7 +51,7 @@
 <div class="overlay" onclick={(e) => e.target === e.currentTarget && onClose()}>
   <div class="modal" role="dialog" aria-modal="true" aria-label="About this page">
     <header>
-      <h2>{m.displayName} <span class="badge">{m.cfg.display.badge}</span></h2>
+      <h2>{m.displayName} <span class="badge"><Badge text={m.cfg.display.badge} /></span></h2>
       <button class="close" aria-label="Close" onclick={onClose}>×</button>
     </header>
     {#if m.licenses.length}

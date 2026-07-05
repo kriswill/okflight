@@ -146,7 +146,10 @@
     backdrop-filter: blur(2px);
   }
   .modal {
-    width: min(430px, calc(100vw - 32px));
+    /* Wide enough that conventionally 80-column-wrapped LICENSE texts render
+       in the licenses pane without harsh re-wraps (80ch of 10.5px monospace
+       + pre/modal padding), while still fitting small screens. */
+    width: min(580px, calc(100vw - 32px));
     margin-top: 13vh;
     max-height: min(80vh, 640px);
     overflow-y: auto;

@@ -74,7 +74,7 @@ describe("okf viz output", () => {
     "the generated page embeds every runtime dep's license notice",
     () => {
       const root = mkdtempSync(join(tmpdir(), "okf-viz-"));
-      writeFileSync(join(root, "okf.toml"), '[vcs]\nprovider = "none"\n');
+      writeFileSync(join(root, "okflight.toml"), '[vcs]\nprovider = "none"\n');
       mkdirSync(join(root, "knowledge"));
       writeFileSync(join(root, "knowledge", "index.md"), "# Index\n");
       writeFileSync(

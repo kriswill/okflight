@@ -1,5 +1,5 @@
 // Unit tests for config-cli.ts's pure section splitter — the build-side
-// normalizer for CLI-only okf.toml sections ([profile], later [vcs]/
+// normalizer for CLI-only okflight.toml sections ([profile], later [vcs]/
 // [scaffold]/[index]). loadContext() itself (fs + git) is exercised by the
 // repo's own battery (okf validate/index/viz), not here.
 

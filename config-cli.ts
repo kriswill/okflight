@@ -1,5 +1,5 @@
 // Build-side config loader — the single entry point every okf command uses.
-// Discovers the workspace (nearest okf.toml up from cwd, else the git
+// Discovers the workspace (nearest okflight.toml up from cwd, else the git
 // toplevel), parses the TOML with Bun.TOML, and normalizes STRICTLY: a
 // malformed or misspelled config fails the command rather than silently
 // running with wrong settings. Viewer sections are delegated to
@@ -13,7 +13,10 @@ import { dirname, join, resolve } from "node:path";
 import { createProvider, gitRoot, type VcsProvider } from "./vcs";
 import { fieldIn, isObj, normalizeVizConfig, VizConfigError, type VizConfig } from "./viz-app/config";
 
-export const CONFIG_FILE = "okf.toml";
+export const CONFIG_FILE = "okflight.toml";
+/** Pre-rebrand config name, still discovered so existing workspaces keep
+ *  working; loadContext suggests the rename once per run. */
+export const LEGACY_CONFIG_FILE = "okf.toml";
 
 export class OkfConfigError extends Error {}
 
@@ -279,16 +282,17 @@ export function splitCliSections(raw: unknown): {
   }
 
   if (!profile.requiredFields.includes("type")) profile.requiredFields = ["type", ...profile.requiredFields];
-  if (errors.length) throw new OkfConfigError("invalid okf.toml:\n  " + errors.join("\n  "));
+  if (errors.length) throw new OkfConfigError(`invalid ${CONFIG_FILE}:\n  ` + errors.join("\n  "));
   return { profile, vcs, scaffold, rest: top };
 }
 
-/** Walk up from `start` to the fs root looking for okf.toml; returns its
- *  directory + name, or null. */
-function findConfigUp(start: string): { dir: string; file: string } | null {
+/** Walk up from `start` to the fs root looking for okflight.toml (the legacy
+ *  okf.toml also matches, losing to okflight.toml in the same directory);
+ *  returns its directory + name, or null. Exported for tests. */
+export function findConfigUp(start: string): { dir: string; file: string } | null {
   let dir = resolve(start);
   for (;;) {
-    if (existsSync(join(dir, CONFIG_FILE))) return { dir, file: CONFIG_FILE };
+    for (const file of [CONFIG_FILE, LEGACY_CONFIG_FILE]) if (existsSync(join(dir, file))) return { dir, file };
     const parent = dirname(dir);
     if (parent === dir) return null;
     dir = parent;
@@ -337,13 +341,15 @@ let ctxCache: OkfContext | null = null;
  *  VCS provider. Exits 1 on a malformed config — no command may run against
  *  a config it can't trust. Absent config file -> generic defaults.
  *
- *  Root discovery: the nearest okf.toml at or above cwd wins (this is also
- *  what makes no-VCS workspaces and monorepo sub-bundles work); without one,
- *  the git toplevel with full defaults — okf's original zero-config
+ *  Root discovery: the nearest okflight.toml at or above cwd wins (this is
+ *  also what makes no-VCS workspaces and monorepo sub-bundles work); without
+ *  one, the git toplevel with full defaults — okf's original zero-config
  *  behavior. */
 export function loadContext(): OkfContext {
   if (ctxCache) return ctxCache;
   const found = findConfigUp(process.cwd());
+  if (found?.file === LEGACY_CONFIG_FILE)
+    console.warn(`okf: note: found legacy ${LEGACY_CONFIG_FILE} — rename it to ${CONFIG_FILE} (same format)`);
   const root = found?.dir ?? gitRoot();
   if (!root) {
     // Distinguish "git isn't installed" from "not in a repo" — gitRoot()

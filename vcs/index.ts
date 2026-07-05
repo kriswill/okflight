@@ -1,5 +1,5 @@
 // Provider factory + git-root probe. Workspace-root discovery itself lives
-// in config-cli.ts (nearest okf.toml up from cwd wins, else the git
+// in config-cli.ts (nearest okflight.toml up from cwd wins, else the git
 // toplevel) because the config file names are its domain; this module turns
 // a chosen root into a provider.
 

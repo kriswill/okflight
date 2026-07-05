@@ -1,4 +1,4 @@
-// Generic scaffold driver. The repo owns its metadata pass: okf.toml's
+// Generic scaffold driver. The repo owns its metadata pass: okflight.toml's
 // [scaffold] configures a script (dynamically imported; default export gets
 // the ScaffoldContext), or a command (non-JS escape hatch, spawned with
 // OKF_* env), plus 0..n declarative [[scaffold.collect]] entries (glob +
@@ -19,7 +19,7 @@ const { script, command, collect } = ctx.cfg.scaffold;
 
 if (!script && !command && !collect.length) {
   console.log(
-    "scaffold: nothing configured — add a [scaffold] section to okf.toml (script, command, or [[scaffold.collect]] entries)",
+    "scaffold: nothing configured — add a [scaffold] section to okflight.toml (script, command, or [[scaffold.collect]] entries)",
   );
   process.exit(0);
 }

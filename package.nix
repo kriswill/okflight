@@ -18,6 +18,9 @@ let
   sources = lib.fileset.unions [
     ./okf.ts
     ./init.ts
+    ./setup.ts
+    ./bootstrap.ts
+    ./templates
     ./lib.ts
     ./config-cli.ts
     ./vcs

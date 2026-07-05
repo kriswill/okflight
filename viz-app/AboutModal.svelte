@@ -56,9 +56,25 @@
     {#if m.licenses.length}
       <div class="tabs" role="tablist" aria-label="About sections">
         <button class="seg" class:active={tab === "info"} role="tab" aria-selected={tab === "info"} onclick={() => (tab = "info")}>
+          <!-- info circle -->
+          <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" focusable="false">
+            <circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.4" />
+            <path d="M8 7.4v3.4M8 5.15v.02" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+          </svg>
           About
         </button>
         <button class="seg" class:active={tab === "licenses"} role="tab" aria-selected={tab === "licenses"} onclick={() => (tab = "licenses")}>
+          <!-- scales of justice -->
+          <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" focusable="false">
+            <path
+              d="M8 2.5v11M5.8 13.5h4.4M3 4.5h10M3 4.5l-1.8 4M3 4.5l1.8 4M1.2 8.5a1.8 1.8 0 0 0 3.6 0M13 4.5l-1.8 4M13 4.5l1.8 4M11.2 8.5a1.8 1.8 0 0 0 3.6 0"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.4"
+              stroke-linejoin="round"
+              stroke-linecap="round"
+            />
+          </svg>
           Third-party licenses
         </button>
       </div>
@@ -214,6 +230,14 @@
     padding-bottom: 8px;
     margin-bottom: 10px;
     border-bottom: 1px solid var(--grid);
+  }
+  .tabs button {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .tabs svg {
+    flex: none;
   }
   .lic-note {
     color: var(--ink-muted);

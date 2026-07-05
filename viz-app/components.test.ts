@@ -757,6 +757,8 @@ describe("AboutModal", () => {
     // Opens on the info pane: size table shown, notices not mounted.
     expect(tabs().map((t) => t.textContent!.trim())).toEqual(["About", "Third-party licenses"]);
     expect(tabs().map((t) => t.getAttribute("aria-selected"))).toEqual(["true", "false"]);
+    // Each tab carries its decorative icon (hidden from the a11y tree).
+    for (const t of tabs()) expect(t.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
     expect(document.querySelector("table")).not.toBeNull();
     expect(document.querySelector("details.lic")).toBeNull();
 

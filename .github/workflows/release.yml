@@ -1,0 +1,42 @@
+# npm publish via OIDC trusted publishing — no token anywhere. The package's
+# npmjs.com settings bind kriswill/okflight + THIS EXACT FILENAME
+# (release.yml) as the trusted publisher; npm exchanges the runner's OIDC
+# id-token for a one-shot publish credential and attaches provenance
+# automatically. Renaming this file breaks the binding until the package
+# settings are updated to match.
+#
+# Release flow: bump package.json version -> merge -> push tag vX.Y.Z.
+# workflow_dispatch runs the same job as a --dry-run (tests + pack, no
+# publish) for smoke-testing workflow changes without burning a version.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # the OIDC token npm exchanges for the tokenless publish
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun test
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      # Trusted publishing needs npm >= 11.5.1; don't trust the bundled one.
+      - run: npm install -g npm@latest
+      - name: Tag must match package.json version
+        if: github.ref_type == 'tag'
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(jq -r .version package.json)"
+          [ "$tag" = "$pkg" ] || { echo "::error::tag v$tag does not match package.json version $pkg"; exit 1; }
+      - name: Publish to npm (dry-run unless a version tag triggered this)
+        run: npm publish ${{ github.ref_type != 'tag' && '--dry-run' || '' }}

@@ -6,8 +6,11 @@
 # settings are updated to match.
 #
 # Release flow: bump package.json version -> merge -> push tag vX.Y.Z.
-# workflow_dispatch runs the same job as a --dry-run (tests + pack, no
-# publish) for smoke-testing workflow changes without burning a version.
+# workflow_dispatch smoke-tests the pipeline (tests + tarball) without
+# publishing — it uses `npm pack --dry-run`, NOT `npm publish --dry-run`,
+# because publish's dry-run still runs the registry version-collision
+# check, which always fails between releases (the current package.json
+# version is already live).
 name: release
 
 on:
@@ -38,5 +41,10 @@ jobs:
           tag="${GITHUB_REF_NAME#v}"
           pkg="$(jq -r .version package.json)"
           [ "$tag" = "$pkg" ] || { echo "::error::tag v$tag does not match package.json version $pkg"; exit 1; }
-      - name: Publish to npm (dry-run unless a version tag triggered this)
-        run: npm publish ${{ github.ref_type != 'tag' && '--dry-run' || '' }}
+      - name: Publish to npm (tag push) / validate tarball (manual dispatch)
+        run: |
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            npm publish
+          else
+            npm pack --dry-run
+          fi

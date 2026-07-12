@@ -64,7 +64,7 @@
   const RADIAL = 6;
   /** Halo tube: wider, faint, additive — reads as glow on dark surfaces. */
   const HALO_R = TUBE_R * 2.8;
-  const HALO_OPACITY = 0.3;
+  const HALO_OPACITY = 0.21;
 
   const motion = createCardMotion();
 

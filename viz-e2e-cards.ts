@@ -112,6 +112,27 @@ try {
   );
   check("root view has no in-row", l.cards.every((c) => c.lane !== "in"));
 
+  console.log("2b. dir cards are bundle indexes: click focuses the bundle, root card walks back");
+  const dirPt = await okf<{ x: number; y: number }>(page, 'window.__okf.cards.project("decisions")');
+  await page.mouse.click(dirPt.x, dirPt.y);
+  await settleMotion(page);
+  l = (await layout(page))!;
+  check(
+    "clicked dir card becomes the bundle focus",
+    l.focusId === "decisions" && l.rootFocus === false && l.byId["decisions"]?.kind === "focus",
+  );
+  check("root card sits in the in-row", l.byId[""]?.kind === "root" && l.byId[""]?.lane === "in");
+  check(
+    "bundle out-row lists the bundle's concepts",
+    l.cards.filter((c) => c.lane === "out" && c.ring === 1).length === 18 && !!l.byId["decisions/adr-001"],
+  );
+  check("hash records the bundle focus", await page.evaluate(() => location.hash === "#b/decisions?view=cards"));
+  const rootPt = await okf<{ x: number; y: number }>(page, 'window.__okf.cards.project("")');
+  await page.mouse.click(rootPt.x, rootPt.y);
+  await settleMotion(page);
+  l = (await layout(page))!;
+  check("clicking the root in-card returns to the root focus", l.rootFocus === true);
+
   console.log("3. focused layout: directional ring 1 (animated refocus)");
   const animatedDuringRefocus = await page.evaluate(
     () =>
@@ -321,6 +342,22 @@ try {
     }),
   );
   await page.emulateMediaFeatures([]);
+
+  console.log("7c. bundle deep link applies and survives reload");
+  await page.evaluate(() => {
+    location.hash = "#b/notes?view=cards";
+  });
+  await settleMotion(page);
+  l = (await layout(page))!;
+  check("hash navigation focuses the bundle", l.focusId === "notes");
+  await page.reload();
+  await waitInteractive(page);
+  await settleMotion(page);
+  l = (await layout(page))!;
+  check(
+    "bundle focus survives reload",
+    (await okf(page, "window.__okf.view")) === "cards" && l.focusId === "notes",
+  );
 
   console.log("8. toggle back to the 3D graph");
   await page.evaluate(() => {

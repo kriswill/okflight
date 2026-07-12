@@ -130,6 +130,9 @@ export interface RawData {
   generator?: GeneratorInfo;
   /** Bundle-root index.md for the cards view's root card (absent/null: none). */
   root?: RootDoc | null;
+  /** Sub-bundle index.md docs by dir path — dir cards render from (and focus
+   *  into) these (absent: pre-bundles embed, dir cards stay inert). */
+  bundles?: Record<string, RootDoc>;
 }
 
 export interface VizModel {
@@ -184,6 +187,9 @@ export interface VizModel {
    *  empty state instead of the root layout). Concept links are pre-validated
    *  against byId. */
   root: RootDoc | null;
+  /** Sub-bundle index docs by dir path, concept links pre-validated like the
+   *  root's ({} when the embed predates bundles). */
+  bundles: Record<string, RootDoc>;
 }
 
 // A concept's id is its bundle-relative path minus ".md" (viz.ts) — the
@@ -377,6 +383,12 @@ export function buildModel(raw: RawData): VizModel {
     root: raw.root
       ? { ...raw.root, links: raw.root.links.filter((l) => l.kind !== "concept" || byId[l.id]) }
       : null,
+    bundles: Object.fromEntries(
+      Object.entries(raw.bundles ?? {}).map(([path, doc]) => [
+        path,
+        { ...doc, links: doc.links.filter((l) => l.kind !== "concept" || byId[l.id]) },
+      ]),
+    ),
   };
 }
 

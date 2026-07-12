@@ -4,9 +4,12 @@
   const { viz }: { viz: VizState } = $props();
 </script>
 
-{#if viz.selectedConcept}
+<!-- Graph view: neighborhood isolation needs an anchor concept. Cards view:
+  the same depth drives the layout's ring count for every focus kind
+  (concept, bundle, root), so the control is always meaningful there. -->
+{#if viz.selectedConcept || viz.viewMode === "cards"}
   <div id="isolate">
-    <span class="hint">neighbors</span>
+    <span class="hint">{viz.viewMode === "cards" ? "hops" : "neighbors"}</span>
     <button
       class="seg"
       class:active={viz.isolateDepth === 1}

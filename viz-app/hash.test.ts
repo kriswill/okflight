@@ -5,6 +5,7 @@ const model = {
   byId: { "wiki/architecture": {} },
   files: { "flakes/okf/viz.ts": {}, "docs/50%.md": {}, "docs/what?.md": {} },
   dirs: { "flakes/ccglass": {} },
+  bundles: { notes: {} },
   typeCounts: { "Alpha Module": 2, Decision: 1 },
   facets: [
     { name: "platform", values: ["macos", "linux"] },
@@ -26,6 +27,31 @@ describe("encodeHash", () => {
 
   test("literal '?' is escaped so it can't read as the filter separator", () => {
     expect(encodeHash({ kind: "file", path: "docs/what?.md" })).toBe("f/docs/what%3F.md");
+  });
+});
+
+// Bundle focus (the cards view centered on a sub-bundle's index.md) is a
+// navigation, so it rides in the selection segment — Back walks through
+// bundles just like concepts.
+describe("bundle selection", () => {
+  const f = { hidden: [], q: "", isolate: 0 as const, facets: {}, view: "cards" as const, flow: "v" as const };
+
+  test("encodes as b/<path>", () => {
+    expect(encodeHash({ kind: "bundle", path: "notes" })).toBe("b/notes");
+    expect(encodeViewHash({ sel: { kind: "bundle", path: "notes" }, filters: f })).toBe("b/notes?view=cards");
+  });
+
+  test("decodes only known bundles; absent bundle map (old embed) -> none", () => {
+    expect(decodeHash("b/notes", model)).toEqual({ kind: "bundle", path: "notes" });
+    expect(decodeHash("b/ghost", model)).toEqual({ kind: "none" });
+    expect(decodeHash("b/notes", { ...model, bundles: undefined })).toEqual({ kind: "none" });
+  });
+
+  test("isolate rides behind '?' for a bundle selection too", () => {
+    expect(encodeViewHash({ sel: { kind: "bundle", path: "notes" }, filters: { ...f, isolate: 2 } })).toBe(
+      "b/notes?isolate=2&view=cards",
+    );
+    expect(decodeViewHash("b/notes?isolate=2", model).filters.isolate).toBe(2);
   });
 });
 

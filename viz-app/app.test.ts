@@ -16,6 +16,7 @@ const model = () =>
     // The '%' in this path is the double-decode regression case: decoding its
     // (once-encoded) hash a second time throws URIError.
     files: { "docs/50%.md": { html: "", md: "# hi", lines: 1, size: 5, date: "", lang: "markdown", refs: [] } },
+    bundles: { notes: { title: "Notes", desc: "", links: [] } },
     cfg: cfg(),
   });
 
@@ -85,6 +86,24 @@ describe("App hash handling", () => {
     window.dispatchEvent(new Event("hashchange"));
     flushSync();
     expect(viz.sel).toEqual({ kind: "concept", id: "wiki/architecture" });
+  });
+
+  test("bundle focus rides the selection segment and applies from a deep link", () => {
+    const viz = createVizState(model());
+    mountApp(viz);
+    viz.focusBundle("notes");
+    flushSync();
+    expect(location.hash).toBe("#b/notes");
+    // A bundle navigation replaces a concept one on Back.
+    location.hash = "#c/wiki/architecture";
+    window.dispatchEvent(new Event("hashchange"));
+    flushSync();
+    expect(viz.cardsBundle).toBeNull();
+    location.hash = "#b/notes"; // simulate Back
+    window.dispatchEvent(new Event("hashchange"));
+    flushSync();
+    expect(viz.cardsBundle).toBe("notes");
+    expect(viz.sel).toEqual({ kind: "none" });
   });
 });
 

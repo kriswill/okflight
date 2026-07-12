@@ -20,6 +20,7 @@ import {
   GAP_X,
   GAP_Y,
   ZOOM_MIN,
+  bundleCardGraph,
   layoutCards,
   rootCardGraph,
 } from "./cardLayout";
@@ -60,6 +61,16 @@ const model = () =>
         { kind: "dir" as const, path: "notes" },
       ],
     },
+    bundles: {
+      notes: {
+        title: "Notes",
+        desc: "",
+        links: [
+          { kind: "concept" as const, id: "island" },
+          { kind: "concept" as const, id: "in2-f" },
+        ],
+      },
+    },
     cfg: cfg(),
   });
 
@@ -87,8 +98,8 @@ describe("cardGraph", () => {
     expect(g1.in2).toEqual([]);
     expect(g1.out2).toEqual([]);
     const g2 = cardGraph(model(), "hub", 2, all)!;
-    expect(g2.in2).toEqual([{ parent: "in-a", id: "in2-f" }]);
-    expect(g2.out2).toEqual([{ parent: "out-c", id: "out2-g" }]);
+    expect(g2.in2).toEqual([{ parent: "in-a", id: "in2-f", kind: "card" }]);
+    expect(g2.out2).toEqual([{ parent: "out-c", id: "out2-g", kind: "card" }]);
   });
 
   test("ring 2 skips already-placed cards and picks the alphabetically-first parent", () => {
@@ -111,7 +122,7 @@ describe("cardGraph", () => {
       cfg: cfg(),
     });
     const g = cardGraph(m, "f", 2, all)!;
-    expect(g.in2).toEqual([{ parent: "p", id: "deep" }]);
+    expect(g.in2).toEqual([{ parent: "p", id: "deep", kind: "card" }]);
   });
 });
 
@@ -343,6 +354,105 @@ describe("rootCardGraph", () => {
   test("hidden types drop concept cards but never dir cards", () => {
     const g = rootCardGraph(model(), (n) => n.type !== "Decision")!;
     expect(g.out1.map((e) => e.id)).toEqual(["island", "notes"]);
+  });
+
+  test("depth 2: concepts expand out-links, dirs expand their bundle's index links", () => {
+    const g = rootCardGraph(model(), all, 2)!;
+    expect(g.in2).toEqual([]);
+    expect(g.out2).toEqual([
+      // hub's out-links, title-sorted (Delta, Epsilon, Gamma).
+      { parent: "hub", id: "out-d", kind: "card" },
+      { parent: "hub", id: "both-e", kind: "card" },
+      { parent: "hub", id: "out-c", kind: "card" },
+      // notes' bundle links in authored order; island is already placed ring 1.
+      { parent: "notes", id: "in2-f", kind: "card" },
+    ]);
+  });
+});
+
+// Focusing a dir card centers that bundle's index.md: parent index above
+// (the root card, or the enclosing bundle for nested dirs), authored links
+// below — the navigable analogue of rootCardGraph.
+describe("bundleCardGraph", () => {
+  const bModel = () =>
+    buildModel({
+      nodes: [
+        node("hub", "Decision", "Hub"),
+        node("notes/n1", "Note", "N1"),
+        node("notes/n2", "Note", "N2"),
+        node("notes/deep/d1", "Note", "D1"),
+      ],
+      edges: [{ s: "notes/n1", t: "hub" }],
+      root: { title: "KB", desc: "", links: [{ kind: "dir" as const, path: "notes" }] },
+      bundles: {
+        notes: {
+          title: "Notes",
+          desc: "Side notes",
+          links: [
+            { kind: "concept" as const, id: "notes/n1" },
+            { kind: "concept" as const, id: "notes/n2" },
+            { kind: "dir" as const, path: "notes/deep" },
+          ],
+        },
+        "notes/deep": {
+          title: "Deep",
+          desc: "",
+          links: [{ kind: "concept" as const, id: "notes/deep/d1" }],
+        },
+      },
+      cfg: cfg(),
+    });
+
+  test("unknown bundle -> null", () => {
+    expect(bundleCardGraph(bModel(), "ghost", 1, all)).toBeNull();
+  });
+
+  test("bundle focus: root card above, authored links below with kinds", () => {
+    const g = bundleCardGraph(bModel(), "notes", 1, all)!;
+    expect(g.focusId).toBe("notes");
+    expect(g.root).toBe(false);
+    expect(g.in1).toEqual([{ id: "", kind: "root", twoWay: false }]);
+    expect(g.out1.map((e) => ({ id: e.id, kind: e.kind }))).toEqual([
+      { id: "notes/n1", kind: "card" },
+      { id: "notes/n2", kind: "card" },
+      { id: "notes/deep", kind: "dir" },
+    ]);
+    expect(g.in2).toEqual([]);
+    expect(g.out2).toEqual([]);
+  });
+
+  test("visible predicate trims concept links, never dirs", () => {
+    const g = bundleCardGraph(bModel(), "notes", 1, (n) => n.id !== "notes/n2")!;
+    expect(g.out1.map((e) => e.id)).toEqual(["notes/n1", "notes/deep"]);
+  });
+
+  test("no embedded root -> no in-row", () => {
+    const m = bModel();
+    const g = bundleCardGraph({ ...m, root: null }, "notes", 1, all)!;
+    expect(g.in1).toEqual([]);
+  });
+
+  test("nested bundle: enclosing bundle above, root chains in at depth 2", () => {
+    const g = bundleCardGraph(bModel(), "notes/deep", 2, all)!;
+    expect(g.in1).toEqual([{ id: "notes", kind: "dir", twoWay: false }]);
+    expect(g.in2).toEqual([{ parent: "notes", id: "", kind: "root" }]);
+    expect(g.out1.map((e) => e.id)).toEqual(["notes/deep/d1"]);
+  });
+
+  test("depth 2: concepts expand out-links, dirs expand their bundle's links", () => {
+    const g = bundleCardGraph(bModel(), "notes", 2, all)!;
+    expect(g.out2).toEqual([
+      { parent: "notes/n1", id: "hub", kind: "card" },
+      { parent: "notes/deep", id: "notes/deep/d1", kind: "card" },
+    ]);
+  });
+
+  test("layout places the root in-card with an arrow into the bundle focus", () => {
+    const l = layoutCards(bundleCardGraph(bModel(), "notes", 1, all)!);
+    expect(l.rootFocus).toBe(false);
+    expect(l.byId["notes"]).toMatchObject({ kind: "focus", ring: 0, x: 0, y: 0 });
+    expect(l.byId[""]).toMatchObject({ kind: "root", lane: "in", ring: 1 });
+    expect(l.arrows.some((a) => a.fromId === "" && a.toId === "notes" && a.dir === "in")).toBe(true);
   });
 });
 

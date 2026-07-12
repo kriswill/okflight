@@ -6,7 +6,7 @@
   import { Canvas } from "@threlte/core";
   import * as THREE from "three";
   import type { VizState } from "../state.svelte";
-  import { cardGraph, layoutCards, rootCardGraph, type CardLayout } from "./cardLayout";
+  import { bundleCardGraph, cardGraph, layoutCards, rootCardGraph, type CardLayout } from "./cardLayout";
   import CardsScene from "./CardsScene.svelte";
 
   const { viz }: { viz: VizState } = $props();
@@ -14,7 +14,9 @@
   const layout: CardLayout | null = $derived.by(() => {
     const g = viz.focusedConcept
       ? cardGraph(viz.model, viz.focusedConcept.id, viz.cardsDepth, viz.visible)
-      : rootCardGraph(viz.model, viz.visible);
+      : viz.cardsBundle
+        ? bundleCardGraph(viz.model, viz.cardsBundle, viz.cardsDepth, viz.visible)
+        : rootCardGraph(viz.model, viz.visible, viz.cardsDepth);
     return g ? layoutCards(g, { flow: viz.cardFlow }) : null;
   });
 </script>

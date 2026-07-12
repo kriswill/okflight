@@ -28,6 +28,10 @@ export function createVizState(model: VizModel) {
   // Scene emphasis + file/dir-view back-link keep pointing at the last concept
   // even while a file or directory is shown (legacy behavior).
   let lastConceptId = $state<string | null>(null);
+  // Cards-view bundle focus: a dir card's bundle index.md centered instead of
+  // a concept. A navigation, not a selection — no details panel — and it
+  // survives file/dir panel views the way backConcept does for concepts.
+  let cardsBundle = $state<string | null>(null);
   const hidden = new SvelteSet<string>();
   let query = $state("");
   let isolateDepth = $state<0 | 1 | 2>(0);
@@ -162,6 +166,7 @@ export function createVizState(model: VizModel) {
       if (!model.byId[id]) return;
       sel = { kind: "concept", id };
       lastConceptId = id;
+      cardsBundle = null;
       fly = flyTo;
       selSeq++;
     },
@@ -176,9 +181,22 @@ export function createVizState(model: VizModel) {
     clearSelection() {
       sel = { kind: "none" };
       lastConceptId = null;
+      cardsBundle = null;
       fly = false;
       selSeq++;
       isolateDepth = 0;
+    },
+    get cardsBundle() {
+      return cardsBundle;
+    },
+    /** Center the cards view on a sub-bundle's index.md (dir card click). */
+    focusBundle(path: string) {
+      if (!model.bundles[path]) return;
+      cardsBundle = path;
+      sel = { kind: "none" };
+      lastConceptId = null;
+      fly = false;
+      selSeq++;
     },
 
     hidden,

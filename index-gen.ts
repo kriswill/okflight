@@ -10,7 +10,7 @@
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { loadContext } from "./config-cli";
-import { fmToYaml, parseDoc, parseFrontmatter, titleFromSlug, type FM } from "./lib";
+import { fmToYaml, indexBlurb, parseDoc, parseFrontmatter, titleFromSlug, type FM } from "./lib";
 
 const { bundle, cfg } = loadContext();
 const bundleName = basename(cfg.viz.bundle.dir);
@@ -28,9 +28,7 @@ function listDir(absDir: string) {
 function existingBlurbAndFm(absIndex: string): { blurb: string; fm: FM | null; fmError: string | null } {
   if (!existsSync(absIndex)) return { blurb: "", fm: null, fmError: null };
   const { fm, fmError, body } = parseFrontmatter(readFileSync(absIndex, "utf8"));
-  const withoutTitle = body.replace(/^\s*# .*\n/, "");
-  const beforeHeading = withoutTitle.split(/^#{1,6} /m)[0].trim();
-  return { blurb: beforeHeading, fm, fmError };
+  return { blurb: indexBlurb(body), fm, fmError };
 }
 
 function genDir(relDir: string): DirInfo {

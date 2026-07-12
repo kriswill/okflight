@@ -21,7 +21,8 @@ export interface CardFaceOpts {
   title: string;
   /** Extra lines under the title (focus card only); "" skips. */
   desc: string;
-  /** Card background — the type color (or the neutral for dir/root/more). */
+  /** Card background — the type color (or the neutral for dir/root/more).
+   *  Outline faces use it as the border color instead. */
   bg: string;
   w: number;
   h: number;
@@ -29,6 +30,12 @@ export interface CardFaceOpts {
   dpr: number;
   /** Dimmed style for "+N more" chips. */
   muted?: boolean;
+  /** Structural (dir/root) card: transparent body, `bg`-colored border,
+   *  text in `ink` — reads as a waypoint, not a document. */
+  outline?: boolean;
+  /** Text color for outline faces (the page ink; solid faces derive theirs
+   *  from `bg` contrast). */
+  ink?: string;
 }
 
 export function makeCardFace(o: CardFaceOpts): THREE.CanvasTexture {
@@ -39,21 +46,36 @@ export function makeCardFace(o: CardFaceOpts): THREE.CanvasTexture {
   canvas.width = W;
   canvas.height = H;
   const ctx = canvas.getContext("2d")!;
-  const ink = inkFor(o.bg);
+  const ink = o.outline ? (o.ink ?? inkFor(o.bg)) : inkFor(o.bg);
   const r = 10 * s;
 
-  ctx.beginPath();
-  ctx.roundRect(1, 1, W - 2, H - 2, r);
-  ctx.fillStyle = o.bg;
-  ctx.globalAlpha = o.muted ? 0.55 : 1;
-  ctx.fill();
-  // Hairline border a step toward the ink color keeps edges defined where
-  // neighboring cards share a hue.
-  ctx.globalAlpha = o.muted ? 0.4 : 0.55;
-  ctx.strokeStyle = ink;
-  ctx.lineWidth = Math.max(1, s * 0.75);
-  ctx.stroke();
-  ctx.globalAlpha = 1;
+  if (o.outline) {
+    // Transparent body (the canvas stays clear) with a faint tint so the
+    // border color registers as the card's identity at a glance.
+    const lw = 2 * s;
+    ctx.beginPath();
+    ctx.roundRect(lw / 2 + 1, lw / 2 + 1, W - lw - 2, H - lw - 2, r - lw / 2);
+    ctx.fillStyle = o.bg;
+    ctx.globalAlpha = 0.08;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = o.bg;
+    ctx.lineWidth = lw;
+    ctx.stroke();
+  } else {
+    ctx.beginPath();
+    ctx.roundRect(1, 1, W - 2, H - 2, r);
+    ctx.fillStyle = o.bg;
+    ctx.globalAlpha = o.muted ? 0.55 : 1;
+    ctx.fill();
+    // Hairline border a step toward the ink color keeps edges defined where
+    // neighboring cards share a hue.
+    ctx.globalAlpha = o.muted ? 0.4 : 0.55;
+    ctx.strokeStyle = ink;
+    ctx.lineWidth = Math.max(1, s * 0.75);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
 
   const padX = 12 * s;
   const maxW = W - padX * 2;

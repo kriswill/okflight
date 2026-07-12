@@ -166,31 +166,50 @@
 
   /* --- colors / titles (structure-time reactivity) ------------------------ */
   const NEUTRAL = $derived(viz.dark ? "#3d4350" : "#c9ced8");
+  const INK = $derived(viz.dark ? "#f6f7f9" : "#16181d");
+  // A dir card wears its bundle's dominant concept type color (an empty
+  // bundle stays neutral) — the same hue the legend gives those concepts.
+  const bundleColor = (path: string): string => {
+    const counts = new Map<string, number>();
+    for (const n of viz.model.nodes)
+      if (n.id.startsWith(path + "/")) counts.set(n.type, (counts.get(n.type) ?? 0) + 1);
+    let best = "";
+    for (const t of [...counts.keys()].sort()) if (counts.get(t)! > (counts.get(best) ?? 0)) best = t;
+    return best ? viz.colorOf(best) : NEUTRAL;
+  };
+  // The KB root card (synthetic focus or ring-1 "root" entry) vs a bundle's
+  // index card vs a concept card, by id shape: concepts win lookups outright.
+  const isRoot = (r: RenderEntry) => r.id === "";
+  const isBundle = (r: RenderEntry) => !isRoot(r) && !viz.model.byId[r.id];
   const colorFor = $derived.by(() => {
     void viz.paletteVersion;
     void viz.dark;
     const m = new Map<string, string>();
     for (const r of motion.renderList) {
       const n = viz.model.byId[r.id];
-      m.set(r.id, (r.kind === "card" || r.kind === "focus") && n ? viz.colorOf(n.type) : NEUTRAL);
+      m.set(r.id, n ? viz.colorOf(n.type) : isBundle(r) ? bundleColor(r.id) : NEUTRAL);
     }
     return m;
   });
+  // Structural cards render as outlines; the synthetic root focus keeps the
+  // solid neutral face (it is the page's title card, not a waypoint).
+  const outlineFor = (r: RenderEntry): boolean => (isRoot(r) ? r.kind !== "focus" : isBundle(r));
   const titleFor = (r: RenderEntry): string => {
-    if (r.kind === "dir") return r.id + "/";
-    if (r.kind === "focus" && r.id === "") return viz.model.root?.title || viz.model.displayName;
+    if (isRoot(r)) return viz.model.root?.title || viz.model.displayName;
+    if (isBundle(r)) return viz.model.bundles[r.id]?.title || r.id + "/";
     return viz.model.byId[r.id]?.title ?? r.id;
   };
   const descFor = (r: RenderEntry): string => {
     if (r.kind !== "focus") return "";
-    if (r.id === "") return viz.model.root?.desc ?? "";
+    if (isRoot(r)) return viz.model.root?.desc ?? "";
+    if (isBundle(r)) return viz.model.bundles[r.id]?.desc ?? "";
     return viz.model.byId[r.id]?.desc ?? "";
   };
   const arrowColor = (fromId: string, toId: string, dir: "in" | "out"): string =>
     colorFor.get(dir === "in" ? fromId : toId) ?? NEUTRAL;
 
   /* --- pointer machine: hover / click / drag ------------------------------ */
-  const clickableKinds = new Set(["card", "dir"]);
+  const clickableKinds = new Set(["card", "dir", "root"]);
   const setHovered = (id: string | null) => {
     if (hovered === id) return;
     const prev = hovered;
@@ -293,7 +312,8 @@
         return;
       }
       const r = motion.renderList.find((x) => x.id === id);
-      if (r?.kind === "dir") viz.selectDir(id);
+      if (r?.kind === "dir") viz.focusBundle(id);
+      else if (r?.kind === "root") viz.clearSelection();
       else if (r?.kind === "card") viz.selectConcept(id, false);
     };
     const cancel = () => {
@@ -390,7 +410,15 @@
 <T.OrthographicCamera makeDefault bind:ref={cam} position={[EYE.x, EYE.y, EYE.z]} near={0.1} far={6000} />
 
 {#each motion.renderList as r (r.id)}
-  <Card entry={r} bg={colorFor.get(r.id) ?? NEUTRAL} title={titleFor(r)} desc={descFor(r)} {registerCard} />
+  <Card
+    entry={r}
+    bg={colorFor.get(r.id) ?? NEUTRAL}
+    title={titleFor(r)}
+    desc={descFor(r)}
+    outline={outlineFor(r)}
+    ink={INK}
+    {registerCard}
+  />
 {/each}
 {#each motion.arrowList as a (a.key)}
   <ElbowArrow arrowKey={a.key} twoWay={a.twoWay} color={arrowColor(a.fromId, a.toId, a.dir)} {registerArrow} />

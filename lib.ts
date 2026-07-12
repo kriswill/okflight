@@ -127,6 +127,28 @@ export function resolveLink(root: string, docRel: string, target: string): strin
   return abs.startsWith(root + "/") ? abs.slice(root.length + 1) : null;
 }
 
+/** The hand-written blurb of an index.md body: prose between the top and
+ *  the first heading (the `# title` line itself excluded). index-gen
+ *  preserves it across regenerations and parent listings show it as the
+ *  directory's description, so it is the durable description source. */
+export function indexBlurb(body: string): string {
+  return body.replace(/^\s*# .*\n/, "").split(/^#{1,6} /m)[0]!.trim();
+}
+
+/** First ATX `# heading` text in a markdown body, skipping fenced code
+ *  (null: none) — the display-title fallback for index docs, which rarely
+ *  carry frontmatter. */
+export function firstHeading(body: string): string | null {
+  let inFence = false;
+  for (const line of body.split("\n")) {
+    if (/^\s*(```|~~~)/.test(line)) { inFence = !inFence; continue; }
+    if (inFence) continue;
+    const m = /^#\s+(.+?)\s*$/.exec(line);
+    if (m) return m[1]!;
+  }
+  return null;
+}
+
 export function titleFromSlug(slug: string): string {
   return slug
     .split("-")

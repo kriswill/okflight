@@ -13,6 +13,7 @@ const model = () =>
     edges: [{ s: "a", t: "b" }],
     files: { "flakes/okf/viz.ts": { html: "", lines: 1, size: 10, date: "", lang: "ts", refs: ["a"] } },
     dirs: { "flakes/ccglass": { files: ["flakes/ccglass/flake.nix"], dirs: [], date: "2026-01-01", refs: ["a"] } },
+    bundles: { notes: { title: "Notes", desc: "", links: [{ kind: "concept" as const, id: "a" }] } },
   });
 
 beforeEach(() => localStorage.clear());
@@ -62,6 +63,34 @@ describe("selection", () => {
     expect(s.sel).toEqual({ kind: "none" });
     expect(s.backConcept).toBeNull();
     expect(s.sceneSelectedIndex).toBeNull();
+  });
+
+  test("focusBundle clears the selection and back-link; unknown paths ignored", () => {
+    const s = createVizState(model());
+    s.selectConcept("a");
+    s.focusBundle("notes");
+    expect(s.cardsBundle).toBe("notes");
+    expect(s.sel).toEqual({ kind: "none" });
+    expect(s.focusedConcept).toBeNull();
+    s.focusBundle("ghost");
+    expect(s.cardsBundle).toBe("notes");
+  });
+
+  test("selecting a concept or clearing leaves bundle focus", () => {
+    const s = createVizState(model());
+    s.focusBundle("notes");
+    s.selectConcept("a");
+    expect(s.cardsBundle).toBeNull();
+    s.focusBundle("notes");
+    s.clearSelection();
+    expect(s.cardsBundle).toBeNull();
+  });
+
+  test("file/dir detail views keep the bundle focus underneath", () => {
+    const s = createVizState(model());
+    s.focusBundle("notes");
+    s.selectFile("flakes/okf/viz.ts");
+    expect(s.cardsBundle).toBe("notes");
   });
 });
 

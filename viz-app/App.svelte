@@ -44,12 +44,15 @@
     if (sel.kind === "concept") viz.selectConcept(sel.id, true);
     else if (sel.kind === "file") viz.selectFile(sel.path);
     else if (sel.kind === "dir") viz.selectDir(sel.path);
+    else if (sel.kind === "bundle") viz.focusBundle(sel.path);
     else viz.clearSelection();
   }
 
   $effect(() => {
     const h = encodeViewHash({
-      sel: viz.sel,
+      // Bundle focus is a navigation without a details panel: viz.sel stays
+      // "none", so compose the encoded selection from cardsBundle here.
+      sel: viz.cardsBundle ? { kind: "bundle", path: viz.cardsBundle } : viz.sel,
       filters: {
         hidden: [...viz.hidden],
         q: viz.query,
@@ -98,6 +101,7 @@
     select: (id: string, fly = true) => (viz.model.byId[id] ? viz.selectConcept(id, fly) : viz.clearSelection()),
     selectFile: (path: string) => viz.selectFile(path),
     selectDir: (path: string) => viz.selectDir(path),
+    focusBundle: (path: string) => viz.focusBundle(path),
     get scene() {
       return sceneRef;
     },

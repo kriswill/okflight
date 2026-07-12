@@ -31,8 +31,16 @@ const HEAD_SIZE = 10;
 
 export interface CardEntry {
   id: string;
-  kind: "card" | "dir";
+  /** "dir" = a sub-bundle's index.md; "root" = the KB-root index card. */
+  kind: "card" | "dir" | "root";
   twoWay: boolean;
+}
+
+/** Ring-2 link in claim order; parent is always a ring-1 id. */
+export interface Ring2Link {
+  parent: string;
+  id: string;
+  kind: "card" | "dir" | "root";
 }
 
 export interface CardGraph {
@@ -41,14 +49,13 @@ export interface CardGraph {
   root: boolean;
   in1: CardEntry[];
   out1: CardEntry[];
-  /** Ring-2 links in claim order; parent is always a ring-1 id. */
-  in2: { parent: string; id: string }[];
-  out2: { parent: string; id: string }[];
+  in2: Ring2Link[];
+  out2: Ring2Link[];
 }
 
 export interface CardPlacement {
   id: string;
-  kind: "focus" | "card" | "dir";
+  kind: "focus" | "card" | "dir" | "root";
   lane: "focus" | "in" | "out";
   ring: 0 | 1 | 2;
   x: number;
@@ -106,8 +113,8 @@ export function cardGraph(
   const in1 = inIds.map((id) => ({ id, kind: "card" as const, twoWay: outAll.has(id) }));
   const out1 = outIds.map((id) => ({ id, kind: "card" as const, twoWay: false }));
 
-  const in2: { parent: string; id: string }[] = [];
-  const out2: { parent: string; id: string }[] = [];
+  const in2: Ring2Link[] = [];
+  const out2: Ring2Link[] = [];
   if (depth === 2) {
     const placed = new Set([focusId, ...inIds, ...outIds]);
     // Parents in row order; a candidate reachable from two parents attaches
@@ -116,33 +123,128 @@ export function cardGraph(
       for (const id of (model.inLinks[p.id] ?? []).filter(ok).sort(cmp))
         if (!placed.has(id)) {
           placed.add(id);
-          in2.push({ parent: p.id, id });
+          in2.push({ parent: p.id, id, kind: "card" });
         }
     for (const p of out1)
-      for (const id of model.edges
-        .filter((e) => e.s === p.id && ok(e.t))
-        .map((e) => e.t)
-        .sort(cmp))
-        if (!placed.has(id)) {
-          placed.add(id);
-          out2.push({ parent: p.id, id });
+      for (const c of childLinks(model, p, visible))
+        if (!placed.has(c.id)) {
+          placed.add(c.id);
+          out2.push({ parent: p.id, ...c });
         }
   }
   return { focusId, root: false, in1, out1, in2, out2 };
 }
 
+/** One entry's onward links, continuing the out-flow: a concept card's
+ *  out-links (title-sorted, like cardGraph), a dir card's bundle-index links
+ *  (authored order — mirrors the document); root entries never expand. */
+function childLinks(
+  model: VizModel,
+  e: CardEntry,
+  visible: (n: ConceptNode) => boolean,
+): { id: string; kind: "card" | "dir" }[] {
+  const ok = (id: string) => !!model.byId[id] && visible(model.byId[id]!);
+  if (e.kind === "card")
+    return [...new Set(model.edges.filter((x) => x.s === e.id && ok(x.t)).map((x) => x.t))]
+      .sort(byTitle(model))
+      .map((id) => ({ id, kind: "card" as const }));
+  if (e.kind === "dir")
+    return (model.bundles[e.id]?.links ?? []).flatMap((l): { id: string; kind: "card" | "dir" }[] =>
+      l.kind === "concept"
+        ? ok(l.id)
+          ? [{ id: l.id, kind: "card" }]
+          : []
+        : [{ id: l.path, kind: "dir" }],
+    );
+  return [];
+}
+
 /** The no-selection layout: a synthetic root card for the bundle's index.md,
- *  its links fanning out below (concept cards plus neutral dir cards; dirs
- *  are structural, so type filters never hide them). Authored link order is
- *  kept — it mirrors the document. Always one ring deep. */
-export function rootCardGraph(model: VizModel, visible: (n: ConceptNode) => boolean): CardGraph | null {
+ *  its links fanning out below (concept cards plus dir cards for sub-bundle
+ *  indexes; dirs are structural, so type filters never hide them). Authored
+ *  link order is kept — it mirrors the document. Depth 2 continues the flow:
+ *  concepts expand their out-links, dirs their bundle's index links. */
+export function rootCardGraph(
+  model: VizModel,
+  visible: (n: ConceptNode) => boolean,
+  depth: 1 | 2 = 1,
+): CardGraph | null {
   if (!model.root) return null;
   const out1: CardEntry[] = [];
   for (const l of model.root.links) {
     if (l.kind === "dir") out1.push({ id: l.path, kind: "dir", twoWay: false });
     else if (model.byId[l.id] && visible(model.byId[l.id]!)) out1.push({ id: l.id, kind: "card", twoWay: false });
   }
-  return { focusId: "", root: true, in1: [], out1, in2: [], out2: [] };
+  const out2: Ring2Link[] = [];
+  if (depth === 2) {
+    const placed = new Set(["", ...out1.map((e) => e.id)]);
+    for (const e of out1)
+      for (const c of childLinks(model, e, visible))
+        if (!placed.has(c.id)) {
+          placed.add(c.id);
+          out2.push({ parent: e.id, ...c });
+        }
+  }
+  return { focusId: "", root: true, in1: [], out1, in2: [], out2 };
+}
+
+/** Focus a dir card: the bundle's index.md centered, its parent index above
+ *  (the root card, or the enclosing bundle for nested dirs), its authored
+ *  links below — the navigable analogue of rootCardGraph. Depth 2 keeps
+ *  chaining in both directions: ancestor indexes up, entries' own links down. */
+export function bundleCardGraph(
+  model: VizModel,
+  path: string,
+  depth: 1 | 2,
+  visible: (n: ConceptNode) => boolean,
+): CardGraph | null {
+  const doc = model.bundles[path];
+  if (!doc) return null;
+  const ok = (id: string) => !!model.byId[id] && visible(model.byId[id]!);
+  // Nearest ancestor with an embedded index: an enclosing bundle, else the
+  // KB root (null when no root index is embedded).
+  const parentOf = (p: string): CardEntry | null => {
+    let up = p;
+    while (up.includes("/")) {
+      up = up.slice(0, up.lastIndexOf("/"));
+      if (model.bundles[up]) return { id: up, kind: "dir", twoWay: false };
+    }
+    return model.root ? { id: "", kind: "root", twoWay: false } : null;
+  };
+
+  const parent = parentOf(path);
+  const in1 = parent ? [parent] : [];
+  const placed = new Set([path, ...in1.map((e) => e.id)]);
+  const out1: CardEntry[] = [];
+  for (const l of doc.links) {
+    const e: CardEntry | null =
+      l.kind === "dir"
+        ? { id: l.path, kind: "dir", twoWay: false }
+        : ok(l.id)
+          ? { id: l.id, kind: "card", twoWay: false }
+          : null;
+    if (!e || placed.has(e.id)) continue;
+    placed.add(e.id);
+    out1.push(e);
+  }
+  const in2: Ring2Link[] = [];
+  const out2: Ring2Link[] = [];
+  if (depth === 2) {
+    if (parent?.kind === "dir") {
+      const gp = parentOf(parent.id);
+      if (gp && !placed.has(gp.id)) {
+        placed.add(gp.id);
+        in2.push({ parent: parent.id, id: gp.id, kind: gp.kind });
+      }
+    }
+    for (const e of out1)
+      for (const c of childLinks(model, e, visible))
+        if (!placed.has(c.id)) {
+          placed.add(c.id);
+          out2.push({ parent: e.id, ...c });
+        }
+  }
+  return { focusId: path, root: false, in1, out1, in2, out2 };
 }
 
 /** One side's ring-1 entries as a SINGLE centered band — never a grid,
@@ -214,26 +316,26 @@ function spreadAlongBand(placed: CardPlacement[], flow: CardFlow, pitch: number)
  *  band position so grandparents/grandchildren track their parent as the
  *  side scrolls; a de-overlap sweep keeps neighboring clusters apart. */
 function placeRing2(
-  links: { parent: string; id: string }[],
+  links: Ring2Link[],
   lane: "in" | "out",
   ring1: CardPlacement[],
   cards: CardPlacement[],
   flow: CardFlow,
 ): CardPlacement[] {
   const placed: CardPlacement[] = [];
-  const byParent = new Map<string, string[]>();
-  for (const l of links) (byParent.get(l.parent) ?? byParent.set(l.parent, []).get(l.parent)!).push(l.id);
-  for (const [parentId, kidIds] of byParent) {
+  const byParent = new Map<string, Ring2Link[]>();
+  for (const l of links) (byParent.get(l.parent) ?? byParent.set(l.parent, []).get(l.parent)!).push(l);
+  for (const [parentId, kids] of byParent) {
     const parent = ring1.find((c) => c.id === parentId);
     if (!parent) continue;
     const anchor = flow === "v" ? parent.x : parent.y;
-    kidIds.forEach((id, i) => {
+    kids.forEach((kid, i) => {
       placed.push({
-        id,
-        kind: "card",
+        id: kid.id,
+        kind: kid.kind,
         lane,
         ring: 2,
-        ...bandCoords(flow, lane, 2, i, kidIds.length, anchor),
+        ...bandCoords(flow, lane, 2, i, kids.length, anchor),
         z: 0,
         w: CARD_W,
         h: CARD_H,

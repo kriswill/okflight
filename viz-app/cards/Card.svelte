@@ -15,10 +15,14 @@
     bg: string;
     title: string;
     desc: string;
+    /** Structural (dir/root) card: outline face, no 3D slab behind it. */
+    outline?: boolean;
+    /** Page ink for outline faces. */
+    ink?: string;
     /** Scene registry hook; returns the unregister cleanup. */
     registerCard: (id: string, refs: CardRefs) => () => void;
   }
-  const { entry, bg, title, desc, registerCard }: Props = $props();
+  const { entry, bg, title, desc, outline = false, ink, registerCard }: Props = $props();
 
   const DEPTH = 8;
 
@@ -42,6 +46,8 @@
       title,
       desc,
       bg,
+      outline,
+      ink,
       w: entry.w,
       h: entry.h,
       dpr: Math.min(Math.max(devicePixelRatio || 1, 1), 2),
@@ -60,7 +66,7 @@
 </script>
 
 <T.Group bind:ref={group}>
-  <T.Mesh bind:ref={boxMesh} position.z={-DEPTH / 2} material={boxMat}>
+  <T.Mesh bind:ref={boxMesh} position.z={-DEPTH / 2} material={boxMat} visible={!outline}>
     <T.BoxGeometry args={[1, 1, 1]} />
   </T.Mesh>
   <T.Mesh bind:ref={faceMesh} position.z={0.5} material={faceMat}>

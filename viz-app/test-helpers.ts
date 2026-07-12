@@ -91,6 +91,9 @@ export const makeStub = (): StubScene => {
     setViewShift(leftInset, rightInset) {
       s.calls.push(["setViewShift", leftInset, rightInset]);
     },
+    setPaused(paused) {
+      s.calls.push(["setPaused", paused]);
+    },
     resize() {},
   };
   return s;

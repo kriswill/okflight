@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Component } from "svelte";
   import AboutBadge from "./AboutBadge.svelte";
   import DetailPanel from "./DetailPanel.svelte";
   import { GraphScene, type CreateScene, type SceneApi, type SceneNode } from "./scene";
@@ -9,6 +10,9 @@
   interface Props {
     viz: VizState;
     createScene?: CreateScene;
+    /** The cards view, injected from main.ts (like createScene, a seam: the
+     *  Threlte subtree must never enter the bun-test module graph). */
+    cards?: Component<{ viz: VizState }>;
     onSceneReady?: (scene: SceneApi) => void;
     onFirstFrame?: () => void;
   }
@@ -16,6 +20,7 @@
   const {
     viz,
     createScene = (el, nodes, edges, theme, cb) => new GraphScene(el, nodes, edges, theme, cb),
+    cards: Cards,
     onSceneReady,
     onFirstFrame,
   }: Props = $props();
@@ -95,11 +100,21 @@
     sceneNodes.forEach((sn, i) => (sn.color = colors[i]!));
     scene.applyTheme(theme);
   });
+
+  // The graph never unmounts (GraphScene has no dispose and a free-running
+  // RAF loop) — cards mode hides it and stops its compositing instead.
+  $effect(() => {
+    scene?.setPaused(viz.viewMode === "cards");
+  });
 </script>
 
 <svelte:window onresize={() => resizeSeq++} />
 
-<main id="stage" bind:this={el} {@attach attach}>
+<main id="stage" bind:this={el}>
+  <div id="graph-host" class:hidden={viz.viewMode === "cards"} {@attach attach}></div>
+  {#if viz.viewMode === "cards" && Cards}
+    <div id="cards-host"><Cards {viz} /></div>
+  {/if}
   <Tooltip {viz} />
   <DetailPanel {viz} stageEl={el} {resizeSeq} />
   <ThemeToggle {viz} stageEl={el} {resizeSeq} />
@@ -114,5 +129,18 @@
     position: absolute;
     inset: 0;
     overflow: hidden;
+  }
+  #graph-host,
+  #cards-host {
+    position: absolute;
+    inset: 0;
+  }
+  #cards-host {
+    z-index: 1; /* above the (hidden) canvas, below the overlay chrome */
+  }
+  #graph-host.hidden {
+    /* visibility (not display): keeps the canvas size stable so no resize
+       churn fires while hidden, and pointer events stop reaching it. */
+    visibility: hidden;
   }
 </style>

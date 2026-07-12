@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Component } from "svelte";
   import { decodeViewHash, encodeViewHash } from "./hash";
   import { installPerf, mark, summary } from "./perf";
   import type { CreateScene, SceneApi } from "./scene";
@@ -10,8 +11,10 @@
     viz: VizState;
     /** Test seam, forwarded to Stage. */
     createScene?: CreateScene;
+    /** Cards view component, injected by main.ts and forwarded to Stage. */
+    cards?: Component<{ viz: VizState }>;
   }
-  const { viz, createScene }: Props = $props();
+  const { viz, createScene, cards }: Props = $props();
 
   /* --- URL state (hash) — selection + filters survive reload/back/forward - */
   let currentState: string | null = null;
@@ -121,4 +124,4 @@
 <svelte:window onhashchange={applyHash} onpopstate={applyHash} />
 
 <Sidebar {viz} />
-<Stage {viz} {createScene} {onSceneReady} {onFirstFrame} />
+<Stage {viz} {createScene} {cards} {onSceneReady} {onFirstFrame} />

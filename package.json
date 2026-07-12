@@ -41,7 +41,8 @@
     "layout3d.ts",
     "licenses.ts",
     "viz-app/",
-    "!viz-app/*.test.ts",
+    "!viz-app/**/*.test.ts",
+    "!viz-app/CardsStub.svelte",
     "templates/",
     "tsconfig.json"
   ],

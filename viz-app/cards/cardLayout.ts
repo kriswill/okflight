@@ -296,20 +296,36 @@ function bandCoords(
   return { x: sign * BAND_X[ring], y: anchor + ((len - 1) / 2 - i) * (CARD_H + GAP_Y) };
 }
 
-/** Greedy 1D de-overlap along the band axis: sort, enforce the pitch left
- *  to right, then re-center the whole set on its intended mean so clusters
- *  stay as close to their parents as spacing allows. */
+/** Optimal 1D de-overlap along the band axis: place the cards to minimize
+ *  total squared displacement from their anchored (parent-centered)
+ *  positions subject to a minimum pitch between neighbors. Substituting
+ *  y_i = x_i − i·pitch turns the gap constraint into monotonicity, so the
+ *  optimum is isotonic regression (pool-adjacent-violators). Colliding
+ *  clusters share the displacement symmetrically — each merged block keeps
+ *  its anchors' mean — and anything clear of the crowd (extremities
+ *  included) stays exactly on its parent, unlike a greedy rightward sweep
+ *  with a global re-center. */
 function spreadAlongBand(placed: CardPlacement[], flow: CardFlow, pitch: number) {
   if (placed.length < 2) return;
   const get = (c: CardPlacement) => (flow === "v" ? c.x : c.y);
   const set = (c: CardPlacement, v: number) => (flow === "v" ? (c.x = v) : (c.y = v));
   const sorted = [...placed].sort((a, b) => get(a) - get(b));
-  const wantedMean = sorted.reduce((n, c) => n + get(c), 0) / sorted.length;
-  for (let i = 1; i < sorted.length; i++) {
-    if (get(sorted[i]!) - get(sorted[i - 1]!) < pitch) set(sorted[i]!, get(sorted[i - 1]!) + pitch);
+  const blocks: { sum: number; n: number }[] = [];
+  for (let i = 0; i < sorted.length; i++) {
+    let cur = { sum: get(sorted[i]!) - i * pitch, n: 1 };
+    while (blocks.length) {
+      const prev = blocks[blocks.length - 1]!;
+      if (prev.sum / prev.n < cur.sum / cur.n) break;
+      blocks.pop();
+      cur = { sum: prev.sum + cur.sum, n: prev.n + cur.n };
+    }
+    blocks.push(cur);
   }
-  const gotMean = sorted.reduce((n, c) => n + get(c), 0) / sorted.length;
-  for (const c of sorted) set(c, get(c) - (gotMean - wantedMean));
+  let i = 0;
+  for (const b of blocks) {
+    const mean = b.sum / b.n;
+    for (let k = 0; k < b.n; k++, i++) set(sorted[i]!, mean + i * pitch);
+  }
 }
 
 /** Ring 2: per-parent clusters on the outer band, centered on the parent's

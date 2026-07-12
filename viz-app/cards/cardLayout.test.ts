@@ -237,6 +237,62 @@ describe("layoutCards", () => {
     expect(Math.abs(meanGot - meanWanted)).toBeLessThan(1e-6);
   });
 
+  test("de-overlap is balanced: crowding splits between both neighbors, extremities never drift", () => {
+    // p1 (band -464) has three kids overflowing rightward into p2's (-232)
+    // single kid; p5 (+464) has one kid far from the crowd. The old greedy
+    // sweep pushed collisions right then re-centered the WHOLE set, dragging
+    // p5's kid off its parent. Optimal placement moves only the colliding
+    // block (sharing displacement across it) and leaves p5's kid exactly
+    // on its anchor.
+    const m = buildModel({
+      nodes: [
+        node("f", "Decision", "Focus"),
+        node("p1", "Pattern", "A"),
+        node("p2", "Pattern", "B"),
+        node("p3", "Pattern", "C"),
+        node("p4", "Pattern", "D"),
+        node("p5", "Pattern", "E"),
+        node("k1", "Term", "K1"),
+        node("k2", "Term", "K2"),
+        node("k3", "Term", "K3"),
+        node("k4", "Term", "K4"),
+        node("k5", "Term", "K5"),
+      ],
+      edges: [
+        { s: "p1", t: "f" },
+        { s: "p2", t: "f" },
+        { s: "p3", t: "f" },
+        { s: "p4", t: "f" },
+        { s: "p5", t: "f" },
+        { s: "k1", t: "p1" },
+        { s: "k2", t: "p1" },
+        { s: "k3", t: "p1" },
+        { s: "k4", t: "p2" },
+        { s: "k5", t: "p5" },
+      ],
+      cfg: cfg(),
+    });
+    const l = layoutCards(cardGraph(m, "f", 2, all)!);
+    const pitch = CARD_W + GAP_X;
+    const ring2 = l.cards.filter((c) => c.ring === 2).sort((a, b) => a.x - b.x);
+    for (let i = 1; i < ring2.length; i++) {
+      expect(ring2[i]!.x - ring2[i - 1]!.x).toBeGreaterThanOrEqual(pitch - 1e-9);
+    }
+    // The far cluster sits exactly on its parent — no global drift.
+    expect(l.byId["k5"]!.x).toBeCloseTo(l.byId["p5"]!.x, 6);
+    // The colliding block shares displacement: its mean stays where the
+    // anchors wanted it (p1's kids nudge left, p2's kid right).
+    const block = [l.byId["k1"]!, l.byId["k2"]!, l.byId["k3"]!, l.byId["k4"]!];
+    const wanted = (l.byId["p1"]!.x - pitch + l.byId["p1"]!.x + (l.byId["p1"]!.x + pitch) + l.byId["p2"]!.x) / 4;
+    const got = block.reduce((n, c) => n + c.x, 0) / 4;
+    expect(got).toBeCloseTo(wanted, 6);
+    // Symmetric sharing: p1's kids give ground leftward…
+    expect(l.byId["k3"]!.x).toBeLessThan(l.byId["p1"]!.x + pitch);
+    expect(l.byId["k1"]!.x).toBeLessThan(l.byId["p1"]!.x - pitch);
+    // …while p2's kid yields rightward.
+    expect(l.byId["k4"]!.x).toBeGreaterThan(l.byId["p2"]!.x);
+  });
+
   test("ring 2 clusters center on their parent and its arrows attach to the parent card edge", () => {
     const l = layoutCards(cardGraph(model(), "hub", 2, all)!);
     // Children track their parent: the cluster centers on the parent's band position.

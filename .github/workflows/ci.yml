@@ -42,3 +42,9 @@ jobs:
       - uses: DeterminateSystems/flakehub-cache-action@main
 
       - run: nix flake check -L
+
+      # `nix flake check` builds only checks.* — packages are eval'd but
+      # "build skipped" (verified 2026-07-12: only okf-tests + the
+      # node_modules FOD landed in the cache). Build the binary explicitly
+      # so the thing consumers actually run gets cached too.
+      - run: nix build .#okf -L

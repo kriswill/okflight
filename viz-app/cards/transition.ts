@@ -1,14 +1,17 @@
 // Refocus transition tracks: one rigid sphere-turn. Every card slerps along
 // a great circle over the same eased 420ms — the new focus's slerp IS the
 // rotation that brings it to the pole; exiting cards are carried with that
-// turn and pushed a further 0.35rad over their meridian while fading;
-// entering cards run the same path in reverse. The motion store owns time;
-// this module owns geometry. Pure three math.
+// turn and pushed a further EXIT_DIST world units over their meridian while
+// fading; entering cards run the same path in reverse. The motion store owns
+// time; this module owns geometry. Pure three math.
 import * as THREE from "three";
 import { extendFromPole, frameFromDir, horizonFade, type DomeLayout } from "./dome";
 
 export const DURATION_MS = 420;
-export const EXIT_ARC = 0.35;
+/** Exit/enter roll-out travel along the dome surface, in world units — a
+ *  fixed distance, because on the big scaffold dome a fixed ANGLE would
+ *  scale with R and fling cards across the stage. */
+export const EXIT_DIST = 420;
 /** Matches GraphScene.stepFly — fast start, gentle landing. */
 export const easeOutCubic = (t: number) => 1 - (1 - t) ** 3;
 
@@ -108,7 +111,7 @@ export function buildTransition(
       tracks.push({
         id: nc.id,
         kind: "enter",
-        v0: extendFromPole(nc.dir.clone().applyQuaternion(qPoleInv), EXIT_ARC),
+        v0: extendFromPole(nc.dir.clone().applyQuaternion(qPoleInv), EXIT_DIST / next.R),
         v1: nc.dir.clone(),
         o0: 0,
         o1: 1,
@@ -129,7 +132,7 @@ export function buildTransition(
       id: pc.id,
       kind: "exit",
       v0: pc.dir.clone(),
-      v1: extendFromPole(pc.dir.clone().applyQuaternion(qPole), EXIT_ARC),
+      v1: extendFromPole(pc.dir.clone().applyQuaternion(qPole), EXIT_DIST / next.R),
       o0: pc.opacity,
       o1: 0,
       s0x: pc.sx,

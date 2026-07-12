@@ -174,9 +174,16 @@ describe("domeRadius / domeProject", () => {
   });
   const flat = layoutCards(cardGraph(model, "f", 1, () => true)!);
 
-  test("radius floors at DOME_R_MIN and scales 1.2x with the extent", () => {
+  test("radius is a stable large constant; only enormous layouts grow it", () => {
+    // Subtle-scaffolding contract: the dome is so big its curvature never
+    // reads as a ball — ring-1 tilt ≈ 2°, edges permanently out of frame —
+    // and R does not wobble between focuses (stabilized card depth).
+    expect(DOME_R_MIN).toBeGreaterThanOrEqual(4800);
     expect(domeRadius(flat.bounds)).toBe(DOME_R_MIN);
-    expect(domeRadius({ minX: -2000, maxX: 1500, minY: -100, maxY: 100 })).toBe(2400);
+    // A mega-hub-sized layout (extent ~1000) still uses the constant.
+    expect(domeRadius({ minX: -1000, maxX: 1000, minY: -450, maxY: 450 })).toBe(DOME_R_MIN);
+    // Only truly enormous layouts scale it (2.5x extent keeps tilt subtle).
+    expect(domeRadius({ minX: -3000, maxX: 1500, minY: -100, maxY: 100 })).toBe(7500);
   });
 
   test("projects every card onto the sphere with its lift along the normal", () => {

@@ -9,7 +9,7 @@ import { buildModel } from "../data";
 import { cfg, node } from "../test-helpers";
 import { CARD_H, CARD_W, cardGraph, FOCUS_H, FOCUS_W, FOCUS_Z, layoutCards } from "./cardLayout";
 import { domeProject, extendFromPole, rotationToPole } from "./dome";
-import { buildTransition, DURATION_MS, easeOutCubic, sampleTrack, snapshotOf } from "./transition";
+import { buildTransition, DURATION_MS, easeOutCubic, EXIT_DIST, sampleTrack, snapshotOf } from "./transition";
 
 const close = (a: number, b: number, eps = 1e-9) => expect(Math.abs(a - b)).toBeLessThan(eps);
 const POLE = new THREE.Vector3(0, 0, 1);
@@ -61,27 +61,33 @@ describe("buildTransition", () => {
     close(byId["f"]!.s0y, FOCUS_H / CARD_H);
   });
 
-  test("exit rolls 0.35 rad past its rotation-carried position", () => {
+  test("exit rolls a fixed surface distance past its rotation-carried position", () => {
+    // Distance (not angle): on the big scaffold dome a fixed angle would
+    // fling exits thousands of units; EXIT_DIST is world units of travel.
     const t = byId["b"]!;
     const qPole = rotationToPole(prevDome.byId["a"]!.lon, prevDome.byId["a"]!.lat);
     const carried = prevDome.byId["b"]!.dir.clone().applyQuaternion(qPole);
-    close(t.v1.angleTo(POLE), carried.angleTo(POLE) + 0.35, 1e-9);
+    close(t.v1.angleTo(POLE), carried.angleTo(POLE) + EXIT_DIST / nextDome.R, 1e-9);
     expect(t.o1).toBe(0);
   });
 
   test("enter starts from the pre-rotation image of its final position", () => {
     const t = byId["c"]!;
     const qPole = rotationToPole(prevDome.byId["a"]!.lon, prevDome.byId["a"]!.lat);
-    const expected = extendFromPole(nextDome.byId["c"]!.dir.clone().applyQuaternion(qPole.clone().invert()), 0.35);
+    const expected = extendFromPole(
+      nextDome.byId["c"]!.dir.clone().applyQuaternion(qPole.clone().invert()),
+      EXIT_DIST / nextDome.R,
+    );
     close(t.v0.distanceTo(expected), 0, 1e-9);
     expect(t.o0).toBe(0);
   });
 
   test("new focus absent from prev falls back to identity pole rotation", () => {
     // Refocus onto c, which is not in prevDome: exits must still roll outward.
-    const spec2 = buildTransition(snapshotOf(prevDome), domeProject(layoutCards(cardGraph(model, "c", 1, all)!)));
+    const nextC = domeProject(layoutCards(cardGraph(model, "c", 1, all)!));
+    const spec2 = buildTransition(snapshotOf(prevDome), nextC);
     const exitB = spec2.tracks.find((t) => t.id === "b")!;
-    close(exitB.v1.angleTo(POLE), prevDome.byId["b"]!.dir.angleTo(POLE) + 0.35, 1e-9);
+    close(exitB.v1.angleTo(POLE), prevDome.byId["b"]!.dir.angleTo(POLE) + EXIT_DIST / nextC.R, 1e-9);
   });
 });
 

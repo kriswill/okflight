@@ -49,8 +49,9 @@
   const motion = createCardMotion();
 
   let cam = $state<THREE.OrthographicCamera | undefined>();
-  let pivotOuter = $state<THREE.Group | undefined>();
-  let pivotInner = $state<THREE.Group | undefined>();
+  // Drag pivot at the ORIGIN — the focus card's home — so reorienting the
+  // dome never displaces the focus from the center of the viewport.
+  let pivot = $state<THREE.Group | undefined>();
   let dragging = $state(false);
 
   /* --- registries + frame application ------------------------------------ */
@@ -103,10 +104,7 @@
   };
 
   const applyPivot = () => {
-    if (!pivotOuter || !pivotInner) return;
-    pivotOuter.position.set(0, 0, -motion.R);
-    pivotInner.position.set(0, 0, motion.R);
-    pivotOuter.quaternion.copy(motion.dragQuat());
+    pivot?.quaternion.copy(motion.dragQuat());
   };
 
   const applyFrame = (forceArrows = false) => {
@@ -244,7 +242,7 @@
         el.style.cursor = "grabbing";
       }
       if (dragging) {
-        motion.dragBy(e.clientX - last.x, e.clientY - last.y, cam?.zoom ?? 1);
+        motion.dragBy(e.clientX - last.x, e.clientY - last.y);
         last = { x: e.clientX, y: e.clientY };
         // Event-driven apply: the pivot is one transform, and waiting on the
         // frame task would drop the last move of a fast drag.
@@ -355,13 +353,11 @@
 
 <T.OrthographicCamera makeDefault bind:ref={cam} position={[EYE.x, EYE.y, EYE.z]} near={0.1} far={6000} />
 
-<T.Group bind:ref={pivotOuter}>
-  <T.Group bind:ref={pivotInner}>
-    {#each motion.renderList as r (r.id)}
-      <Card entry={r} bg={colorFor.get(r.id) ?? NEUTRAL} title={titleFor(r)} desc={descFor(r)} {registerCard} />
-    {/each}
-    {#each motion.arrowList as a (a.key)}
-      <ElbowArrow arrowKey={a.key} twoWay={a.twoWay} color={arrowColor(a.fromId, a.toId, a.dir)} {registerArrow} />
-    {/each}
-  </T.Group>
+<T.Group bind:ref={pivot}>
+  {#each motion.renderList as r (r.id)}
+    <Card entry={r} bg={colorFor.get(r.id) ?? NEUTRAL} title={titleFor(r)} desc={descFor(r)} {registerCard} />
+  {/each}
+  {#each motion.arrowList as a (a.key)}
+    <ElbowArrow arrowKey={a.key} twoWay={a.twoWay} color={arrowColor(a.fromId, a.toId, a.dir)} {registerArrow} />
+  {/each}
 </T.Group>

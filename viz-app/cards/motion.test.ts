@@ -232,31 +232,41 @@ describe("arrow heads", () => {
 });
 
 describe("drag", () => {
-  test("clamps and rotates the pick poses, not the raw samples", () => {
+  // Drag is a SUBTLE reorientation about the focus card (the origin), never
+  // a globe spin: tight clamps, fixed per-pixel sensitivity, and — the core
+  // contract — the focus card stays (essentially) centered at all times.
+  test("clamps tight and keeps the focus card centered while neighbors parallax", () => {
     const m = createCardMotion({ reducedMotion: () => false });
     m.setLayout(layoutF());
-    m.dragBy(100000, 100000, 1);
-    close(m.drag.yaw, 0.9);
-    close(m.drag.pitch, 0.6);
+    m.dragBy(100000, 100000);
+    close(m.drag.yaw, 0.18);
+    close(m.drag.pitch, 0.12);
     const raw = m.sample("f")!.pos;
     close(raw.x, 0, 1e-6); // raw sample untouched
-    const picked = m.pickItems().find((p) => p.id === "f")!;
-    expect(picked.pos.distanceTo(raw)).toBeGreaterThan(100); // composed pose moved
-    const posed = m.pose("f")!;
-    expect(posed.distanceTo(picked.pos)).toBeLessThan(1e-9);
+    // The focus sits at the pivot: only its tiny lift vector rotates.
+    const pickedFocus = m.pickItems().find((p) => p.id === "f")!;
+    expect(pickedFocus.pos.distanceTo(raw)).toBeLessThan(2);
+    // Ring cards get visible-but-moderate parallax, not relocation.
+    const rawA = m.sample("a")!.pos;
+    const pickedA = m.pickItems().find((p) => p.id === "a")!;
+    const shift = pickedA.pos.distanceTo(rawA);
+    expect(shift).toBeGreaterThan(10);
+    expect(shift).toBeLessThan(80);
+    const posed = m.pose("a")!;
+    expect(posed.distanceTo(pickedA.pos)).toBeLessThan(1e-9);
   });
 
-  test("sensitivity follows zoom·R (grab the surface)", () => {
+  test("fixed per-pixel sensitivity (independent of zoom and dome size)", () => {
     const m = createCardMotion({ reducedMotion: () => false });
     m.setLayout(layoutF());
-    m.dragBy(90, 0, 0.5);
-    close(m.drag.yaw, 90 / (0.5 * m.R), 1e-12);
+    m.dragBy(90, 0);
+    close(m.drag.yaw, 90 * 0.0009, 1e-12);
   });
 
   test("refocus bakes the drag into the start state and zeroes it", () => {
     const m = createCardMotion({ reducedMotion: () => false });
     m.setLayout(layoutF());
-    m.dragBy(200, 80, 1);
+    m.dragBy(200, 80);
     const dragged = m.pose("a")!.clone();
     m.setLayout(layoutA());
     close(m.drag.yaw, 0);

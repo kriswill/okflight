@@ -23,8 +23,13 @@ export const HEAD_H = 12;
 const HEAD_STEM = 8;
 const ARROW_BASE_OPACITY = 0.85;
 const VIEW_TAU_MS = 90;
-const YAW_CLAMP = 0.9;
-const PITCH_CLAMP = 0.6;
+// Drag is a subtle reorientation about the FOCUS card (the origin), not a
+// globe spin about the far-away sphere center: tight clamps and a fixed
+// per-pixel sensitivity keep the focus centered and neighbors at a gentle
+// parallax — the dome is scaffolding, not a trackball.
+const YAW_CLAMP = 0.18;
+const PITCH_CLAMP = 0.12;
+const DRAG_SENS = 0.0009; // rad per pixel
 
 export interface RenderEntry {
   id: string;
@@ -131,21 +136,29 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
     };
   };
 
-  /** Live state with the drag baked in — the `from` of every transition. */
+  /** Live state with the drag baked in — the `from` of every transition.
+   *  Drag rotates about the ORIGIN, so the baked sphere direction comes
+   *  from the rendered world position, re-expressed against the center. */
   const snapshot = (): DomeSnapshot => {
     const qDrag = dragQuat();
+    const C = new THREE.Vector3(0, 0, -liveR);
     return {
       R: liveR,
-      cards: [...samples.entries()].map(([id, s]) => ({
-        id,
-        dir: s.dir.clone().applyQuaternion(qDrag),
-        opacity: s.opacity,
-        sx: s.sx,
-        sy: s.sy,
-        w: s.w,
-        h: s.h,
-        lift: s.lift,
-      })),
+      cards: [...samples.entries()].map(([id, s]) => {
+        const world = s.pos.clone().applyQuaternion(qDrag);
+        const rel = world.sub(C);
+        const dist = rel.length();
+        return {
+          id,
+          dir: rel.multiplyScalar(1 / dist),
+          opacity: s.opacity,
+          sx: s.sx,
+          sy: s.sy,
+          w: s.w,
+          h: s.h,
+          lift: dist - liveR,
+        };
+      }),
     };
   };
 
@@ -422,28 +435,26 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
       updateSettled();
     },
 
-    dragBy(dxPx: number, dyPx: number, zoom: number) {
-      const denom = Math.max(1e-6, zoom * liveR);
-      drag.yaw = Math.min(YAW_CLAMP, Math.max(-YAW_CLAMP, drag.yaw + dxPx / denom));
-      drag.pitch = Math.min(PITCH_CLAMP, Math.max(-PITCH_CLAMP, drag.pitch + dyPx / denom));
+    dragBy(dxPx: number, dyPx: number) {
+      drag.yaw = Math.min(YAW_CLAMP, Math.max(-YAW_CLAMP, drag.yaw + dxPx * DRAG_SENS));
+      drag.pitch = Math.min(PITCH_CLAMP, Math.max(-PITCH_CLAMP, drag.pitch + dyPx * DRAG_SENS));
     },
 
     sample(id: string): CardSample | null {
       return samples.get(id) ?? null;
     },
 
-    /** Drag-composed world center of a card (what the user actually sees). */
+    /** Drag-composed world center of a card (what the user actually sees).
+     *  Rotation about the origin: the focus card never leaves center. */
     pose(id: string): THREE.Vector3 | null {
       const s = samples.get(id);
       if (!s) return null;
-      const C = new THREE.Vector3(0, 0, -liveR);
-      return s.pos.clone().sub(C).applyQuaternion(dragQuat()).add(C);
+      return s.pos.clone().applyQuaternion(dragQuat());
     },
 
     /** Live pickable poses: drag-composed transforms, live footprints. */
     pickItems(): PickItem[] {
       const qDrag = dragQuat();
-      const C = new THREE.Vector3(0, 0, -liveR);
       const items: PickItem[] = [];
       for (const r of renderList) {
         const s = samples.get(r.id);
@@ -451,7 +462,7 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
         items.push({
           id: r.id,
           kind: r.kind,
-          pos: s.pos.clone().sub(C).applyQuaternion(qDrag).add(C),
+          pos: s.pos.clone().applyQuaternion(qDrag),
           quat: qDrag.clone().multiply(s.quat),
           w: s.w * s.sx,
           h: s.h * s.sy,

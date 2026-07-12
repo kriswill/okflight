@@ -309,8 +309,13 @@ export function layoutCards(g: CardGraph): CardLayout {
   return { focusId: g.focusId, rootFocus: g.root, cards, arrows, byId, bounds };
 }
 
+/** Card scale never drops below this: readable cards beat fitting every
+ *  last rim card on screen (rows are capped, so overflow is bounded). */
+export const ZOOM_MIN = 0.6;
+
 /** Ortho zoom fitting the layout's symmetric envelope (origin-centered, so
- *  the focus card stays centered) into the viewport; never zooms past 1. */
+ *  the focus card stays centered) into the viewport; clamped to
+ *  [ZOOM_MIN, 1] so card size stays stable across focuses. */
 export function fitZoom(
   b: CardLayout["bounds"],
   vw: number,
@@ -320,5 +325,5 @@ export function fitZoom(
   const w = 2 * Math.max(Math.abs(b.minX), Math.abs(b.maxX));
   const h = 2 * Math.max(Math.abs(b.minY), Math.abs(b.maxY));
   if (!(w > 0) || !(h > 0)) return 1;
-  return Math.min(1, pad * Math.min(vw / w, vh / h));
+  return Math.min(1, Math.max(ZOOM_MIN, pad * Math.min(vw / w, vh / h)));
 }

@@ -6,7 +6,10 @@
 import * as THREE from "three";
 import type { CardLayout, CardPlacement } from "./cardLayout";
 
-export const DOME_R_MIN = 900;
+// Big enough that the sphere never reads as a ball: ring-1 tilt ≈ 2°, the
+// dome's edges stay permanently out of frame, and R stays constant across
+// focuses (stable card depth/scale) — subtle scaffolding, not a globe.
+export const DOME_R_MIN = 4800;
 /** Angle-from-pole band over which cards fade at the dome's horizon. */
 const FADE_START_Z = Math.cos((55 * Math.PI) / 180);
 const FADE_END_Z = Math.cos((80 * Math.PI) / 180);
@@ -34,11 +37,12 @@ export interface DomeLayout {
   flat: CardLayout;
 }
 
-/** Sphere radius for a layout: floored so small layouts barely curl, scaled
- *  so wide layouts never push their rim into the resting fade zone. */
+/** Sphere radius for a layout: a stable large constant; only enormous
+ *  layouts scale it (2.5× extent) so the rim never approaches the fade
+ *  zone at rest. */
 export function domeRadius(b: CardLayout["bounds"]): number {
   const extent = Math.max(Math.abs(b.minX), Math.abs(b.maxX), Math.abs(b.minY), Math.abs(b.maxY));
-  return Math.max(DOME_R_MIN, 1.2 * extent);
+  return Math.max(DOME_R_MIN, 2.5 * extent);
 }
 
 /** Geodesic mapping of a flat point: arc lengths become angles. */

@@ -1,0 +1,39 @@
+# Publish tagged releases to FlakeHub (flakehub.com/flake/kriswill/okflight).
+# Same trust model as ci.yml: the OIDC id-token is the only credential —
+# FlakeHub accepts releases exclusively from CI identities.
+#
+# Deliberately a separate file from release.yml: that filename is bound to
+# npm trusted publishing, and this repo's release tags are pushed by a
+# human, so a plain tag trigger fires naturally (no GITHUB_TOKEN cascade
+# workaround needed — unlike flake-explorer's bot-tagged flow).
+#
+# The build re-runs before the push (a cache hit after ci.yml has run) so
+# include-output-paths records real, cached store paths with the release —
+# letting fh resolve/apply map the release straight to closures.
+name: flakehub-publish
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: read
+  id-token: write # the FlakeHub credential (release push + cache)
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: DeterminateSystems/determinate-nix-action@v3
+
+      - uses: DeterminateSystems/flakehub-cache-action@main
+
+      - run: nix build .#okf -L
+
+      - uses: DeterminateSystems/flakehub-push@main
+        with:
+          visibility: public
+          include-output-paths: true

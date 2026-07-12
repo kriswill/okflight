@@ -7,7 +7,7 @@
 // and applies imperatively (single-writer rule).
 import * as THREE from "three";
 import type { ArrowSpec, CardLayout, CardPlacement } from "./cardLayout";
-import { arrowAnchors, elbowPath3, headTransform, trimEnd } from "./arrowFrame";
+import { arrowAnchors, edgeHead, elbowPath3 } from "./arrowFrame";
 import { domeProject, frameFromDir, type DomeLayout } from "./dome";
 import {
   buildTransition,
@@ -19,7 +19,8 @@ import {
 import type { PickItem } from "./picking";
 
 export const HEAD_H = 12;
-const HEAD_TRIM = HEAD_H * 0.8;
+/** Straight run before each cone base so the tube meets the flat side at 90°. */
+const HEAD_STEM = 8;
 const ARROW_BASE_OPACITY = 0.85;
 const VIEW_TAU_MS = 90;
 const YAW_CLAMP = 0.9;
@@ -227,7 +228,18 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
       const toWorld = new THREE.Vector3(tl.x, tl.y, 0).applyQuaternion(to.quat).add(to.pos);
       const fromTan = new THREE.Vector3(0, -1, 0).applyQuaternion(from.quat);
       const toTan = new THREE.Vector3(0, 1, 0).applyQuaternion(to.quat);
-      const full = elbowPath3(fromWorld, fromTan, toWorld, toTan);
+      // Heads are pinned 90° to the card edges (apex on the anchor); the
+      // tube runs anchor→stub as a bezier, then a dead-straight stem into
+      // each cone's base center — it never touches the card itself.
+      const head = edgeHead(toWorld, toTan, HEAD_H);
+      const tailHead = tr.spec.twoWay ? edgeHead(fromWorld, fromTan, HEAD_H) : null;
+      const endStub = toWorld.clone().addScaledVector(toTan, HEAD_H + HEAD_STEM);
+      const startPoint = tailHead ? tailHead.base : fromWorld;
+      const startStub = tailHead
+        ? fromWorld.clone().addScaledVector(fromTan, HEAD_H + HEAD_STEM)
+        : fromWorld;
+      const bez = elbowPath3(startStub, fromTan, endStub, toTan);
+      const path = tailHead ? [startPoint.clone(), ...bez, head.base] : [...bez, head.base];
       const opacity =
         tr.kind === "exit"
           ? ARROW_BASE_OPACITY * (1 - Math.min(1, e / 0.5))
@@ -242,9 +254,9 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
         twoWay: tr.spec.twoWay,
         fromLocal: fl,
         toLocal: tl,
-        path: trimEnd(full, HEAD_TRIM),
-        head: headTransform(full, HEAD_H),
-        tailHead: tr.spec.twoWay ? headTransform(full, HEAD_H, true) : null,
+        path,
+        head,
+        tailHead,
         opacity,
       });
     }

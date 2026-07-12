@@ -1,9 +1,10 @@
 // Frame-time arrow math for the animated card view. The static ArrowSpec
 // endpoints become card-local anchors once per layout; every animated frame
 // re-derives world anchors from the cards' live pose, bends the elbow in 3D
-// along the cards' edge normals, and orients the head cones by the live end
-// tangent — tips stay glued to both the tube and the card edge no matter
-// how the dome turns. Pure three math; elbow.ts (the 2D grammar) untouched.
+// along the cards' edge normals, and pins the head cones perpendicular to
+// the card edge with the tube ending at each cone's base center — tips stay
+// glued to both the tube and the card no matter how the dome turns. Pure
+// three math; elbow.ts (the 2D grammar) untouched.
 import * as THREE from "three";
 import type { ArrowSpec, CardPlacement } from "./cardLayout";
 
@@ -68,28 +69,21 @@ export function elbowPath3(
   return pts;
 }
 
-/** Cone transform for an arrowhead: apex exactly on the path end, axis
- *  aligned with the live travel direction (cone geometry points +y with the
- *  apex at +h/2, so pos backs off half a height along the tangent). */
-export function headTransform(
-  path: THREE.Vector3[],
+/** Cone transform for an arrowhead pinned to a card edge: apex exactly on
+ *  the anchor, axis forced perpendicular to the edge (along −outward, into
+ *  the card) regardless of how the sampled curve approaches, and `base` —
+ *  the flat side's center, one head-height out along the edge tangent —
+ *  which is exactly where the tube must terminate. */
+export function edgeHead(
+  anchor: THREE.Vector3,
+  outward: THREE.Vector3,
   size: number,
-  atStart = false,
-): { pos: THREE.Vector3; quat: THREE.Quaternion } {
-  const a = atStart ? path[1]! : path[path.length - 2]!;
-  const b = atStart ? path[0]! : path[path.length - 1]!;
-  const d = b.clone().sub(a).normalize();
-  const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d);
-  return { pos: b.clone().addScaledVector(d, -size / 2), quat };
-}
-
-/** Pull the final sample back along the end segment so the tube tucks under
- *  the head's base instead of poking past the apex. */
-export function trimEnd(path: THREE.Vector3[], trim: number): THREE.Vector3[] {
-  const a = path[path.length - 2]!;
-  const b = path[path.length - 1]!;
-  const d = b.clone().sub(a).normalize();
-  const out = path.slice();
-  out[out.length - 1] = b.clone().addScaledVector(d, -trim);
-  return out;
+): { pos: THREE.Vector3; quat: THREE.Quaternion; base: THREE.Vector3 } {
+  const axis = outward.clone().negate();
+  const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis);
+  return {
+    pos: anchor.clone().addScaledVector(outward, size / 2),
+    quat,
+    base: anchor.clone().addScaledVector(outward, size),
+  };
 }

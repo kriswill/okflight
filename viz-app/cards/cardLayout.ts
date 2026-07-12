@@ -13,7 +13,9 @@ export const CARD_W = 180;
 export const CARD_H = 64;
 export const FOCUS_W = 230;
 export const FOCUS_H = 96;
-export const GAP_X = 28;
+// Wide enough that dome tilt foreshortening never makes neighbors read as
+// touching (28 looked cramped once cards curled onto the sphere).
+export const GAP_X = 52;
 /** Row band centers by ring: [focus, ring 1, ring 2]. */
 export const BAND_Y = [0, 180, 350] as const;
 /** Extra rows of a wrapped band step outward by this much. */

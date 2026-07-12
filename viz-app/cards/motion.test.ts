@@ -8,7 +8,7 @@ import { buildModel } from "../data";
 import { cfg, node } from "../test-helpers";
 import { cardGraph, FOCUS_Z, layoutCards, type CardLayout } from "./cardLayout";
 import { domeProject } from "./dome";
-import { createCardMotion } from "./motion.svelte";
+import { createCardMotion, HEAD_H } from "./motion.svelte";
 import { DURATION_MS, easeOutCubic } from "./transition";
 
 const close = (a: number, b: number, eps = 1e-9) => expect(Math.abs(a - b)).toBeLessThan(eps);
@@ -183,6 +183,51 @@ describe("arrows during transition", () => {
     close(late["f→b"]!.opacity, 0, 1e-6);
     for (let i = 0; i < 12; i++) m.step(10);
     expect(m.arrowStates().find((a) => a.key === "f→b")).toBeUndefined();
+  });
+});
+
+describe("arrow heads", () => {
+  // The user-visible contract: the tube stops at the cone's flat base
+  // center and meets it at 90°; the apex touches the card edge exactly.
+  test("tube terminates at the head's base center via a straight perpendicular stem", () => {
+    const m = createCardMotion({ reducedMotion: () => false });
+    m.setLayout(layoutF());
+    expect(m.arrowStates().length).toBeGreaterThan(0);
+    for (const a of m.arrowStates()) {
+      const to = m.sample(a.toId)!;
+      const toTan = new THREE.Vector3(0, 1, 0).applyQuaternion(to.quat);
+      const anchor = new THREE.Vector3(a.toLocal.x, a.toLocal.y, 0).applyQuaternion(to.quat).add(to.pos);
+      const last = a.path[a.path.length - 1]!;
+      const prev = a.path[a.path.length - 2]!;
+      expect(last.distanceTo(anchor.clone().addScaledVector(toTan, HEAD_H))).toBeLessThan(1e-9);
+      const d = last.clone().sub(prev).normalize();
+      expect(d.dot(toTan.clone().negate())).toBeGreaterThan(0.999999);
+      const apex = new THREE.Vector3(0, HEAD_H / 2, 0).applyQuaternion(a.head.quat).add(a.head.pos);
+      expect(apex.distanceTo(anchor)).toBeLessThan(1e-9);
+    }
+  });
+
+  test("two-way arrows get the same treatment at the tail", () => {
+    const mutual = buildModel({
+      nodes: [node("f", "Decision", "Focus"), node("e", "Pattern", "Echo")],
+      edges: [
+        { s: "e", t: "f" },
+        { s: "f", t: "e" },
+      ],
+      cfg: cfg(),
+    });
+    const m = createCardMotion({ reducedMotion: () => false });
+    m.setLayout(layoutCards(cardGraph(mutual, "f", 1, all)!));
+    const a = m.arrowStates().find((s) => s.twoWay)!;
+    const from = m.sample(a.fromId)!;
+    const fromTan = new THREE.Vector3(0, -1, 0).applyQuaternion(from.quat);
+    const anchor = new THREE.Vector3(a.fromLocal.x, a.fromLocal.y, 0).applyQuaternion(from.quat).add(from.pos);
+    // Path starts at the tail cone's base center, leaving perpendicular.
+    expect(a.path[0]!.distanceTo(anchor.clone().addScaledVector(fromTan, HEAD_H))).toBeLessThan(1e-9);
+    const d0 = a.path[1]!.clone().sub(a.path[0]!).normalize();
+    expect(d0.dot(fromTan)).toBeGreaterThan(0.999999);
+    const tailApex = new THREE.Vector3(0, HEAD_H / 2, 0).applyQuaternion(a.tailHead!.quat).add(a.tailHead!.pos);
+    expect(tailApex.distanceTo(anchor)).toBeLessThan(1e-9);
   });
 });
 

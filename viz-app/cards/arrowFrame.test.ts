@@ -1,8 +1,8 @@
 // Frame-time arrow math: while cards move, every arrow is rebuilt from the
 // cards' LIVE transforms — endpoints as card-local anchors carried by the
 // card pose, the bezier generalized to 3D along the cards' edge normals,
-// and heads oriented by the live end tangent so tips never detach from the
-// line or the card ("wonky heads" are the explicit failure mode here).
+// and heads locked at 90° to the card edge with the tube terminating at the
+// cone's base center ("wonky heads" are the explicit failure mode here).
 import { describe, expect, test } from "bun:test";
 import * as THREE from "three";
 import { buildModel } from "../data";
@@ -10,7 +10,7 @@ import { cfg, node } from "../test-helpers";
 import { cardGraph, layoutCards } from "./cardLayout";
 import { domePoint, frameFromDir } from "./dome";
 import { elbowPath } from "./elbow";
-import { arrowAnchors, elbowPath3, headTransform, trimEnd } from "./arrowFrame";
+import { arrowAnchors, edgeHead, elbowPath3 } from "./arrowFrame";
 
 const close = (a: number, b: number, eps = 1e-9) => expect(Math.abs(a - b)).toBeLessThan(eps);
 const v3 = (x: number, y: number, z = 0) => new THREE.Vector3(x, y, z);
@@ -89,36 +89,33 @@ describe("elbowPath3", () => {
   });
 });
 
-describe("headTransform", () => {
-  const path = elbowPath3(v3(0, 148), v3(0, -1, 0), v3(20, 48), v3(0, 1, 0));
-
-  test("end head: cone apex lands exactly on the path tip, axis along travel", () => {
-    const h = headTransform(path, 12);
-    const apex = v3(0, 6, 0).applyQuaternion(h.quat).add(h.pos);
-    expect(apex.distanceTo(path[path.length - 1]!)).toBeLessThan(1e-9);
-    const travel = path[path.length - 1]!.clone().sub(path[path.length - 2]!).normalize();
-    const axis = v3(0, 1, 0).applyQuaternion(h.quat);
-    expect(axis.dot(travel)).toBeGreaterThan(0.999999);
+describe("edgeHead", () => {
+  test("apex sits exactly on the card-edge anchor, axis perpendicular to the edge", () => {
+    for (const [x, y] of [
+      [0, 0],
+      [300, 350],
+      [-500, -200],
+    ] as const) {
+      const { dir } = domePoint(x, y, 1000);
+      const outward = frameFromDir(dir).north; // out of a card's top edge
+      const anchor = v3(x, y, -30);
+      const h = edgeHead(anchor, outward, 12);
+      // Cone geometry: apex at +h/2 on local +Y.
+      const apex = v3(0, 6, 0).applyQuaternion(h.quat).add(h.pos);
+      expect(apex.distanceTo(anchor)).toBeLessThan(1e-9);
+      // Axis points INTO the card (against the outward edge tangent) — the
+      // head is forced to 90° against the surface, never the sampled curve.
+      const axis = v3(0, 1, 0).applyQuaternion(h.quat);
+      expect(axis.dot(outward.clone().negate())).toBeGreaterThan(0.999999);
+    }
   });
 
-  test("start head: apex on the first point, oriented backwards", () => {
-    const h = headTransform(path, 12, true);
-    const apex = v3(0, 6, 0).applyQuaternion(h.quat).add(h.pos);
-    expect(apex.distanceTo(path[0]!)).toBeLessThan(1e-9);
-    const backward = path[0]!.clone().sub(path[1]!).normalize();
-    const axis = v3(0, 1, 0).applyQuaternion(h.quat);
-    expect(axis.dot(backward)).toBeGreaterThan(0.999999);
-  });
-});
-
-describe("trimEnd", () => {
-  test("pulls the final sample back along the end segment, leaving the rest", () => {
-    const path = elbowPath3(v3(0, 148), v3(0, -1, 0), v3(20, 48), v3(0, 1, 0));
-    const before = path.map((p) => p.clone());
-    const trimmed = trimEnd(path, 9.6);
-    const d = before[before.length - 1]!.clone().sub(before[before.length - 2]!).normalize();
-    const expected = before[before.length - 1]!.clone().addScaledVector(d, -9.6);
-    expect(trimmed[trimmed.length - 1]!.distanceTo(expected)).toBeLessThan(1e-9);
-    for (let i = 0; i < trimmed.length - 1; i++) expect(trimmed[i]!.distanceTo(before[i]!)).toBe(0);
+  test("base center lands one head-height out along the edge tangent — where the tube must stop", () => {
+    const outward = v3(0, 1, 0);
+    const h = edgeHead(v3(10, 48, 0), outward, 12);
+    expect(h.base.distanceTo(v3(10, 60, 0))).toBeLessThan(1e-9);
+    // Base is also derivable from the transform: pos - axis·h/2.
+    const viaPose = v3(0, -6, 0).applyQuaternion(h.quat).add(h.pos);
+    expect(viaPose.distanceTo(h.base)).toBeLessThan(1e-9);
   });
 });

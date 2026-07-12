@@ -103,6 +103,20 @@ describe("inline rendering", () => {
   test("unembedded directory link degrades to title-only anchor", () => {
     expect(md.mdToHtml("[x](../../flakes/nope/)", from)).toBe('<p><a title="../../flakes/nope/">x</a></p>');
   });
+
+  test("bundle index links resolve to data-bundle (root index -> empty path)", () => {
+    const b = createMd({ ...ctx, bundles: { decisions: {}, "decisions/deep": {} }, root: {} });
+    expect(b.mdToHtml("[here](index.md)", from)).toBe('<p><a href="#" data-bundle="decisions">here</a></p>');
+    expect(b.mdToHtml("[deep](deep/index.md)", from)).toBe(
+      '<p><a href="#" data-bundle="decisions/deep">deep</a></p>',
+    );
+    expect(b.mdToHtml("[root](../index.md)", from)).toBe('<p><a href="#" data-bundle="">root</a></p>');
+  });
+
+  test("index links without an embedded bundle/root doc degrade to title-only anchors", () => {
+    expect(md.mdToHtml("[x](nope/index.md)", from)).toBe('<p><a title="nope/index.md">x</a></p>');
+    expect(md.mdToHtml("[r](../index.md)", from)).toBe('<p><a title="../index.md">r</a></p>');
+  });
 });
 
 describe("bare path autolinking", () => {

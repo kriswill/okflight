@@ -627,3 +627,35 @@ describe("root card data", () => {
     ]);
   });
 });
+
+// Sub-bundle index.md docs ride along the same way (RawData.bundles, keyed by
+// dir path): the cards view renders each dir card from its bundle's index and
+// focuses it on click, so every embedded bundle doc must be pre-validated
+// exactly like the root.
+describe("bundle index data", () => {
+  test("buildModel threads bundles through; absent -> empty map", () => {
+    const bundles = {
+      notes: { title: "Notes", desc: "d", links: [{ kind: "concept" as const, id: "a" }] },
+    };
+    expect(buildModel({ ...raw, bundles }).bundles).toEqual(bundles);
+    expect(buildModel(raw).bundles).toEqual({});
+  });
+
+  test("buildModel drops bundle concept links pointing at unknown ids", () => {
+    const bundles = {
+      notes: {
+        title: "Notes",
+        desc: "",
+        links: [
+          { kind: "concept" as const, id: "ghost" },
+          { kind: "concept" as const, id: "b" },
+          { kind: "dir" as const, path: "notes/deep" },
+        ],
+      },
+    };
+    expect(buildModel({ ...raw, bundles }).bundles["notes"]!.links).toEqual([
+      { kind: "concept", id: "b" },
+      { kind: "dir", path: "notes/deep" },
+    ]);
+  });
+});

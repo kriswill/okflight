@@ -1,0 +1,47 @@
+<script lang="ts">
+  // Band-edge overflow indicator: a small pill pinned at the window edge
+  // showing how many cards live past it. Static between recomputes — plain
+  // Threlte prop reactivity (no frame-applier registry) keeps it in place;
+  // motion.overflow re-emits whenever scroll/window/layout changes.
+  import { T } from "@threlte/core";
+  import * as THREE from "three";
+  import { makeChipFace } from "./cardFace";
+
+  interface Props {
+    count: number;
+    /** Triangle direction, radians (0 = +x on screen, canvas y-down). */
+    angle: number;
+    pos: THREE.Vector3;
+    quat: THREE.Quaternion;
+    bg: string;
+    ink: string;
+  }
+  const { count, angle, pos, quat, bg, ink }: Props = $props();
+
+  const CHIP_W = 64;
+  const CHIP_H = 26;
+
+  const mat = new THREE.MeshBasicMaterial({ toneMapped: false, transparent: true });
+  const texture = $derived(
+    makeChipFace({
+      count,
+      angle,
+      bg,
+      ink,
+      w: CHIP_W,
+      h: CHIP_H,
+      dpr: Math.min(Math.max(devicePixelRatio || 1, 1), 2),
+    }),
+  );
+  $effect(() => {
+    mat.map = texture;
+    mat.needsUpdate = true;
+    return () => texture.dispose();
+  });
+</script>
+
+<T.Group position={[pos.x, pos.y, pos.z]} quaternion={[quat.x, quat.y, quat.z, quat.w]}>
+  <T.Mesh material={mat} scale={[CHIP_W, CHIP_H, 1]}>
+    <T.PlaneGeometry args={[1, 1]} />
+  </T.Mesh>
+</T.Group>

@@ -18,9 +18,24 @@ export interface MdCtx {
   commits?: Record<string, string>;
   /** Repo-relative OKF bundle directory (cfg.bundle.dir). */
   bundleDir?: string;
+  /** Embedded sub-bundle index docs by dir path — `<dir>/index.md` link
+   *  targets resolve to data-bundle navigations when present. */
+  bundles?: Record<string, unknown>;
+  /** Embedded root index doc — gates the root `index.md` link target
+   *  (data-bundle=""). */
+  root?: unknown;
 }
 
-export function createMd({ files, byId, dirs = {}, commitUrl = null, commits = {}, bundleDir = DEFAULT_BUNDLE_DIR }: MdCtx) {
+export function createMd({
+  files,
+  byId,
+  dirs = {},
+  commitUrl = null,
+  commits = {},
+  bundleDir = DEFAULT_BUNDLE_DIR,
+  bundles = {},
+  root = null,
+}: MdCtx) {
   /** Resolve a relative link target against a repo-root-relative directory. */
   function resolveRel(dir: string[], target: string): string | null {
     if (/^[a-z][a-z0-9+.-]*:/.test(target) || target.startsWith("#")) return null;
@@ -97,6 +112,12 @@ export function createMd({ files, byId, dirs = {}, commitUrl = null, commits = {
         if (nid) return `<a href="#" data-node="${esc(nid)}">${txt}</a>`;
         if (p && files[p]) return `<a href="#" data-file="${esc(p)}">${txt}</a>`;
         if (p && dirs[p]) return `<a href="#" data-dir="${esc(p)}">${txt}</a>`;
+        // Index docs are reserved (never concepts): a bundle's index.md is a
+        // focus navigation; the root's is the root card ("" path).
+        if (p && p.startsWith(bundlePrefix) && (p.endsWith("/index.md") || p === bundlePrefix + "index.md")) {
+          const bid = p === bundlePrefix + "index.md" ? "" : p.slice(bundlePrefix.length, -"/index.md".length);
+          if (bid ? bundles[bid] : root) return `<a href="#" data-bundle="${esc(bid)}">${txt}</a>`;
+        }
         if (/^https?:/.test(href)) return `<a href="${esc(href)}" target="_blank" rel="noopener">${txt}</a>`;
         return `<a title="${esc(href)}">${txt}</a>`;
       });

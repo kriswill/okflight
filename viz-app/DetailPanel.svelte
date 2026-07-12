@@ -20,12 +20,21 @@
     commitUrl: viz.model.commitUrl,
     commits: viz.model.commits,
     bundleDir: viz.model.cfg.bundle.dir,
+    bundles: viz.model.bundles,
+    root: viz.model.root,
   });
 
   const file = $derived(viz.sel.kind === "file" ? viz.model.files[viz.sel.path] : null);
   const filePath = $derived(viz.sel.kind === "file" ? viz.sel.path : "");
   const dir = $derived(viz.sel.kind === "dir" ? viz.model.dirs[viz.sel.path] : null);
   const dirPath = $derived(viz.sel.kind === "dir" ? viz.sel.path : "");
+  // Cards view, nothing selected: the focused index doc (bundle or root).
+  const indexDoc = $derived(viz.cardsIndexDoc);
+  const indexTitle = $derived(
+    indexDoc ? indexDoc.title || (viz.cardsBundle ? viz.cardsBundle + "/" : viz.model.displayName) : "",
+  );
+  /** Pseudo doc id whose directory the index body's links resolve against. */
+  const indexFromId = $derived(viz.cardsBundle ? viz.cardsBundle + "/index" : "index");
 
   const fmtDate = (v: unknown) => formatDate(v, viz.model.cfg.display.dateFormat);
 
@@ -54,7 +63,10 @@
   function onClick(e: MouseEvent) {
     const t = e.target as Element;
     if (t.closest(".close")) {
-      viz.clearSelection();
+      // Closing an index panel is a dismissal, not a navigation — the cards
+      // focus must not change under the user.
+      if (viz.sel.kind === "none") viz.hideIndexPanel();
+      else viz.clearSelection();
       return;
     }
     const af = t.closest("a[data-file]") as HTMLElement | null;
@@ -67,6 +79,14 @@
     if (ad) {
       e.preventDefault();
       viz.selectDir(ad.dataset.dir!);
+      return;
+    }
+    const ab = t.closest("a[data-bundle]") as HTMLElement | null;
+    if (ab) {
+      e.preventDefault();
+      const path = ab.dataset.bundle ?? "";
+      if (path) viz.focusBundle(path);
+      else viz.clearSelection(); // the root index link -> root focus
       return;
     }
     const a = t.closest("a[data-node]") as HTMLElement | null;
@@ -102,11 +122,12 @@
 
   $effect(() => {
     void viz.sel;
+    void viz.cardsBundle;
     if (panelEl) panelEl.scrollTop = 0;
   });
 </script>
 
-{#if viz.sel.kind !== "none"}
+{#if viz.sel.kind !== "none" || indexDoc}
   <!-- Click/pointer handlers are delegates for keyboard-reachable anchors and
        the close button inside — the section itself is not the interactive
        element. -->
@@ -131,6 +152,8 @@
         >
       {:else if viz.selectedConcept}
         <span class="crumb title">{viz.selectedConcept.title}</span>
+      {:else if indexDoc}
+        <span class="crumb title">{indexTitle}</span>
       {:else if viz.sel.kind === "dir"}
         <span class="crumb">{dirPath.split("/").pop()}/</span>
       {:else}
@@ -206,6 +229,11 @@
           </li>
         {/each}
       </ul>
+    {:else if indexDoc}
+      <!-- The focused index.md read as a document; its listing links navigate
+           (concepts select, sub-bundle indexes refocus). -->
+      <span class="chip"><span class="dot" style="background:var(--ink-muted)"></span>index</span>
+      <div id="body-md" class="md-doc">{@html md.mdToHtml(indexDoc.body ?? "", indexFromId)}</div>
     {/if}
   </section>
 {/if}

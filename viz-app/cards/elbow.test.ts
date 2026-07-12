@@ -4,7 +4,7 @@
 // exact endpoints, vertical tangents, monotonic descent — because the layout
 // and the e2e assertions both build on it.
 import { describe, expect, test } from "bun:test";
-import { arrowHead, edgeSlot, elbowPath } from "./elbow";
+import { arrowHead, edgeSlot, elbowPath, sideSlot } from "./elbow";
 
 const close = (a: number, b: number) => expect(Math.abs(a - b)).toBeLessThan(1e-6);
 
@@ -46,6 +46,48 @@ describe("elbowPath", () => {
       close(p.x, 5);
       expect(Number.isFinite(p.y)).toBe(true);
     }
+  });
+});
+
+describe("elbowPath axis x (horizontal flow)", () => {
+  const from = { x: -40, y: 20 };
+  const to = { x: 60, y: -15 };
+  const path = elbowPath(from, to, { axis: "x" });
+
+  test("exact endpoints, horizontal tangents at both ends", () => {
+    expect(path[0]).toEqual(from);
+    expect(path[path.length - 1]).toEqual(to);
+    const fine = elbowPath(from, to, { axis: "x", segments: 1000 });
+    const slope = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+      Math.abs(b.y - a.y) / Math.abs(b.x - a.x);
+    expect(slope(fine[0]!, fine[1]!)).toBeLessThan(0.01);
+    expect(slope(fine[fine.length - 2]!, fine[fine.length - 1]!)).toBeLessThan(0.01);
+  });
+
+  test("x advances monotonically when flowing rightward", () => {
+    for (let i = 1; i < path.length; i++) expect(path[i]!.x).toBeGreaterThanOrEqual(path[i - 1]!.x);
+  });
+
+  test("horizontally aligned anchors degrade to a straight finite line", () => {
+    const straight = elbowPath({ x: 0, y: 7 }, { x: 50, y: 7 }, { axis: "x" });
+    for (const p of straight) {
+      close(p.y, 7);
+      expect(Number.isFinite(p.x)).toBe(true);
+    }
+  });
+});
+
+describe("sideSlot", () => {
+  test("single slot sits at the vertical edge center", () => {
+    expect(sideSlot(4, -115, 96, 0, 1)).toEqual({ x: -115, y: 4 });
+  });
+
+  test("slots spread evenly along the edge height, symmetric, inset from corners", () => {
+    const s = [0, 1, 2].map((i) => sideSlot(0, 115, 96, i, 3));
+    close(s[1]!.y, 0);
+    close(s[0]!.y, -s[2]!.y);
+    expect(Math.abs(s[0]!.y)).toBeLessThan(48);
+    for (const p of s) expect(p.x).toBe(115);
   });
 });
 

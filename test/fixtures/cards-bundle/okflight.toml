@@ -1,7 +1,11 @@
 # Fixture workspace for the cards-view e2e checks (viz-e2e-cards.ts).
-# Small graph exercising every card-layout shape: in/out/mutual ring-1 links,
-# directional ring-2 above and below, a hideable type, an island, and a
-# sub-bundle dir for root-view dir cards.
+# Two layers:
+#  - a hand-written core cluster around `hub` whose exact neighborhood the
+#    e2e assertions pin (in/out/mutual ring-1, directional ring-2, island);
+#  - a generated realistic mass (generate.ts) — ADR chains, pattern catalog,
+#    a >24-in-link mega-hub service, cycles, mutuals, orphan glossary terms,
+#    an unregistered "Experiment" type — that must never link into the core.
+# Regenerate: bun generate.ts && bun ../../../okf.ts index (from this dir).
 
 [bundle]
 dir = "knowledge"
@@ -10,4 +14,4 @@ dir = "knowledge"
 title = "Cards Fixture"
 
 [taxonomy]
-types = ["Decision", "Pattern", "Playbook", "Reference", "Host"]
+types = ["Decision", "Pattern", "Playbook", "Reference", "Host", "Service", "Runbook", "Term"]

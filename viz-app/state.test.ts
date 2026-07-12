@@ -13,6 +13,10 @@ const model = () =>
     edges: [{ s: "a", t: "b" }],
     files: { "flakes/okf/viz.ts": { html: "", lines: 1, size: 10, date: "", lang: "ts", refs: ["a"] } },
     dirs: { "flakes/ccglass": { files: ["flakes/ccglass/flake.nix"], dirs: [], date: "2026-01-01", refs: ["a"] } },
+    root: { title: "KB", desc: "", body: "# kb\nroot body", links: [{ kind: "dir" as const, path: "notes" }] },
+    bundles: {
+      notes: { title: "Notes", desc: "", body: "# notes\nnotes body", links: [{ kind: "concept" as const, id: "a" }] },
+    },
   });
 
 beforeEach(() => localStorage.clear());
@@ -62,6 +66,68 @@ describe("selection", () => {
     expect(s.sel).toEqual({ kind: "none" });
     expect(s.backConcept).toBeNull();
     expect(s.sceneSelectedIndex).toBeNull();
+  });
+
+  test("focusBundle clears the selection and back-link; unknown paths ignored", () => {
+    const s = createVizState(model());
+    s.selectConcept("a");
+    s.focusBundle("notes");
+    expect(s.cardsBundle).toBe("notes");
+    expect(s.sel).toEqual({ kind: "none" });
+    expect(s.focusedConcept).toBeNull();
+    s.focusBundle("ghost");
+    expect(s.cardsBundle).toBe("notes");
+  });
+
+  test("selecting a concept or clearing leaves bundle focus", () => {
+    const s = createVizState(model());
+    s.focusBundle("notes");
+    s.selectConcept("a");
+    expect(s.cardsBundle).toBeNull();
+    s.focusBundle("notes");
+    s.clearSelection();
+    expect(s.cardsBundle).toBeNull();
+  });
+
+  test("file/dir detail views keep the bundle focus underneath", () => {
+    const s = createVizState(model());
+    s.focusBundle("notes");
+    s.selectFile("flakes/okf/viz.ts");
+    expect(s.cardsBundle).toBe("notes");
+  });
+
+  test("cardsIndexDoc: the focused index doc, cards view only, no selection open", () => {
+    const s = createVizState(model());
+    expect(s.cardsIndexDoc).toBeNull(); // graph view
+    s.setViewMode("cards");
+    expect(s.cardsIndexDoc?.title).toBe("KB"); // root focus
+    s.focusBundle("notes");
+    expect(s.cardsIndexDoc?.title).toBe("Notes");
+    s.selectFile("flakes/okf/viz.ts"); // a file panel takes over
+    expect(s.cardsIndexDoc).toBeNull();
+    s.clearSelection();
+    s.selectConcept("a"); // concept panel takes over
+    expect(s.cardsIndexDoc).toBeNull();
+  });
+
+  test("hideIndexPanel dismisses until the next navigation", () => {
+    const s = createVizState(model());
+    s.setViewMode("cards");
+    s.hideIndexPanel();
+    expect(s.cardsIndexDoc).toBeNull();
+    s.focusBundle("notes"); // navigating reopens
+    expect(s.cardsIndexDoc?.title).toBe("Notes");
+    s.hideIndexPanel();
+    expect(s.cardsIndexDoc).toBeNull();
+    s.clearSelection(); // background click: stays hidden at the root
+    expect(s.cardsIndexDoc).toBeNull();
+    s.selectConcept("a"); // any panel navigation re-arms it…
+    s.clearSelection();
+    expect(s.cardsIndexDoc?.title).toBe("KB"); // …so closing lands back on the index
+    s.hideIndexPanel();
+    s.setViewMode("graph");
+    s.setViewMode("cards"); // re-entering the view reopens too
+    expect(s.cardsIndexDoc?.title).toBe("KB");
   });
 });
 
@@ -551,6 +617,18 @@ describe("theme toggle", () => {
     expect(rootVar("--page")).toBe(""); // no inline override until a pick
   });
 
+  test("theme() serves the cards' ink/neutral from the applied stop's vars", () => {
+    const s = createVizState(model());
+    s.systemSchemeChanged(false); // light OS…
+    s.setTheme(1); // …dark theme picked: values come from THEMES[1], not the scheme
+    expect(s.dark).toBe(false);
+    expect(s.theme().ink).toBe("#ffffff");
+    expect(s.theme().neutral).toBe("#383835");
+    s.setTheme(0);
+    expect(s.theme().ink).toBe("#0b0b0b");
+    expect(s.theme().neutral).toBe("#c0bfb2");
+  });
+
   test("setTheme applies inline vars, persists, and bumps the palette", () => {
     const s = createVizState(model());
     const before = s.paletteVersion;
@@ -608,6 +686,20 @@ describe("view mode", () => {
     expect(s.viewMode).toBe("cards");
     s.setFilters([], "");
     expect(s.viewMode).toBe("graph");
+  });
+
+  test("cardFlow defaults vertical; setCardFlow flips; invalid ignored; setFilters applies", () => {
+    const s = createVizState(model());
+    expect(s.cardFlow).toBe("v");
+    s.setCardFlow("h");
+    expect(s.cardFlow).toBe("h");
+    s.setCardFlow("diagonal" as never);
+    expect(s.cardFlow).toBe("h");
+    s.setFilters([], "", 0, {}, "cards", "v");
+    expect(s.cardFlow).toBe("v");
+    s.setFilters([], "");
+    expect(s.viewMode).toBe("graph");
+    expect(s.cardFlow).toBe("v");
   });
 
   test("clearSelection leaves the view mode alone", () => {

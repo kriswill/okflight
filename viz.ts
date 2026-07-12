@@ -11,7 +11,7 @@
 import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { extname, join } from "node:path";
 import { loadContext } from "./config-cli";
-import { extractLinks, isExternal, nowISO, parseDoc, resolveLink, walkMd } from "./lib";
+import { extractLinks, firstHeading, indexBlurb, isExternal, nowISO, parseDoc, resolveLink, titleFromSlug, walkMd } from "./lib";
 import { layout3d } from "./layout3d";
 import { collectLicenses, generatorInfo } from "./licenses";
 import { displayName } from "./viz-app/config";
@@ -98,18 +98,17 @@ const dedupedEdges = edges.filter((e) => {
   return true;
 });
 
-// --- Root card source ------------------------------------------------------
-// The bundle-root index.md is reserved (never a node), but the cards view
-// centers its no-selection layout on it: embed its identity plus resolved
-// links (concept docs and sub-bundle dirs) as RawData.root.
-let root: RootDoc | null = null;
-if (existsSync(join(bundle, "index.md"))) {
-  const doc = parseDoc(bundle, "index.md");
+// --- Root + sub-bundle card sources ------------------------------------------
+// index.md files are reserved (never nodes), but the cards view renders them:
+// the bundle-root index becomes the no-selection root card (RawData.root) and
+// every sub-bundle's index becomes its dir card's identity/focus target
+// (RawData.bundles, keyed by dir path).
+const indexLinks = (body: string, rel: string): RootLink[] => {
   const links: RootLink[] = [];
   const linkSeen = new Set<string>();
-  for (const target of extractLinks(doc.body)) {
+  for (const target of extractLinks(body)) {
     if (isExternal(target)) continue;
-    const resolved = resolveLink(bundle, "index.md", target);
+    const resolved = resolveLink(bundle, rel, target);
     if (!resolved || !resolved.endsWith(".md")) continue;
     const l = classifyRootLink(resolved, ids);
     const k = l && (l.kind === "concept" ? `c:${l.id}` : `d:${l.path}`);
@@ -117,10 +116,42 @@ if (existsSync(join(bundle, "index.md"))) {
     linkSeen.add(k!);
     links.push(l);
   }
+  return links;
+};
+
+// Descriptions come from the index's hand-written blurb (the only prose
+// `okf index` preserves on sub-bundles), first sentence — the same string
+// parent listings display for the directory.
+const firstSentence = (s: string) => s.split(/(?<=\.)\s/)[0]!.replace(/\n/g, " ").trim();
+
+let root: RootDoc | null = null;
+if (existsSync(join(bundle, "index.md"))) {
+  const doc = parseDoc(bundle, "index.md");
   root = {
     title: (doc.fm?.title as string) ?? "",
-    desc: (doc.fm?.description as string) ?? "",
-    links,
+    desc: (doc.fm?.description as string) ?? firstSentence(indexBlurb(doc.body)),
+    body: doc.body,
+    links: indexLinks(doc.body, "index.md"),
+  };
+}
+
+const bundles: Record<string, RootDoc> = {};
+for (const rel of walkMd(bundle)) {
+  if (!rel.endsWith("/index.md")) continue;
+  if (ids.has(rel.replace(/\.md$/, ""))) continue; // unreserved index = a node, never a dir card
+  const doc = parseDoc(bundle, rel);
+  const path = rel.slice(0, -"/index.md".length);
+  const base = path.split("/").pop()!;
+  // `okf index` regenerates the H1 as the bare dir name and drops sub-bundle
+  // frontmatter, so an H1 only counts as a title when it says something the
+  // slug doesn't; otherwise prettify the slug.
+  const h1 = firstHeading(doc.body);
+  bundles[path] = {
+    title: (doc.fm?.title as string) ?? (h1 && h1 !== base ? h1 : titleFromSlug(base)),
+    desc: (doc.fm?.description as string) ?? firstSentence(indexBlurb(doc.body)),
+    body: doc.body,
+    // A self-link would render a dir card pointing at its own focus — drop it.
+    links: indexLinks(doc.body, rel).filter((l) => !(l.kind === "dir" && l.path === path)),
   };
 }
 lap("graph");
@@ -444,7 +475,7 @@ const themeCss = (name: string) =>
 
 const assemble = (totalBytes: number) => {
   const stats: BuildStats = { generatedAt, totalBytes, bytes: sectionBytes };
-  const data = JSON.stringify({ nodes, edges: dedupedEdges, files, dirs, repoUrl, commitUrl, commits, facetMaps, cfg, stats, licenses, generator, root }).replace(
+  const data = JSON.stringify({ nodes, edges: dedupedEdges, files, dirs, repoUrl, commitUrl, commits, facetMaps, cfg, stats, licenses, generator, root, bundles }).replace(
     /<\//g,
     "<\\/",
   );

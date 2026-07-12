@@ -5,6 +5,7 @@ const model = {
   byId: { "wiki/architecture": {} },
   files: { "flakes/okf/viz.ts": {}, "docs/50%.md": {}, "docs/what?.md": {} },
   dirs: { "flakes/ccglass": {} },
+  bundles: { notes: {} },
   typeCounts: { "Alpha Module": 2, Decision: 1 },
   facets: [
     { name: "platform", values: ["macos", "linux"] },
@@ -29,6 +30,31 @@ describe("encodeHash", () => {
   });
 });
 
+// Bundle focus (the cards view centered on a sub-bundle's index.md) is a
+// navigation, so it rides in the selection segment — Back walks through
+// bundles just like concepts.
+describe("bundle selection", () => {
+  const f = { hidden: [], q: "", isolate: 0 as const, facets: {}, view: "cards" as const, flow: "v" as const };
+
+  test("encodes as b/<path>", () => {
+    expect(encodeHash({ kind: "bundle", path: "notes" })).toBe("b/notes");
+    expect(encodeViewHash({ sel: { kind: "bundle", path: "notes" }, filters: f })).toBe("b/notes?view=cards");
+  });
+
+  test("decodes only known bundles; absent bundle map (old embed) -> none", () => {
+    expect(decodeHash("b/notes", model)).toEqual({ kind: "bundle", path: "notes" });
+    expect(decodeHash("b/ghost", model)).toEqual({ kind: "none" });
+    expect(decodeHash("b/notes", { ...model, bundles: undefined })).toEqual({ kind: "none" });
+  });
+
+  test("isolate rides behind '?' for a bundle selection too", () => {
+    expect(encodeViewHash({ sel: { kind: "bundle", path: "notes" }, filters: { ...f, isolate: 2 } })).toBe(
+      "b/notes?isolate=2&view=cards",
+    );
+    expect(decodeViewHash("b/notes?isolate=2", model).filters.isolate).toBe(2);
+  });
+});
+
 describe("encodeViewHash", () => {
   const none = { kind: "none" } as const;
   const f = (o: Partial<{ hidden: string[]; q: string; isolate: 0 | 1 | 2; facets: Record<string, string> }>) => ({
@@ -37,6 +63,7 @@ describe("encodeViewHash", () => {
     isolate: 0 as const,
     facets: {},
     view: "graph" as const,
+    flow: "v" as const,
     ...o,
   });
 
@@ -99,7 +126,7 @@ describe("encodeViewHash", () => {
 // The cards view is a filter-class hash param: selection-independent,
 // "graph" (the default) never emitted so pre-cards links stay canonical.
 describe("view mode param", () => {
-  const f = (view: "graph" | "cards") => ({ hidden: [], q: "", isolate: 0 as const, facets: {}, view });
+  const f = (view: "graph" | "cards") => ({ hidden: [], q: "", isolate: 0 as const, facets: {}, view, flow: "v" as const });
 
   test("view=cards encodes with or without a selection; graph adds nothing", () => {
     expect(encodeViewHash({ sel: { kind: "none" }, filters: f("cards") })).toBe("?view=cards");
@@ -113,7 +140,7 @@ describe("view mode param", () => {
     expect(
       encodeViewHash({
         sel: { kind: "concept", id: "wiki/architecture" },
-        filters: { hidden: ["Decision"], q: "arch", isolate: 1, facets: { platform: "macos" }, view: "cards" },
+        filters: { hidden: ["Decision"], q: "arch", isolate: 1, facets: { platform: "macos" }, view: "cards", flow: "v" },
       }),
     ).toBe("c/wiki/architecture?hide=Decision&q=arch&isolate=1&view=cards&platform=macos");
   });
@@ -127,24 +154,47 @@ describe("view mode param", () => {
   });
 });
 
+// Horizontal card flow rides the hash the same way as view=cards.
+describe("flow param", () => {
+  const f = (flow: "v" | "h") => ({
+    hidden: [],
+    q: "",
+    isolate: 0 as const,
+    facets: {},
+    view: "cards" as const,
+    flow,
+  });
+
+  test("flow=h encodes only when horizontal; composes after view", () => {
+    expect(encodeViewHash({ sel: { kind: "none" }, filters: f("h") })).toBe("?view=cards&flow=h");
+    expect(encodeViewHash({ sel: { kind: "none" }, filters: f("v") })).toBe("?view=cards");
+  });
+
+  test("round-trips; absent or garbage decode to vertical", () => {
+    expect(decodeViewHash(encodeViewHash({ sel: { kind: "none" }, filters: f("h") }), model).filters.flow).toBe("h");
+    expect(decodeViewHash("?view=cards", model).filters.flow).toBe("v");
+    expect(decodeViewHash("?flow=sideways", model).filters.flow).toBe("v");
+  });
+});
+
 describe("decodeViewHash", () => {
   test("selection + filters round-trip, including '%' paths", () => {
     for (const view of [
       {
         sel: { kind: "concept", id: "wiki/architecture" },
-        filters: { hidden: ["Alpha Module", "Decision"], q: "", isolate: 0, facets: { platform: "all", status: "all" }, view: "graph" },
+        filters: { hidden: ["Alpha Module", "Decision"], q: "", isolate: 0, facets: { platform: "all", status: "all" }, view: "graph", flow: "v" },
       },
       {
         sel: { kind: "none" },
-        filters: { hidden: [], q: "a?b&c=%", isolate: 0, facets: { platform: "macos", status: "all" }, view: "graph" },
+        filters: { hidden: [], q: "a?b&c=%", isolate: 0, facets: { platform: "macos", status: "all" }, view: "graph", flow: "v" },
       },
       {
         sel: { kind: "file", path: "docs/50%.md" },
-        filters: { hidden: ["Decision"], q: "tmux", isolate: 0, facets: { platform: "linux", status: "draft" }, view: "graph" },
+        filters: { hidden: ["Decision"], q: "tmux", isolate: 0, facets: { platform: "linux", status: "draft" }, view: "graph", flow: "v" },
       },
       {
         sel: { kind: "concept", id: "wiki/architecture" },
-        filters: { hidden: ["Decision"], q: "tmux", isolate: 1, facets: { platform: "macos", status: "all" }, view: "graph" },
+        filters: { hidden: ["Decision"], q: "tmux", isolate: 1, facets: { platform: "macos", status: "all" }, view: "graph", flow: "v" },
       },
     ] as const) {
       const decoded = decodeViewHash(encodeViewHash(view as never), model);
@@ -156,7 +206,7 @@ describe("decodeViewHash", () => {
   test("bare selection hashes decode with empty filters, every facet 'all' (old links stay valid)", () => {
     expect(decodeViewHash("c/wiki/architecture", model)).toEqual({
       sel: { kind: "concept", id: "wiki/architecture" },
-      filters: { hidden: [], q: "", isolate: 0, facets: { platform: "all", status: "all" }, view: "graph" },
+      filters: { hidden: [], q: "", isolate: 0, facets: { platform: "all", status: "all" }, view: "graph", flow: "v" },
     });
   });
 

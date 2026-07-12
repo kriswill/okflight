@@ -28,6 +28,13 @@ export function createVizState(model: VizModel) {
   // Scene emphasis + file/dir-view back-link keep pointing at the last concept
   // even while a file or directory is shown (legacy behavior).
   let lastConceptId = $state<string | null>(null);
+  // Cards-view bundle focus: a dir card's bundle index.md centered instead of
+  // a concept. A navigation, not a selection, and it survives file/dir panel
+  // views the way backConcept does for concepts.
+  let cardsBundle = $state<string | null>(null);
+  // The focused index's panel can be dismissed; any navigation re-arms it
+  // (background clicks / clearSelection do not).
+  let indexPanelHidden = $state(false);
   const hidden = new SvelteSet<string>();
   let query = $state("");
   let isolateDepth = $state<0 | 1 | 2>(0);
@@ -35,6 +42,8 @@ export function createVizState(model: VizModel) {
   // layout. Filter-class state (rides the hash as `view=cards`), independent
   // of selection so it survives select/clear cycles.
   let viewMode = $state<"graph" | "cards">("graph");
+  // Cards-view flow orientation: "v" = top-down (default), "h" = left-right.
+  let cardFlow = $state<"v" | "h">("v");
   // facet name -> "all" or one of that facet's values; keyed in model.facets
   // order (load-bearing: hash.ts's encode walks this same order). Always
   // replaced wholesale (never mutated in place) so effects tracking the
@@ -107,6 +116,15 @@ export function createVizState(model: VizModel) {
   const facetActive = $derived(Object.values(facetSel).some((v) => v !== "all"));
 
   const selectedConcept = $derived(sel.kind === "concept" ? (model.byId[sel.id] ?? null) : null);
+  // The index doc behind the cards focus (bundle, else root) — shown in the
+  // details panel whenever no selection claims it and it isn't dismissed.
+  const cardsIndexDoc = $derived(
+    viewMode === "cards" && sel.kind === "none" && !indexPanelHidden
+      ? cardsBundle
+        ? (model.bundles[cardsBundle] ?? null)
+        : model.root
+      : null,
+  );
   const backConcept = $derived(lastConceptId ? (model.byId[lastConceptId] ?? null) : null);
   const focusedConcept = $derived(selectedConcept ?? backConcept);
   // Anchored on selectedConcept strictly (not focusedConcept): isolation is
@@ -160,6 +178,8 @@ export function createVizState(model: VizModel) {
       if (!model.byId[id]) return;
       sel = { kind: "concept", id };
       lastConceptId = id;
+      cardsBundle = null;
+      indexPanelHidden = false;
       fly = flyTo;
       selSeq++;
     },
@@ -174,9 +194,30 @@ export function createVizState(model: VizModel) {
     clearSelection() {
       sel = { kind: "none" };
       lastConceptId = null;
+      cardsBundle = null;
       fly = false;
       selSeq++;
       isolateDepth = 0;
+    },
+    get cardsBundle() {
+      return cardsBundle;
+    },
+    /** Center the cards view on a sub-bundle's index.md (dir card click). */
+    focusBundle(path: string) {
+      if (!model.bundles[path]) return;
+      cardsBundle = path;
+      sel = { kind: "none" };
+      lastConceptId = null;
+      indexPanelHidden = false;
+      fly = false;
+      selSeq++;
+    },
+    get cardsIndexDoc() {
+      return cardsIndexDoc;
+    },
+    /** Dismiss the focused index's panel until the next navigation. */
+    hideIndexPanel() {
+      indexPanelHidden = true;
     },
 
     hidden,
@@ -207,6 +248,7 @@ export function createVizState(model: VizModel) {
       isolate: 0 | 1 | 2 = 0,
       sel: Record<string, string> = {},
       view: "graph" | "cards" = "graph",
+      flow: "v" | "h" = "v",
     ) {
       const want = new Set(hiddenTypes);
       for (const t of [...hidden]) if (!want.has(t)) hidden.delete(t);
@@ -214,6 +256,7 @@ export function createVizState(model: VizModel) {
       query = q;
       isolateDepth = isolate;
       viewMode = view;
+      cardFlow = flow;
       facetSel = Object.fromEntries(
         model.facets.map((f) => {
           const v = sel[f.name];
@@ -239,12 +282,20 @@ export function createVizState(model: VizModel) {
       return viewMode;
     },
     setViewMode(v: "graph" | "cards") {
-      if (v === "graph" || v === "cards") viewMode = v;
+      if (v !== "graph" && v !== "cards") return;
+      viewMode = v;
+      indexPanelHidden = false;
     },
     /** Card-layout ring depth: the view inherently shows the direct ring, so
      *  only 2-hop isolation widens it (hops "off" and "1-hop" both mean 1). */
     get cardsDepth(): 1 | 2 {
       return isolateDepth === 2 ? 2 : 1;
+    },
+    get cardFlow() {
+      return cardFlow;
+    },
+    setCardFlow(f: "v" | "h") {
+      if (f === "v" || f === "h") cardFlow = f;
     },
 
     get facetSel() {
@@ -339,8 +390,20 @@ export function createVizState(model: VizModel) {
       // generated color at the theme's lightness/chroma.
       return slots[t] || nameColor(t, THEMES[themeIndex]!.gen);
     },
+    /** Canvas-drawn colors, read live from the APPLIED theme's CSS vars —
+     *  the single source in themes.ts — so every surface (graph labels,
+     *  card faces) follows the same stops. `dark` only mirrors the OS
+     *  scheme; a toggle pick overrides it, and these track the pick. */
     theme() {
-      return { bg: cssVar("--page"), labelInk: cssVar("--ink-2"), labelStroke: cssVar("--surface-1") };
+      return {
+        bg: cssVar("--page"),
+        labelInk: cssVar("--ink-2"),
+        labelStroke: cssVar("--surface-1"),
+        /** Primary page ink — card-face text. */
+        ink: cssVar("--ink-1"),
+        /** Structural neutral — root/dir card fill and borders. */
+        neutral: cssVar("--baseline"),
+      };
     },
   };
 }

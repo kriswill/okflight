@@ -310,6 +310,22 @@ describe("ViewToggle", () => {
     expect(state.viewMode).toBe("graph");
   });
 
+  test("flow control appears only in cards mode and drives setCardFlow", () => {
+    const state = createVizState(model());
+    mountC(ViewToggle, { viz: state });
+    expect([...document.querySelectorAll("#viewtoggle .seg")]).toHaveLength(2); // no flow control in graph mode
+    state.setViewMode("cards");
+    flushSync();
+    const segs = [...document.querySelectorAll("#viewtoggle .seg")] as HTMLElement[];
+    expect(segs).toHaveLength(4);
+    const [, , down, right] = segs;
+    expect(down!.classList.contains("active")).toBe(true);
+    right!.click();
+    flushSync();
+    expect(state.cardFlow).toBe("h");
+    expect(right!.classList.contains("active")).toBe(true);
+  });
+
   test("Sidebar hosts the toggle", () => {
     const state = createVizState(model());
     mountC(Sidebar, { viz: state });

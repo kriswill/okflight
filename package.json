@@ -49,6 +49,7 @@
     "bun": ">=1.2"
   },
   "dependencies": {
+    "@threlte/core": "^8.5.16",
     "bun-plugin-svelte": "^0.0.6",
     "postprocessing": "^6.38.3",
     "svelte": "^5.56.4",

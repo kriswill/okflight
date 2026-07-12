@@ -99,3 +99,34 @@ export function edgeHead(
     base: anchor.clone().addScaledVector(outward, size),
   };
 }
+
+/** Per-vertex colors for an open TubeGeometry(path, rings, r, radial): a
+ *  linear gradient along the path from the source card's color to the
+ *  target's. Ring-major vertex order — (rings+1) rings of (radial+1)
+ *  vertices — mirrors three's generator, so index i's ring is i/(radial+1). */
+export function tubeGradient(
+  from: THREE.Color,
+  to: THREE.Color,
+  rings: number,
+  radial: number,
+): Float32Array {
+  const perRing = radial + 1;
+  const out = new Float32Array((rings + 1) * perRing * 3);
+  const c = new THREE.Color();
+  for (let r = 0; r <= rings; r++) {
+    c.copy(from).lerp(to, rings === 0 ? 0 : r / rings);
+    for (let j = 0; j < perRing; j++) {
+      const i = (r * perRing + j) * 3;
+      out[i] = c.r;
+      out[i + 1] = c.g;
+      out[i + 2] = c.b;
+    }
+  }
+  return out;
+}
+
+/** Lift a color toward white — the cards' stand-in for the graph's bloom on
+ *  dark surfaces (amount 0 = the color as assigned). */
+export function brighten(hex: string, amount: number): THREE.Color {
+  return new THREE.Color(hex).lerp(new THREE.Color("#ffffff"), amount);
+}

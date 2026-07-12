@@ -17,7 +17,15 @@
     tubeMesh: THREE_NS.Mesh;
     headMesh: THREE_NS.Mesh;
     tailMesh: THREE_NS.Mesh | null;
-    mat: THREE_NS.MeshBasicMaterial;
+    /** Additive glow tube behind the line (dark surfaces only). */
+    haloMesh: THREE_NS.Mesh | null;
+    tubeMat: THREE_NS.MeshBasicMaterial;
+    headMat: THREE_NS.MeshBasicMaterial;
+    tailMat: THREE_NS.MeshBasicMaterial | null;
+    haloMat: THREE_NS.MeshBasicMaterial | null;
+    /** Gradient endpoints (already glow-lifted), read on every tube rebuild. */
+    from: THREE_NS.Color;
+    to: THREE_NS.Color;
   }
 </script>
 
@@ -32,7 +40,9 @@
   import * as THREE from "three";
   import { mark } from "../perf";
   import type { VizState } from "../state.svelte";
+  import { tubeGradient } from "./arrowFrame";
   import Card from "./Card.svelte";
+  import { inkFor } from "./cardFace";
   import { fitZoom, type CardLayout } from "./cardLayout";
   import ElbowArrow from "./ElbowArrow.svelte";
   import { createCardMotion, type ArrowState } from "./motion.svelte";
@@ -47,6 +57,12 @@
   const EYE = new THREE.Vector3(0, 0, 900);
   const SIDEBAR_W = 260; // keep in sync with Stage.svelte / Sidebar #side
   const TUBE_R = 1.4;
+  /** Tube tessellation — tubeGradient's ring math must match. */
+  const TUBULAR = 40;
+  const RADIAL = 6;
+  /** Halo tube: wider, faint, additive — reads as glow on dark surfaces. */
+  const HALO_R = TUBE_R * 2.8;
+  const HALO_OPACITY = 0.3;
 
   const motion = createCardMotion();
 
@@ -76,15 +92,21 @@
 
   const applyArrow = (a: ArrowState, refs: ArrowRefs, rebuildTube: boolean) => {
     if (rebuildTube) {
+      const curve = new THREE.CatmullRomCurve3(a.path);
+      // Same CPU gradient array for tube and halo (separate GL buffers).
+      const grad = tubeGradient(refs.from, refs.to, TUBULAR, RADIAL);
       const old = refs.tubeMesh.geometry;
-      refs.tubeMesh.geometry = new THREE.TubeGeometry(
-        new THREE.CatmullRomCurve3(a.path),
-        40,
-        TUBE_R,
-        6,
-        false,
-      );
+      const tube = new THREE.TubeGeometry(curve, TUBULAR, TUBE_R, RADIAL, false);
+      tube.setAttribute("color", new THREE.BufferAttribute(grad, 3));
+      refs.tubeMesh.geometry = tube;
       old?.dispose();
+      if (refs.haloMesh) {
+        const oldHalo = refs.haloMesh.geometry;
+        const halo = new THREE.TubeGeometry(curve, TUBULAR, HALO_R, RADIAL, false);
+        halo.setAttribute("color", new THREE.BufferAttribute(grad, 3));
+        refs.haloMesh.geometry = halo;
+        oldHalo?.dispose();
+      }
     }
     refs.headMesh.position.copy(a.head.pos);
     refs.headMesh.quaternion.copy(a.head.quat);
@@ -92,7 +114,10 @@
       refs.tailMesh.position.copy(a.tailHead.pos);
       refs.tailMesh.quaternion.copy(a.tailHead.quat);
     }
-    refs.mat.opacity = a.opacity;
+    refs.tubeMat.opacity = a.opacity;
+    refs.headMat.opacity = a.opacity;
+    if (refs.tailMat) refs.tailMat.opacity = a.opacity;
+    if (refs.haloMat) refs.haloMat.opacity = a.opacity * HALO_OPACITY;
   };
 
   const applyCamera = () => {
@@ -129,8 +154,18 @@
     invalidate();
     return () => {
       refs.tubeMesh.geometry?.dispose();
+      refs.haloMesh?.geometry?.dispose();
       arrowRefs.delete(key);
     };
+  };
+  /** Structure-time color/glow change: rebuild that arrow's gradient. */
+  const refreshArrow = (key: string) => {
+    const refs = arrowRefs.get(key);
+    const a = motion.arrowStates().find((s) => s.key === key);
+    if (refs && a) {
+      applyArrow(a, refs, true);
+      invalidate();
+    }
   };
 
   /* --- the one frame task ------------------------------------------------- */
@@ -200,9 +235,12 @@
     }
     return m;
   });
-  // Structural cards render as outlines; the synthetic root focus keeps the
-  // solid neutral face (it is the page's title card, not a waypoint).
-  const outlineFor = (r: RenderEntry): boolean => (isRoot(r) ? r.kind !== "focus" : isBundle(r));
+  // Concept cards read as type-colored outlines with page-ink text; the
+  // structural cards (root and bundle indexes) are the solid slabs.
+  const outlineFor = (r: RenderEntry): boolean => !isRoot(r) && !isBundle(r);
+  // Dark surface -> glow treatment on the lines, judged from the applied
+  // theme's page color (same luminance rule the card faces use for ink).
+  const GLOW = $derived(inkFor(themeVars.bg || "#ffffff") !== "#16181d");
   const titleFor = (r: RenderEntry): string => {
     if (isRoot(r)) return viz.model.root?.title || viz.model.displayName;
     if (isBundle(r)) return viz.model.bundles[r.id]?.title || r.id + "/";
@@ -214,8 +252,6 @@
     if (isBundle(r)) return viz.model.bundles[r.id]?.desc ?? "";
     return viz.model.byId[r.id]?.desc ?? "";
   };
-  const arrowColor = (fromId: string, toId: string, dir: "in" | "out"): string =>
-    colorFor.get(dir === "in" ? fromId : toId) ?? NEUTRAL;
 
   /* --- pointer machine: hover / click / drag ------------------------------ */
   const clickableKinds = new Set(["card", "dir", "root"]);
@@ -430,5 +466,13 @@
   />
 {/each}
 {#each motion.arrowList as a (a.key)}
-  <ElbowArrow arrowKey={a.key} twoWay={a.twoWay} color={arrowColor(a.fromId, a.toId, a.dir)} {registerArrow} />
+  <ElbowArrow
+    arrowKey={a.key}
+    twoWay={a.twoWay}
+    fromColor={colorFor.get(a.fromId) ?? NEUTRAL}
+    toColor={colorFor.get(a.toId) ?? NEUTRAL}
+    glow={GLOW}
+    {registerArrow}
+    {refreshArrow}
+  />
 {/each}

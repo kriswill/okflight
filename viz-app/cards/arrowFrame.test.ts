@@ -9,7 +9,7 @@ import { buildModel } from "../data";
 import { cfg, node } from "../test-helpers";
 import { cardGraph, layoutCards } from "./cardLayout";
 import { elbowPath } from "./elbow";
-import { arrowAnchors, edgeHead, edgeTangent, elbowPath3 } from "./arrowFrame";
+import { arrowAnchors, brighten, edgeHead, edgeTangent, elbowPath3, tubeGradient } from "./arrowFrame";
 
 const close = (a: number, b: number, eps = 1e-9) => expect(Math.abs(a - b)).toBeLessThan(eps);
 const v3 = (x: number, y: number, z = 0) => new THREE.Vector3(x, y, z);
@@ -129,5 +129,53 @@ describe("edgeHead", () => {
     // Base is also derivable from the transform: pos - axis·h/2.
     const viaPose = v3(0, -6, 0).applyQuaternion(h.quat).add(h.pos);
     expect(viaPose.distanceTo(h.base)).toBeLessThan(1e-9);
+  });
+});
+
+// Arrow lines carry a gradient from the source card's color to the target's
+// (the cards' answer to the 3D graph's colored glow edges).
+describe("tubeGradient", () => {
+  test("one color triplet per TubeGeometry vertex, from at the start, to at the end, mixed mid-path", () => {
+    const rings = 8;
+    const radial = 4;
+    const geom = new THREE.TubeGeometry(
+      new THREE.CatmullRomCurve3([v3(0, 0, 0), v3(10, 0, 0), v3(20, 0, 0)]),
+      rings,
+      1,
+      radial,
+      false,
+    );
+    const from = new THREE.Color("#ff0000");
+    const to = new THREE.Color("#0000ff");
+    const colors = tubeGradient(from, to, rings, radial);
+    expect(colors.length).toBe(geom.attributes.position.count * 3);
+    const perRing = radial + 1;
+    // Every vertex of the first ring is pure `from`, of the last pure `to`.
+    for (let j = 0; j < perRing; j++) {
+      expect(colors[j * 3]!).toBeCloseTo(from.r, 6);
+      expect(colors[j * 3 + 2]!).toBeCloseTo(from.b, 6);
+      const last = (rings * perRing + j) * 3;
+      expect(colors[last]!).toBeCloseTo(to.r, 6);
+      expect(colors[last + 2]!).toBeCloseTo(to.b, 6);
+    }
+    // The middle ring is the even mix.
+    const mid = (rings / 2) * perRing * 3;
+    expect(colors[mid]!).toBeCloseTo((from.r + to.r) / 2, 6);
+    expect(colors[mid + 2]!).toBeCloseTo((from.b + to.b) / 2, 6);
+  });
+});
+
+describe("brighten", () => {
+  test("lifts toward white by the given amount; zero is identity", () => {
+    const c = brighten("#000000", 0.5);
+    expect(c.r).toBeCloseTo(0.5, 6);
+    expect(c.g).toBeCloseTo(0.5, 6);
+    expect(c.b).toBeCloseTo(0.5, 6);
+    const base = new THREE.Color("#4478bc");
+    const same = brighten("#4478bc", 0);
+    expect(same.r).toBeCloseTo(base.r, 6);
+    const lifted = brighten("#4478bc", 0.2);
+    expect(lifted.r).toBeGreaterThan(base.r);
+    expect(lifted.b).toBeGreaterThan(base.b);
   });
 });

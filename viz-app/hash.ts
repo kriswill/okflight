@@ -23,6 +23,8 @@ export interface ViewFilters {
   facets: Record<string, string>;
   /** Stage rendering format; "graph" (the default) never encodes. */
   view: "graph" | "cards";
+  /** Cards-view flow orientation; "v" (the default) never encodes. */
+  flow: "v" | "h";
 }
 
 export interface ViewState {
@@ -63,6 +65,7 @@ export function encodeViewHash(view: ViewState): string {
   if (view.filters.q) p.set("q", view.filters.q);
   if (view.sel.kind === "concept" && view.filters.isolate) p.set("isolate", String(view.filters.isolate));
   if (view.filters.view === "cards") p.set("view", "cards");
+  if (view.filters.flow === "h") p.set("flow", "h");
   for (const [name, v] of Object.entries(view.filters.facets)) if (v && v !== "all") p.set(name, v);
   const qs = p.toString();
   return encodeHash(view.sel) + (qs ? "?" + qs : "");
@@ -100,5 +103,6 @@ export function decodeViewHash(raw: string, model: HashModel): ViewState {
     facets[f.name] = v && f.values.includes(v) ? v : "all";
   }
   const view: "graph" | "cards" = p.get("view") === "cards" ? "cards" : "graph";
-  return { sel, filters: { hidden, q, isolate, facets, view } };
+  const flow: "v" | "h" = p.get("flow") === "h" ? "h" : "v";
+  return { sel, filters: { hidden, q, isolate, facets, view, flow } };
 }

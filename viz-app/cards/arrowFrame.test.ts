@@ -10,7 +10,7 @@ import { cfg, node } from "../test-helpers";
 import { cardGraph, layoutCards } from "./cardLayout";
 import { domePoint, frameFromDir } from "./dome";
 import { elbowPath } from "./elbow";
-import { arrowAnchors, edgeHead, elbowPath3 } from "./arrowFrame";
+import { arrowAnchors, edgeHead, edgeTangent, elbowPath3 } from "./arrowFrame";
 
 const close = (a: number, b: number, eps = 1e-9) => expect(Math.abs(a - b)).toBeLessThan(eps);
 const v3 = (x: number, y: number, z = 0) => new THREE.Vector3(x, y, z);
@@ -86,6 +86,19 @@ describe("elbowPath3", () => {
     expect(d0.dot(fromTan)).toBeGreaterThan(0.999);
     // Entering along -toTan (the path flows INTO the edge the tangent leaves).
     expect(d1.dot(toTan.clone().negate())).toBeGreaterThan(0.999);
+  });
+});
+
+describe("edgeTangent", () => {
+  test("classifies which card edge a local anchor sits on and returns its outward normal", () => {
+    // Bottom-center of a 180x64 card (vertical-flow departure).
+    expect(edgeTangent({ x: 12, y: -32 }, 180, 64)).toEqual({ x: 0, y: -1 });
+    // Top-edge slot (vertical-flow arrival).
+    expect(edgeTangent({ x: -40, y: 32 }, 180, 64)).toEqual({ x: 0, y: 1 });
+    // Right-edge center (horizontal-flow departure).
+    expect(edgeTangent({ x: 90, y: 0 }, 180, 64)).toEqual({ x: 1, y: 0 });
+    // Left-edge slot (horizontal-flow arrival).
+    expect(edgeTangent({ x: -115, y: 20 }, 230, 96)).toEqual({ x: -1, y: 0 });
   });
 });
 

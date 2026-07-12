@@ -35,6 +35,8 @@ export function createVizState(model: VizModel) {
   // layout. Filter-class state (rides the hash as `view=cards`), independent
   // of selection so it survives select/clear cycles.
   let viewMode = $state<"graph" | "cards">("graph");
+  // Cards-view flow orientation: "v" = top-down (default), "h" = left-right.
+  let cardFlow = $state<"v" | "h">("v");
   // facet name -> "all" or one of that facet's values; keyed in model.facets
   // order (load-bearing: hash.ts's encode walks this same order). Always
   // replaced wholesale (never mutated in place) so effects tracking the
@@ -207,6 +209,7 @@ export function createVizState(model: VizModel) {
       isolate: 0 | 1 | 2 = 0,
       sel: Record<string, string> = {},
       view: "graph" | "cards" = "graph",
+      flow: "v" | "h" = "v",
     ) {
       const want = new Set(hiddenTypes);
       for (const t of [...hidden]) if (!want.has(t)) hidden.delete(t);
@@ -214,6 +217,7 @@ export function createVizState(model: VizModel) {
       query = q;
       isolateDepth = isolate;
       viewMode = view;
+      cardFlow = flow;
       facetSel = Object.fromEntries(
         model.facets.map((f) => {
           const v = sel[f.name];
@@ -245,6 +249,12 @@ export function createVizState(model: VizModel) {
      *  only 2-hop isolation widens it (hops "off" and "1-hop" both mean 1). */
     get cardsDepth(): 1 | 2 {
       return isolateDepth === 2 ? 2 : 1;
+    },
+    get cardFlow() {
+      return cardFlow;
+    },
+    setCardFlow(f: "v" | "h") {
+      if (f === "v" || f === "h") cardFlow = f;
     },
 
     get facetSel() {

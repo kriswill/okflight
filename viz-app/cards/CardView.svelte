@@ -15,7 +15,7 @@
     const g = viz.focusedConcept
       ? cardGraph(viz.model, viz.focusedConcept.id, viz.cardsDepth, viz.visible)
       : rootCardGraph(viz.model, viz.visible);
-    return g ? layoutCards(g) : null;
+    return g ? layoutCards(g, { flow: viz.cardFlow }) : null;
   });
 </script>
 

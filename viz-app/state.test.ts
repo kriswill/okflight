@@ -610,6 +610,20 @@ describe("view mode", () => {
     expect(s.viewMode).toBe("graph");
   });
 
+  test("cardFlow defaults vertical; setCardFlow flips; invalid ignored; setFilters applies", () => {
+    const s = createVizState(model());
+    expect(s.cardFlow).toBe("v");
+    s.setCardFlow("h");
+    expect(s.cardFlow).toBe("h");
+    s.setCardFlow("diagonal" as never);
+    expect(s.cardFlow).toBe("h");
+    s.setFilters([], "", 0, {}, "cards", "v");
+    expect(s.cardFlow).toBe("v");
+    s.setFilters([], "");
+    expect(s.viewMode).toBe("graph");
+    expect(s.cardFlow).toBe("v");
+  });
+
   test("clearSelection leaves the view mode alone", () => {
     const s = createVizState(model());
     s.setViewMode("cards");

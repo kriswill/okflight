@@ -226,6 +226,16 @@ describe("cards view mode", () => {
     expect(location.hash).toBe("");
   });
 
+  test("flow deep link applies; setCardFlow amends the URL in place", () => {
+    location.hash = "#c/wiki/architecture?view=cards&flow=h";
+    const viz = createVizState(model());
+    mountApp(viz);
+    expect(viz.cardFlow).toBe("h");
+    viz.setCardFlow("v");
+    flushSync();
+    expect(location.hash).toBe("#c/wiki/architecture?view=cards");
+  });
+
   test("__okf exposes view accessors for browser automation", () => {
     const viz = createVizState(model());
     mountApp(viz);

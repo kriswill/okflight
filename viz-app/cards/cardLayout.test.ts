@@ -8,6 +8,7 @@ import type { ConceptNode } from "../data";
 import { buildModel } from "../data";
 import { cfg, node } from "../test-helpers";
 import {
+  BAND_X,
   BAND_Y,
   CARD_H,
   CARD_W,
@@ -17,6 +18,8 @@ import {
   FOCUS_Z,
   fitZoom,
   GAP_X,
+  GAP_Y,
+  SUB_GAP_X,
   ZOOM_MIN,
   layoutCards,
   MAX_PER_SIDE,
@@ -230,6 +233,74 @@ describe("layoutCards", () => {
     const a = layoutCards(cardGraph(model(), "hub", 2, all)!);
     const b = layoutCards(cardGraph(model(), "hub", 2, all)!);
     expect(a).toEqual(b);
+  });
+});
+
+describe("horizontal flow", () => {
+  const h = (focus = "hub", depth: 1 | 2 = 1) => layoutCards(cardGraph(model(), focus, depth, all)!, { flow: "h" });
+
+  test("in-column left, out-column right, focus at the origin, columns centered", () => {
+    const l = h();
+    const pitch = CARD_H + GAP_Y;
+    expect(l.byId["hub"]).toMatchObject({ x: 0, y: 0, kind: "focus" });
+    // Sorted [in-a, in-b, both-e] reads top -> bottom in the left column.
+    expect(l.byId["in-a"]).toMatchObject({ lane: "in", ring: 1, x: -BAND_X[1]!, y: pitch });
+    expect(l.byId["in-b"]).toMatchObject({ x: -BAND_X[1]!, y: 0 });
+    expect(l.byId["both-e"]).toMatchObject({ x: -BAND_X[1]!, y: -pitch, twoWay: true });
+    expect(l.byId["out-d"]).toMatchObject({ lane: "out", ring: 1, x: BAND_X[1]!, y: pitch / 2 });
+    expect(l.byId["out-c"]).toMatchObject({ x: BAND_X[1]!, y: -pitch / 2 });
+  });
+
+  test("arrows flow rightward: card right edge -> left-edge slot; heads point right", () => {
+    const l = h();
+    const inArrow = l.arrows.find((a) => a.fromId === "in-a")!;
+    expect(inArrow.path[0]).toEqual({ x: -BAND_X[1]! + CARD_W / 2, y: l.byId["in-a"]!.y });
+    const end = inArrow.path[inArrow.path.length - 1]!;
+    expect(end.x).toBe(-FOCUS_W / 2);
+    expect(Math.abs(end.y)).toBeLessThan(FOCUS_H / 2);
+    // Head at the right end, wings trailing left: rightward flow.
+    expect(inArrow.head.tip.x).toBe(end.x);
+    expect(inArrow.head.left.x).toBeLessThan(inArrow.head.tip.x);
+    expect(inArrow.head.right.x).toBeLessThan(inArrow.head.tip.x);
+
+    const outArrow = l.arrows.find((a) => a.toId === "out-c")!;
+    expect(outArrow.path[0]!.x).toBe(FOCUS_W / 2);
+    expect(outArrow.path[outArrow.path.length - 1]).toEqual({
+      x: BAND_X[1]! - CARD_W / 2,
+      y: l.byId["out-c"]!.y,
+    });
+  });
+
+  test("ring 2 sits one band further out on each side", () => {
+    const l = h("hub", 2);
+    expect(l.byId["in2-f"]).toMatchObject({ ring: 2, x: -BAND_X[2]!, parentId: "in-a" });
+    expect(l.byId["out2-g"]).toMatchObject({ ring: 2, x: BAND_X[2]!, parentId: "out-c" });
+    const a = l.arrows.find((x) => x.fromId === "in2-f")!;
+    expect(a.path[0]!.x).toBe(-BAND_X[2]! + CARD_W / 2);
+    expect(a.path[a.path.length - 1]!.x).toBe(-BAND_X[1]! - CARD_W / 2);
+  });
+
+  test("columns wrap outward at ROW_CAP", () => {
+    const many = buildModel({
+      nodes: [node("f", "Decision", "Focus"), ...Array.from({ length: 9 }, (_, i) => node(`n${i}`, "Pattern", `N${i}`))],
+      edges: Array.from({ length: 9 }, (_, i) => ({ s: `n${i}`, t: "f" })),
+      cfg: cfg(),
+    });
+    const l = layoutCards(cardGraph(many, "f", 1, all)!, { flow: "h" });
+    const col1 = l.cards.filter((c) => c.x === -BAND_X[1]!);
+    const col2 = l.cards.filter((c) => c.x === -(BAND_X[1]! + SUB_GAP_X));
+    expect(col1).toHaveLength(ROW_CAP);
+    expect(col2).toHaveLength(9 - ROW_CAP);
+    expect(col2[0]!.y).toBe(0);
+  });
+
+  test("same card set as vertical; only the geometry changes", () => {
+    const v = layoutCards(cardGraph(model(), "hub", 2, all)!);
+    const hz = h("hub", 2);
+    expect(hz.cards.map((c) => c.id).sort()).toEqual(v.cards.map((c) => c.id).sort());
+    expect(hz.arrows.map((a) => a.fromId + "→" + a.toId).sort()).toEqual(
+      v.arrows.map((a) => a.fromId + "→" + a.toId).sort(),
+    );
   });
 });
 

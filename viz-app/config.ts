@@ -107,7 +107,7 @@ export interface FacetConfig {
 
 /** Facet names reserved because they collide with hash-param names or the
  *  "all" sentinel value. */
-const RESERVED_FACET_NAMES = new Set(["hide", "q", "isolate", "os", "all", "view"]);
+const RESERVED_FACET_NAMES = new Set(["hide", "q", "isolate", "os", "all", "view", "flow"]);
 const FACET_NAME_RE = /^[a-z][a-z0-9-]*$/;
 
 export class VizConfigError extends Error {}

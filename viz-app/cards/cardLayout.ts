@@ -6,7 +6,7 @@
 // Pure data -> geometry; rendering (Threlte) and reactivity live elsewhere.
 
 import type { ConceptNode, VizModel } from "../data";
-import { arrowHead, edgeSlot, elbowPath, type Head, type Pt } from "./elbow";
+import { arrowHead, edgeSlot, elbowPath, sideSlot, type Head, type Pt } from "./elbow";
 
 // World units ≈ CSS px at ortho zoom 1 (the camera auto-fits via fitZoom).
 export const CARD_W = 180;
@@ -16,10 +16,20 @@ export const FOCUS_H = 96;
 // Wide enough that dome tilt foreshortening never makes neighbors read as
 // touching (28 looked cramped once cards curled onto the sphere).
 export const GAP_X = 52;
-/** Row band centers by ring: [focus, ring 1, ring 2]. */
+/** Row band centers by ring: [focus, ring 1, ring 2] (vertical flow). */
 export const BAND_Y = [0, 180, 350] as const;
 /** Extra rows of a wrapped band step outward by this much. */
 export const SUB_GAP = 96;
+
+/** Horizontal flow (in-links left, out-links right): column band centers by
+ *  ring, vertical gap inside a column, and the outward step for wrapped
+ *  columns (must exceed CARD_W so columns never overlap). */
+export const BAND_X = [0, 320, 620] as const;
+export const GAP_Y = 28;
+export const SUB_GAP_X = 220;
+
+/** Card flow orientation: "v" = TheBrain top-down (default), "h" = left-to-right. */
+export type CardFlow = "v" | "h";
 export const ROW_CAP = 8;
 export const MAX_PER_SIDE = 24;
 export const FOCUS_Z = 6;
@@ -148,9 +158,9 @@ export function rootCardGraph(model: VizModel, visible: (n: ConceptNode) => bool
 function placeSide(
   entries: CardEntry[],
   lane: "in" | "out",
-  sign: 1 | -1,
   parentId: string,
   cards: CardPlacement[],
+  flow: CardFlow,
 ): CardPlacement[] {
   const kept = entries.slice(0, MAX_PER_SIDE);
   const overflow = entries.length - kept.length;
@@ -160,7 +170,6 @@ function placeSide(
   const placed: CardPlacement[] = [];
   for (let r = 0; r * ROW_CAP < items.length; r++) {
     const row = items.slice(r * ROW_CAP, (r + 1) * ROW_CAP);
-    const pitch = CARD_W + GAP_X;
     for (let i = 0; i < row.length; i++) {
       const e = row[i]!;
       placed.push({
@@ -168,8 +177,7 @@ function placeSide(
         kind: e.kind,
         lane,
         ring: 1,
-        x: (i - (row.length - 1) / 2) * pitch,
-        y: sign * (BAND_Y[1] + r * SUB_GAP),
+        ...bandCoords(flow, lane, 1, r, i, row.length),
         z: 0,
         w: CARD_W,
         h: CARD_H,
@@ -183,15 +191,33 @@ function placeSide(
   return placed.filter((c) => c.kind !== "more");
 }
 
+/** Position within a band for either flow: vertical = centered rows above/
+ *  below stepping outward in y; horizontal = centered columns left/right
+ *  stepping outward in x (sorted order reads top→bottom). */
+function bandCoords(
+  flow: CardFlow,
+  lane: "in" | "out",
+  ring: 1 | 2,
+  wrap: number,
+  i: number,
+  len: number,
+): { x: number; y: number } {
+  if (flow === "v") {
+    const sign = lane === "in" ? 1 : -1;
+    return { x: (i - (len - 1) / 2) * (CARD_W + GAP_X), y: sign * (BAND_Y[ring] + wrap * SUB_GAP) };
+  }
+  const sign = lane === "in" ? -1 : 1;
+  return { x: sign * (BAND_X[ring] + wrap * SUB_GAP_X), y: ((len - 1) / 2 - i) * (CARD_H + GAP_Y) };
+}
+
 /** Ring 2: one band further out, wrapped the same way. */
 function placeRing2(
   links: { parent: string; id: string }[],
   lane: "in" | "out",
-  sign: 1 | -1,
   cards: CardPlacement[],
+  flow: CardFlow,
 ): CardPlacement[] {
   const placed: CardPlacement[] = [];
-  const pitch = CARD_W + GAP_X;
   for (let r = 0; r * ROW_CAP < links.length; r++) {
     const row = links.slice(r * ROW_CAP, (r + 1) * ROW_CAP);
     for (let i = 0; i < row.length; i++) {
@@ -201,8 +227,7 @@ function placeRing2(
         kind: "card",
         lane,
         ring: 2,
-        x: (i - (row.length - 1) / 2) * pitch,
-        y: sign * (BAND_Y[2] + r * SUB_GAP),
+        ...bandCoords(flow, lane, 2, r, i, row.length),
         z: 0,
         w: CARD_W,
         h: CARD_H,
@@ -216,7 +241,8 @@ function placeRing2(
   return placed;
 }
 
-export function layoutCards(g: CardGraph): CardLayout {
+export function layoutCards(g: CardGraph, opts?: { flow?: CardFlow }): CardLayout {
+  const flow = opts?.flow ?? "v";
   const cards: CardPlacement[] = [];
   const arrows: ArrowSpec[] = [];
 
@@ -236,15 +262,21 @@ export function layoutCards(g: CardGraph): CardLayout {
   };
   cards.push(focus);
 
-  const inPlaced = placeSide(g.in1, "in", 1, g.focusId, cards);
-  const outPlaced = placeSide(g.out1, "out", -1, g.focusId, cards);
-  const in2Placed = placeRing2(g.in2, "in", 1, cards);
-  const out2Placed = placeRing2(g.out2, "out", -1, cards);
+  const inPlaced = placeSide(g.in1, "in", g.focusId, cards, flow);
+  const outPlaced = placeSide(g.out1, "out", g.focusId, cards, flow);
+  const in2Placed = placeRing2(g.in2, "in", cards, flow);
+  const out2Placed = placeRing2(g.out2, "out", cards, flow);
   const byId = Object.fromEntries(cards.map((c) => [c.id, c]));
 
-  // Ring 1 in: card bottom-center down to its own slot on the focus top edge.
+  // Ring 1 in: card exit-edge center to its own slot on the focus entry
+  // edge (bottom->top for vertical flow, right->left-edge for horizontal;
+  // horizontal slot order is reversed so the top card takes the top slot).
   inPlaced.forEach((c, i) => {
-    const path = elbowPath({ x: c.x, y: c.y - c.h / 2 }, edgeSlot(0, FOCUS_H / 2, FOCUS_W, i, inPlaced.length));
+    const n = inPlaced.length;
+    const path =
+      flow === "v"
+        ? elbowPath({ x: c.x, y: c.y - c.h / 2 }, edgeSlot(0, FOCUS_H / 2, FOCUS_W, i, n))
+        : elbowPath({ x: c.x + c.w / 2, y: c.y }, sideSlot(0, -FOCUS_W / 2, FOCUS_H, n - 1 - i, n), { axis: "x" });
     arrows.push({
       fromId: c.id,
       toId: g.focusId,
@@ -255,9 +287,13 @@ export function layoutCards(g: CardGraph): CardLayout {
       tailHead: c.twoWay ? arrowHead(path, HEAD_SIZE, true) : null,
     });
   });
-  // Ring 1 out: focus bottom-edge slot down to the card top-center.
+  // Ring 1 out: focus exit-edge slot to the card entry-edge center.
   outPlaced.forEach((c, i) => {
-    const path = elbowPath(edgeSlot(0, -FOCUS_H / 2, FOCUS_W, i, outPlaced.length), { x: c.x, y: c.y + c.h / 2 });
+    const n = outPlaced.length;
+    const path =
+      flow === "v"
+        ? elbowPath(edgeSlot(0, -FOCUS_H / 2, FOCUS_W, i, n), { x: c.x, y: c.y + c.h / 2 })
+        : elbowPath(sideSlot(0, FOCUS_W / 2, FOCUS_H, n - 1 - i, n), { x: c.x - c.w / 2, y: c.y }, { axis: "x" });
     arrows.push({
       fromId: g.focusId,
       toId: c.id,
@@ -279,14 +315,25 @@ export function layoutCards(g: CardGraph): CardLayout {
     for (const [parentId, kids] of siblings) {
       const p = byId[parentId]!;
       kids.forEach((c, i) => {
-        const slot =
-          dir === "in"
-            ? edgeSlot(p.x, p.y + p.h / 2, p.w, i, kids.length)
-            : edgeSlot(p.x, p.y - p.h / 2, p.w, i, kids.length);
-        const path =
-          dir === "in"
-            ? elbowPath({ x: c.x, y: c.y - c.h / 2 }, slot)
-            : elbowPath(slot, { x: c.x, y: c.y + c.h / 2 });
+        const n = kids.length;
+        let path;
+        if (flow === "v") {
+          const slot =
+            dir === "in" ? edgeSlot(p.x, p.y + p.h / 2, p.w, i, n) : edgeSlot(p.x, p.y - p.h / 2, p.w, i, n);
+          path =
+            dir === "in"
+              ? elbowPath({ x: c.x, y: c.y - c.h / 2 }, slot)
+              : elbowPath(slot, { x: c.x, y: c.y + c.h / 2 });
+        } else {
+          const slot =
+            dir === "in"
+              ? sideSlot(p.y, p.x - p.w / 2, p.h, n - 1 - i, n)
+              : sideSlot(p.y, p.x + p.w / 2, p.h, n - 1 - i, n);
+          path =
+            dir === "in"
+              ? elbowPath({ x: c.x + c.w / 2, y: c.y }, slot, { axis: "x" })
+              : elbowPath(slot, { x: c.x - c.w / 2, y: c.y }, { axis: "x" });
+        }
         arrows.push({
           fromId: dir === "in" ? c.id : parentId,
           toId: dir === "in" ? parentId : c.id,

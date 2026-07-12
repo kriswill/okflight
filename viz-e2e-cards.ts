@@ -235,6 +235,33 @@ try {
   });
   await settleMotion(page);
 
+  console.log("6c. flow toggle reorients the layout with an animated transition");
+  const animatedFlowToggle = await page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const okf = (window as any).__okf;
+        okf.setFlow("h");
+        requestAnimationFrame(() => resolve(okf.cards.settled === false));
+      }),
+  );
+  check("flow toggle animates cards to their new positions", animatedFlowToggle === true);
+  await settleMotion(page);
+  l = (await layout(page))!;
+  check(
+    "horizontal flow: in-links left, out-links right",
+    l.cards.filter((c) => c.lane === "in").every((c) => c.x < 0) &&
+      l.cards.filter((c) => c.lane === "out").every((c) => c.x > 0) &&
+      l.byId[l.focusId]!.x === 0,
+  );
+  check("hash carries flow=h", await page.evaluate(() => location.hash.includes("flow=h")));
+  await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window as any).__okf.setFlow("v");
+  });
+  await settleMotion(page);
+  check("back to vertical: flow param drops from the hash", await page.evaluate(() => !location.hash.includes("flow")));
+
   console.log("7. reload restores the cards view from the URL");
   await page.reload();
   await waitInteractive(page);

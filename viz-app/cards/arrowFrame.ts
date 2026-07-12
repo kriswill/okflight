@@ -30,6 +30,18 @@ export function arrowAnchors(
   };
 }
 
+/** Which edge a card-local anchor sits on, as its outward unit normal —
+ *  the flow tangent for that endpoint. Anchors always land on an edge
+ *  midline (slots are corner-inset), so the dominant normalized component
+ *  decides. Orientation-agnostic: this is what lets the same arrow code
+ *  serve vertical and horizontal layouts. */
+export function edgeTangent(local: { x: number; y: number }, w: number, h: number): { x: number; y: number } {
+  const rx = local.x / (w / 2);
+  const ry = local.y / (h / 2);
+  if (Math.abs(ry) >= Math.abs(rx)) return { x: 0, y: Math.sign(ry) || 1 };
+  return { x: Math.sign(rx), y: 0 };
+}
+
 /** The 2D elbow generalized to 3D: control points extend along each card's
  *  edge tangent, scaled by the projected drop (bend · (other−this)·tangent),
  *  which reproduces the flat elbow exactly in the degenerate planar case.

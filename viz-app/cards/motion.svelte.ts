@@ -7,7 +7,7 @@
 // and applies imperatively (single-writer rule).
 import * as THREE from "three";
 import type { ArrowSpec, CardLayout, CardPlacement } from "./cardLayout";
-import { arrowAnchors, edgeHead, elbowPath3 } from "./arrowFrame";
+import { arrowAnchors, edgeHead, edgeTangent, elbowPath3 } from "./arrowFrame";
 import { domeProject, frameFromDir, type DomeLayout } from "./dome";
 import {
   buildTransition,
@@ -239,8 +239,12 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
       const tl = tr.kind === "shared" ? lerp(tr.to0, tr.to1) : tr.to0;
       const fromWorld = new THREE.Vector3(fl.x, fl.y, 0).applyQuaternion(from.quat).add(from.pos);
       const toWorld = new THREE.Vector3(tl.x, tl.y, 0).applyQuaternion(to.quat).add(to.pos);
-      const fromTan = new THREE.Vector3(0, -1, 0).applyQuaternion(from.quat);
-      const toTan = new THREE.Vector3(0, 1, 0).applyQuaternion(to.quat);
+      // Which edge each anchor sits on decides the flow tangent — the same
+      // arrow code serves vertical and horizontal layouts.
+      const ft = edgeTangent(fl, from.w, from.h);
+      const tt = edgeTangent(tl, to.w, to.h);
+      const fromTan = new THREE.Vector3(ft.x, ft.y, 0).applyQuaternion(from.quat);
+      const toTan = new THREE.Vector3(tt.x, tt.y, 0).applyQuaternion(to.quat);
       // Heads are pinned 90° to the card edges (apex on the anchor); the
       // tube runs anchor→stub as a bezier, then a dead-straight stem into
       // each cone's base center — it never touches the card itself.

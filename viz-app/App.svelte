@@ -32,7 +32,14 @@
     const h = encodeViewHash(view);
     if (h === currentState) return;
     currentState = h;
-    viz.setFilters(view.filters.hidden, view.filters.q, view.filters.isolate, view.filters.facets, view.filters.view);
+    viz.setFilters(
+      view.filters.hidden,
+      view.filters.q,
+      view.filters.isolate,
+      view.filters.facets,
+      view.filters.view,
+      view.filters.flow,
+    );
     const sel = view.sel;
     if (sel.kind === "concept") viz.selectConcept(sel.id, true);
     else if (sel.kind === "file") viz.selectFile(sel.path);
@@ -49,6 +56,7 @@
         isolate: viz.isolateDepth,
         facets: { ...viz.facetSel },
         view: viz.viewMode,
+        flow: viz.cardFlow,
       },
     });
     if (currentState === h) return;
@@ -97,6 +105,10 @@
       return viz.viewMode;
     },
     setView: (v: "graph" | "cards") => viz.setViewMode(v),
+    get flow() {
+      return viz.cardFlow;
+    },
+    setFlow: (f: "v" | "h") => viz.setCardFlow(f),
     // svelte-ignore state_referenced_locally -- viz's identity never changes
     nodes: viz.model.nodes,
   };

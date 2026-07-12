@@ -8,6 +8,7 @@ import { buildModel } from "../data";
 import { cfg, node } from "../test-helpers";
 import { cardGraph, FOCUS_Z, layoutCards, type CardLayout } from "./cardLayout";
 import { domeProject } from "./dome";
+import { edgeTangent } from "./arrowFrame";
 import { createCardMotion, HEAD_H } from "./motion.svelte";
 import { DURATION_MS, easeOutCubic } from "./transition";
 
@@ -228,6 +229,42 @@ describe("arrow heads", () => {
     expect(d0.dot(fromTan)).toBeGreaterThan(0.999999);
     const tailApex = new THREE.Vector3(0, HEAD_H / 2, 0).applyQuaternion(a.tailHead!.quat).add(a.tailHead!.pos);
     expect(tailApex.distanceTo(anchor)).toBeLessThan(1e-9);
+  });
+});
+
+describe("horizontal flow arrows", () => {
+  test("the same head/stem contract holds when the layout flows left-to-right", () => {
+    const m = createCardMotion({ reducedMotion: () => false });
+    m.setLayout(layoutCards(cardGraph(model, "f", 1, all)!, { flow: "h" }));
+    expect(m.settled).toBe(true);
+    for (const a of m.arrowStates()) {
+      const to = m.sample(a.toId)!;
+      const tt = edgeTangent(a.toLocal, to.w, to.h);
+      // Horizontal layouts anchor on left/right edges.
+      expect(Math.abs(tt.x)).toBe(1);
+      const toTan = new THREE.Vector3(tt.x, tt.y, 0).applyQuaternion(to.quat);
+      const anchor = new THREE.Vector3(a.toLocal.x, a.toLocal.y, 0).applyQuaternion(to.quat).add(to.pos);
+      const last = a.path[a.path.length - 1]!;
+      const prev = a.path[a.path.length - 2]!;
+      expect(last.distanceTo(anchor.clone().addScaledVector(toTan, HEAD_H))).toBeLessThan(1e-9);
+      expect(last.clone().sub(prev).normalize().dot(toTan.clone().negate())).toBeGreaterThan(0.999999);
+      const apex = new THREE.Vector3(0, HEAD_H / 2, 0).applyQuaternion(a.head.quat).add(a.head.pos);
+      expect(apex.distanceTo(anchor)).toBeLessThan(1e-9);
+    }
+  });
+
+  test("toggling flow with the same focus animates every card to its new position", () => {
+    const m = createCardMotion({ reducedMotion: () => false });
+    m.setLayout(layoutCards(cardGraph(model, "f", 1, all)!));
+    const vPos = m.sample("a")!.pos.clone();
+    m.setLayout(layoutCards(cardGraph(model, "f", 1, all)!, { flow: "h" }));
+    expect(m.settled).toBe(false); // geometry changed -> transition
+    expect(m.sample("a")!.pos.distanceTo(vPos)).toBeLessThan(1e-6); // starts from live
+    for (let i = 0; i < 42; i++) m.step(10);
+    expect(m.settled).toBe(true);
+    const h = domeProject(layoutCards(cardGraph(model, "f", 1, all)!, { flow: "h" }));
+    expect(m.sample("a")!.pos.distanceTo(h.byId["a"]!.pos)).toBeLessThan(1e-6);
+    expect(m.sample("f")!.pos.distanceTo(h.byId["f"]!.pos)).toBeLessThan(1e-6); // focus stays at pole
   });
 });
 

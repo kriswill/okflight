@@ -92,6 +92,19 @@ export interface GeneratorInfo {
   text: string | null;
 }
 
+/** One resolved link out of the bundle-root index.md: either a concept doc
+ *  or a sub-bundle directory (its `<dir>/index.md` listing). */
+export type RootLink = { kind: "concept"; id: string } | { kind: "dir"; path: string };
+
+/** The bundle-root index.md, embedded for the cards view's synthetic root
+ *  card. index.md is a reserved file — never a node — so its identity and
+ *  out-links ride separately from the graph. */
+export interface RootDoc {
+  title: string;
+  desc: string;
+  links: RootLink[];
+}
+
 export interface RawData {
   nodes: ConceptNode[];
   edges: { s: string; t: string }[];
@@ -115,6 +128,8 @@ export interface RawData {
   licenses?: DepLicense[];
   /** The generating okflight's identity (absent: pre-generator embed). */
   generator?: GeneratorInfo;
+  /** Bundle-root index.md for the cards view's root card (absent/null: none). */
+  root?: RootDoc | null;
 }
 
 export interface VizModel {
@@ -165,6 +180,10 @@ export interface VizModel {
   /** The generating okflight's identity (null: pre-generator embed — the
    *  About modal hides the Built-with line and own-license entry). */
   generator: GeneratorInfo | null;
+  /** Root card source (null: no root index.md embedded — cards view shows an
+   *  empty state instead of the root layout). Concept links are pre-validated
+   *  against byId. */
+  root: RootDoc | null;
 }
 
 // A concept's id is its bundle-relative path minus ".md" (viz.ts) — the
@@ -355,7 +374,21 @@ export function buildModel(raw: RawData): VizModel {
     stats: raw.stats ?? null,
     licenses: raw.licenses ?? [],
     generator: raw.generator ?? null,
+    root: raw.root
+      ? { ...raw.root, links: raw.root.links.filter((l) => l.kind !== "concept" || byId[l.id]) }
+      : null,
   };
+}
+
+/** Map one resolved bundle-relative link target from the root index.md to a
+ *  RootLink: a known concept wins outright; otherwise a sub-bundle's
+ *  `<dir>/index.md` names that dir; anything else (unknown doc, the root
+ *  index itself) drops. Pure — the generator resolves paths first. */
+export function classifyRootLink(resolved: string, ids: Set<string>): RootLink | null {
+  const id = resolved.replace(/\.md$/, "");
+  if (ids.has(id)) return { kind: "concept", id };
+  if (resolved.endsWith("/index.md")) return { kind: "dir", path: resolved.slice(0, -"/index.md".length) };
+  return null;
 }
 
 /** BFS neighbor set within `depth` hops of `id`, including `id` itself so the

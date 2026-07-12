@@ -5,7 +5,7 @@
 // is by arc distance from the band center — the window cards scroll through.
 import { describe, expect, test } from "bun:test";
 import * as THREE from "three";
-import { arcFade, CYL_R, cylPose, FADE_END, FADE_START } from "./cylinder";
+import { arcFade, arcScale, CYL_R, cylPose, FADE_END, FADE_START, SCALE_MIN } from "./cylinder";
 
 const close = (a: number, b: number, eps = 1e-9) => expect(Math.abs(a - b)).toBeLessThan(eps);
 const vClose = (v: THREE.Vector3, x: number, y: number, z: number, eps = 1e-6) => {
@@ -52,6 +52,23 @@ describe("cylPose", () => {
     const p6 = cylPose(600, 0, 6, "v");
     const n = new THREE.Vector3(0, 0, 1).applyQuaternion(p0.quat);
     expect(p6.pos.clone().sub(p0.pos).distanceTo(n.multiplyScalar(6))).toBeLessThan(1e-9);
+  });
+});
+
+describe("arcScale", () => {
+  test("full size at the band center, SCALE_MIN by the fade edge, symmetric and monotone", () => {
+    expect(arcScale(0)).toBe(1);
+    close(arcScale(FADE_END), SCALE_MIN);
+    close(arcScale(-FADE_END), SCALE_MIN);
+    expect(arcScale(FADE_END + 500)).toBe(SCALE_MIN);
+    let prev = 1;
+    for (let d = 0; d <= FADE_END; d += 20) {
+      const s = arcScale(d);
+      expect(s).toBeLessThanOrEqual(prev);
+      expect(s).toBeGreaterThanOrEqual(SCALE_MIN);
+      close(s, arcScale(-d));
+      prev = s;
+    }
   });
 });
 

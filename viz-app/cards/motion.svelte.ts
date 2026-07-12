@@ -10,7 +10,7 @@
 import * as THREE from "three";
 import type { ArrowSpec, CardFlow, CardLayout, CardPlacement } from "./cardLayout";
 import { arrowAnchors, edgeHead, edgeTangent, elbowPath3 } from "./arrowFrame";
-import { arcFade, cylPose, FADE_END, FADE_START } from "./cylinder";
+import { arcFade, arcScale, cylPose, FADE_END, FADE_START } from "./cylinder";
 import { buildTransition, easeOutCubic, sampleTrack, type FlatSnapshot, type TransitionSpec } from "./transition";
 import type { PickItem } from "./picking";
 
@@ -53,6 +53,9 @@ export interface CardSample {
   opacity: number;
   /** Band coordinate after scroll — what fades and drift anchors read. */
   effBand: number;
+  /** Aperture scale by band distance (1 at center, SCALE_MIN at the fade
+   *  edge) — the rendered card size; arrows and picking follow it. */
+  scale: number;
 }
 
 export interface ArrowState {
@@ -125,6 +128,7 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
     s.quat = p.quat;
     s.effBand = eff;
     s.opacity = s.baseOpacity * arcFade(eff);
+    s.scale = arcScale(eff);
   };
   const reprojectAll = () => {
     for (const s of samples.values()) reproject(s);
@@ -165,6 +169,7 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
       quat: new THREE.Quaternion(),
       opacity: 1,
       effBand: 0,
+      scale: 1,
     };
     reproject(s);
     return s;
@@ -279,13 +284,18 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
       const tt = edgeTangent(tl, to.w, to.h);
       const fromTan = new THREE.Vector3(ft.x, ft.y, 0).applyQuaternion(from.quat);
       const toTan = new THREE.Vector3(tt.x, tt.y, 0).applyQuaternion(to.quat);
-      const fromWorld = new THREE.Vector3(fl.x, fl.y, 0).applyQuaternion(from.quat).add(from.pos);
-      const toWorld = new THREE.Vector3(tl.x, tl.y, 0).applyQuaternion(to.quat).add(to.pos);
-      const head = edgeHead(toWorld, toTan, HEAD_H);
-      const tailHead = tr.spec.twoWay ? edgeHead(fromWorld, fromTan, HEAD_H) : null;
-      const endStub = toWorld.clone().addScaledVector(toTan, HEAD_H + HEAD_STEM);
+      // Anchors (and head sizes) follow the aperture-scaled card edges.
+      const fromWorld = new THREE.Vector3(fl.x * from.scale, fl.y * from.scale, 0)
+        .applyQuaternion(from.quat)
+        .add(from.pos);
+      const toWorld = new THREE.Vector3(tl.x * to.scale, tl.y * to.scale, 0).applyQuaternion(to.quat).add(to.pos);
+      const head = edgeHead(toWorld, toTan, HEAD_H * to.scale);
+      const tailHead = tr.spec.twoWay ? edgeHead(fromWorld, fromTan, HEAD_H * from.scale) : null;
+      const endStub = toWorld.clone().addScaledVector(toTan, (HEAD_H + HEAD_STEM) * to.scale);
       const startPoint = tailHead ? tailHead.base : fromWorld;
-      const startStub = tailHead ? fromWorld.clone().addScaledVector(fromTan, HEAD_H + HEAD_STEM) : fromWorld;
+      const startStub = tailHead
+        ? fromWorld.clone().addScaledVector(fromTan, (HEAD_H + HEAD_STEM) * from.scale)
+        : fromWorld;
       const bez = elbowPath3(startStub, fromTan, endStub, toTan);
       const path = tailHead ? [startPoint.clone(), ...bez, head.base] : [...bez, head.base];
       const ramp =
@@ -513,8 +523,8 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
           kind: r.kind,
           pos: s.pos,
           quat: s.quat,
-          w: s.w * s.sx,
-          h: s.h * s.sy,
+          w: s.w * s.sx * s.scale,
+          h: s.h * s.sy * s.scale,
           opacity: s.opacity,
         });
       }

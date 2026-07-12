@@ -9,7 +9,7 @@ import { buildModel } from "../data";
 import { cfg, node } from "../test-helpers";
 import { edgeTangent } from "./arrowFrame";
 import { BAND_Y, CARD_W, cardGraph, FOCUS_Z, layoutCards } from "./cardLayout";
-import { arcFade, cylPose, FADE_END, FADE_START } from "./cylinder";
+import { arcFade, arcScale, CYL_R, cylPose, FADE_END, FADE_START } from "./cylinder";
 import { createCardMotion, HEAD_H } from "./motion.svelte";
 import { DURATION_MS, easeOutCubic } from "./transition";
 
@@ -166,8 +166,10 @@ describe("refocus transition", () => {
     m.setLayout(layoutCards(cardGraph(model, "f", 1, all)!, { flow: "h" }), "h");
     expect(m.settled).toBe(false);
     // Flat coords carry over exactly; the only start-of-transition delta is
-    // the cylinder curvature plane switching axes (~z-only, invisible at R).
-    expect(m.sample("a")!.pos.distanceTo(vPos)).toBeLessThan(5);
+    // the cylinder curvature plane switching axes — a z-only sag of
+    // R(1-cos(band/R)) at card a's band coordinate (BAND_Y[1]).
+    const zSag = CYL_R * (1 - Math.cos(BAND_Y[1] / CYL_R));
+    expect(m.sample("a")!.pos.distanceTo(vPos)).toBeLessThan(zSag + 0.5);
     for (let i = 0; i < 42; i++) m.step(10);
     const flatH = layoutCards(cardGraph(model, "f", 1, all)!, { flow: "h" });
     const p = flatH.byId["a"]!;
@@ -196,16 +198,19 @@ describe("arrows", () => {
     for (const a of m.arrowStates()) {
       const from = m.sample(a.fromId)!;
       const to = m.sample(a.toId)!;
-      const anchorFrom = new THREE.Vector3(a.fromLocal.x, a.fromLocal.y, 0)
+      // Anchors live on the RENDERED (aperture-scaled) card edges.
+      const anchorFrom = new THREE.Vector3(a.fromLocal.x * from.scale, a.fromLocal.y * from.scale, 0)
         .applyQuaternion(from.quat)
         .add(from.pos);
       expect(a.path[0]!.distanceTo(anchorFrom)).toBeLessThan(1e-9);
       const tt = edgeTangent(a.toLocal, to.w, to.h);
       const toTan = new THREE.Vector3(tt.x, tt.y, 0).applyQuaternion(to.quat);
-      const anchorTo = new THREE.Vector3(a.toLocal.x, a.toLocal.y, 0).applyQuaternion(to.quat).add(to.pos);
+      const anchorTo = new THREE.Vector3(a.toLocal.x * to.scale, a.toLocal.y * to.scale, 0)
+        .applyQuaternion(to.quat)
+        .add(to.pos);
       const last = a.path[a.path.length - 1]!;
-      expect(last.distanceTo(anchorTo.clone().addScaledVector(toTan, HEAD_H))).toBeLessThan(1e-9);
-      const apex = new THREE.Vector3(0, HEAD_H / 2, 0).applyQuaternion(a.head.quat).add(a.head.pos);
+      expect(last.distanceTo(anchorTo.clone().addScaledVector(toTan, HEAD_H * to.scale))).toBeLessThan(1e-9);
+      const apex = new THREE.Vector3(0, (HEAD_H * to.scale) / 2, 0).applyQuaternion(a.head.quat).add(a.head.pos);
       expect(apex.distanceTo(anchorTo)).toBeLessThan(1e-9);
     }
   });
@@ -252,6 +257,31 @@ describe("scroll", () => {
     const farId = flat.cards.find((c) => c.x === minBand && c.ring === 1)!.id;
     close(m.sample(farId)!.opacity, arcFade(minBand - L), 1e-6);
     expect(m.sample(farId)!.opacity).toBe(0);
+  });
+
+  test("aperture: cards shrink toward the window edge; picking and arrows track the scaled edge", () => {
+    const m = start();
+    m.scrollBy("in", 300);
+    // Every band card's scale follows its scrolled band distance; the focus
+    // (band center) stays full size.
+    close(m.sample("f")!.scale, 1);
+    const flat = wideLayout();
+    for (const c of flat.cards.filter((x) => x.lane === "in" && x.ring === 1)) {
+      const s = m.sample(c.id)!;
+      close(s.scale, arcScale(s.effBand));
+      const item = m.pickItems().find((i) => i.id === c.id)!;
+      close(item.w, s.w * s.scale);
+      close(item.h, s.h * s.scale);
+    }
+    // An off-center card's arrow starts exactly on its scaled edge.
+    const id = flat.cards.find((x) => x.lane === "in" && x.ring === 1 && Math.abs(x.x - 300) > 500)!.id;
+    const s = m.sample(id)!;
+    expect(s.scale).toBeLessThan(1);
+    const a = m.arrowStates().find((x) => x.fromId === id)!;
+    const anchor = new THREE.Vector3(a.fromLocal.x * s.scale, a.fromLocal.y * s.scale, 0)
+      .applyQuaternion(s.quat)
+      .add(s.pos);
+    expect(a.path[0]!.distanceTo(anchor)).toBeLessThan(1e-9);
   });
 
   test("cards adopt their new band on refocus: an ex-focus scrolls with its band", () => {

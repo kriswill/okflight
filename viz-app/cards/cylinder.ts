@@ -9,11 +9,14 @@
 import * as THREE from "three";
 import type { CardFlow } from "./cardLayout";
 
-/** Same scale as the old dome: curvature never reads as a ball. */
-export const CYL_R = 4800;
+/** Tight enough that the curve reads as gentle depth (with the aperture
+ *  scale below), never as a ball. */
+export const CYL_R = 2400;
 /** Arc distance from band center where cards start/finish fading. */
 export const FADE_START = 640;
 export const FADE_END = 920;
+/** Aperture floor: a card at the fade edge renders at this scale. */
+export const SCALE_MIN = 0.85;
 
 /** Surface pose for a (band, cross) coordinate: band is the scrollable axis
  *  (x in vertical flow, y in horizontal), cross is the flat ring offset. */
@@ -39,6 +42,16 @@ export function cylPose(
     lift,
   );
   return { pos, quat };
+}
+
+/** Aperture scale by arc distance from the band center: full size in the
+ *  middle, smoothstepped down to SCALE_MIN by the fade edge. The dead-on
+ *  orthographic camera has no perspective of its own, so this supplies the
+ *  depth cue as cards recede along the cylinder. */
+export function arcScale(dist: number): number {
+  const t = Math.min(1, Math.abs(dist) / FADE_END);
+  const s = t * t * (3 - 2 * t);
+  return 1 - (1 - SCALE_MIN) * s;
 }
 
 /** Visibility by arc distance from the band center: 1 inside the window,

@@ -63,7 +63,9 @@
     if (!s) return;
     refs.group.position.copy(s.pos);
     refs.group.quaternion.copy(s.quat);
-    refs.group.scale.setScalar(hovered === id ? 1.03 : 1);
+    // Aperture depth cue: the whole card shrinks with its sample scale
+    // (arrow anchors and picking follow it inside the motion store).
+    refs.group.scale.setScalar(s.scale * (hovered === id ? 1.03 : 1));
     refs.boxMesh.scale.set(s.w * s.sx, s.h * s.sy, DEPTH);
     refs.faceMesh.scale.set(s.w * s.sx, s.h * s.sy, 1);
     refs.boxMat.opacity = s.opacity;

@@ -254,6 +254,26 @@ describe("scroll", () => {
     expect(m.sample(farId)!.opacity).toBe(0);
   });
 
+  test("cards adopt their new band on refocus: an ex-focus scrolls with its band", () => {
+    const m = createCardMotion({ reducedMotion: () => false });
+    // n00 is the focus first (lane "focus"), then f takes over and n00
+    // joins the wide in band — its sample must re-band or it stays pinned
+    // while the band scrolls under it.
+    m.setLayout(layoutCards(cardGraph(wideModel, "n00", 1, all)!));
+    m.setLayout(wideLayout());
+    m.step(DURATION_MS);
+    expect(m.settled).toBe(true);
+    const s0 = m.sample("n00")!;
+    const posBefore = s0.pos.clone();
+    const effBefore = s0.effBand;
+    m.scrollBy("in", 200);
+    const s = m.sample("n00")!;
+    close(s.effBand, effBefore - 200, 1e-6);
+    expect(s.pos.distanceTo(posBefore)).toBeGreaterThan(100);
+    // And the new focus (previously an out-lane card) stays pinned.
+    expect(m.sample("f")!.effBand).toBe(0);
+  });
+
   test("ring-2 children track their parent through the scroll", () => {
     const m = start();
     const parentBefore = m.sample("n00")!.pos.clone();

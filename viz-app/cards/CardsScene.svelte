@@ -42,7 +42,9 @@
 
   const { size, invalidate, renderer } = useThrelte();
 
-  const EYE = new THREE.Vector3(0.25, 0.18, 1).normalize().multiplyScalar(900);
+  // Dead-on orthographic view: visual depth comes from the cylinder tilt
+  // and card slabs alone, so bands and arrows line up with the screen axes.
+  const EYE = new THREE.Vector3(0, 0, 900);
   const SIDEBAR_W = 260; // keep in sync with Stage.svelte / Sidebar #side
   const TUBE_R = 1.4;
 
@@ -233,8 +235,8 @@
       return pickCard3(ndc(e.clientX, e.clientY), cam, motion.pickItems());
     };
     // Which scrollable band the pointer is over: intersect the pointer ray
-    // with the z=0 stage plane (a plain unproject drifts under the skewed
-    // camera) and classify by the cross coordinate.
+    // with the z=0 stage plane (exact for any camera pose, unlike a plain
+    // unproject) and classify by the cross coordinate.
     const ray = new THREE.Raycaster();
     const sideAt = (cx: number, cy: number): "in" | "out" | null => {
       if (!cam) return null;

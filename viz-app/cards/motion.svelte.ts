@@ -451,12 +451,16 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
           .filter((tr) => tr.kind === "exit" && prevEntries.has(tr.id))
           .map((tr) => ({ ...prevEntries.get(tr.id)!, exiting: true })),
       ];
-      // Ensure every track id has a sample shell to tween.
+      // Ensure every track id has a sample shell to tween, and re-band the
+      // persisting ones: lane picks the scroll offset in reproject, so a
+      // card moving between the focus/in/out lanes must adopt its NEW band
+      // (a stale lane left ex-focus cards pinned while their band scrolled
+      // under them). Exit tracks have no next placement and keep theirs.
       for (const track of spec.tracks) {
-        if (!samples.has(track.id)) {
-          const p = next.byId[track.id]!;
-          samples.set(track.id, sampleOf(p));
-        }
+        const p = next.byId[track.id];
+        const s = samples.get(track.id);
+        if (!s) samples.set(track.id, sampleOf(p!));
+        else if (p) s.lane = p.lane;
       }
       retargetArrows(prevFlat, next);
       flat = next;

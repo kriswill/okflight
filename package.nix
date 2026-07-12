@@ -116,7 +116,7 @@ let
 in
 stdenvNoCC.mkDerivation {
   pname = "okf";
-  version = "0.1.0";
+  version = "0.1.1";
   inherit src;
 
   nativeBuildInputs = [ makeBinaryWrapper ];

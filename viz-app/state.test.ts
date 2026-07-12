@@ -110,6 +110,16 @@ describe("selection", () => {
     expect(s.cardsIndexDoc).toBeNull();
   });
 
+  test("themeDark tracks the picked theme, not the OS scheme", () => {
+    const s = createVizState(model());
+    s.systemSchemeChanged(false); // light OS…
+    s.setTheme(1); // …but the dark theme picked via the toggle
+    expect(s.dark).toBe(false);
+    expect(s.themeDark).toBe(true);
+    s.setTheme(0);
+    expect(s.themeDark).toBe(false);
+  });
+
   test("hideIndexPanel dismisses until the next navigation", () => {
     const s = createVizState(model());
     s.setViewMode("cards");

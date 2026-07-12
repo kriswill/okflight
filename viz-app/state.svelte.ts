@@ -363,6 +363,12 @@ export function createVizState(model: VizModel) {
     set dark(v: boolean) {
       dark = v;
     },
+    /** Whether the APPLIED theme is the dark stop. `dark` only mirrors the
+     *  OS scheme (it picks the un-picked default); an explicit toggle pick
+     *  overrides it, so canvas-drawn colors must key off this instead. */
+    get themeDark() {
+      return THEMES[themeIndex]!.name === "dark";
+    },
     get paletteVersion() {
       return paletteVersion;
     },

@@ -232,13 +232,24 @@
     const move = (e: PointerEvent) => {
       if (press && !dragging && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 4) {
         dragging = true;
-        el.setPointerCapture(e.pointerId);
+        // Capture can race pointer release (and synthetic pointers in
+        // automation have no capture target) — losing it only degrades to
+        // an ended drag, never an error worth surfacing.
+        try {
+          el.setPointerCapture(e.pointerId);
+        } catch {
+          /* no active pointer */
+        }
         setHovered(null);
         el.style.cursor = "grabbing";
       }
       if (dragging) {
         motion.dragBy(e.clientX - last.x, e.clientY - last.y, cam?.zoom ?? 1);
         last = { x: e.clientX, y: e.clientY };
+        // Event-driven apply: the pivot is one transform, and waiting on the
+        // frame task would drop the last move of a fast drag.
+        applyPivot();
+        invalidate();
         return;
       }
       if (!motion.settled) return; // hover disabled mid-animation
@@ -251,7 +262,11 @@
       const wasDragging = dragging;
       dragging = false;
       if (wasDragging) {
-        el.releasePointerCapture(e.pointerId);
+        try {
+          el.releasePointerCapture(e.pointerId);
+        } catch {
+          /* no active pointer */
+        }
         el.style.cursor = "grab";
         press = null;
         return; // a drag never selects

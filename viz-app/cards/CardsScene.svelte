@@ -43,9 +43,11 @@
   import { tubeGradient } from "./arrowFrame";
   import Card from "./Card.svelte";
   import { inkFor } from "./cardFace";
-  import { fitZoom, type CardLayout } from "./cardLayout";
+  import { BAND_X, BAND_Y, fitZoom, type CardLayout } from "./cardLayout";
+  import { cylPose } from "./cylinder";
   import ElbowArrow from "./ElbowArrow.svelte";
   import { createCardMotion, type ArrowState } from "./motion.svelte";
+  import OverflowChip from "./OverflowChip.svelte";
   import { pickCard3 } from "./picking";
 
   const { viz, layout }: { viz: VizState; layout: CardLayout } = $props();
@@ -188,17 +190,24 @@
   });
 
   const rightInset = $derived(viz.sel.kind !== "none" || viz.cardsIndexDoc ? viz.panelPx($size.width) : 0);
-  const zoomTarget = $derived(
-    fitZoom(layout.bounds, Math.max(160, $size.width - SIDEBAR_W - rightInset), Math.max(160, $size.height - 48)),
-  );
+  const stageW = $derived(Math.max(160, $size.width - SIDEBAR_W - rightInset));
+  const stageH = $derived(Math.max(160, $size.height - 48));
+  const zoomTarget = $derived(fitZoom(layout.bounds, stageW, stageH, viz.cardFlow));
   const shiftTarget = $derived.by(() => {
     const z = zoomTarget;
     return (rightInset - SIDEBAR_W) / 2 / z;
   });
+  // The visible half-extent along the band axis (world units at the target
+  // zoom): the motion store fades cards out BEFORE the screen edge and
+  // surfaces the hidden remainder as overflow chips.
+  const halfBandTarget = $derived(
+    ((viz.cardFlow === "v" ? stageW : stageH) / 2 - 24) / zoomTarget,
+  );
   $effect(() => {
     motion.setViewTargets(zoomTarget, shiftTarget);
+    motion.setWindow(halfBandTarget);
     if (motion.settled) {
-      applyCamera();
+      applyFrame(true);
       invalidate();
     }
   });
@@ -416,6 +425,12 @@
         applyFrame(true);
         invalidate();
       },
+      get overflow() {
+        return motion.overflow.map((o) => ({ ...o }));
+      },
+      get zoom() {
+        return motion.view.zoom;
+      },
       pose: (id: string) => {
         const p = motion.pose(id);
         return p ? { x: p.x, y: p.y, z: p.z } : null;
@@ -475,4 +490,11 @@
     {registerArrow}
     {refreshArrow}
   />
+{/each}
+{#each motion.overflow as o (o.key)}
+  {@const cross =
+    motion.flow === "v" ? (o.lane === "in" ? 1 : -1) * BAND_Y[1] : (o.lane === "in" ? -1 : 1) * BAND_X[1]}
+  {@const p = cylPose(o.dir * (motion.window.fadeEnd - 40), cross, 6, motion.flow)}
+  {@const angle = motion.flow === "v" ? (o.dir === 1 ? 0 : Math.PI) : o.dir === 1 ? -Math.PI / 2 : Math.PI / 2}
+  <OverflowChip count={o.count} {angle} pos={p.pos} quat={p.quat} bg={NEUTRAL} ink={INK} />
 {/each}

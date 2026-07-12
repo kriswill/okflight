@@ -70,6 +70,12 @@ describe("arcScale", () => {
       prev = s;
     }
   });
+
+  test("the fade edge is a parameter — narrow viewports pull it in", () => {
+    close(arcScale(400, 400), SCALE_MIN);
+    expect(arcScale(0, 400)).toBe(1);
+    expect(arcScale(200, 400)).toBeLessThan(arcScale(200));
+  });
 });
 
 describe("arcFade", () => {
@@ -86,6 +92,14 @@ describe("arcFade", () => {
       prev = f;
     }
     const mid = arcFade((FADE_START + FADE_END) / 2);
+    expect(mid).toBeGreaterThan(0.4);
+    expect(mid).toBeLessThan(0.6);
+  });
+
+  test("the window is parameterized — fade tracks a viewport-derived ramp", () => {
+    expect(arcFade(250, 250, 400)).toBe(1);
+    expect(arcFade(400, 250, 400)).toBe(0);
+    const mid = arcFade(325, 250, 400);
     expect(mid).toBeGreaterThan(0.4);
     expect(mid).toBeLessThan(0.6);
   });

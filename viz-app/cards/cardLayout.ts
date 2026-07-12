@@ -467,17 +467,23 @@ export function layoutCards(g: CardGraph, opts?: { flow?: CardFlow }): CardLayou
  *  last band card on screen (long bands are explored by scrolling). */
 export const ZOOM_MIN = 0.6;
 
-/** Ortho zoom fitting the layout's symmetric envelope (origin-centered, so
- *  the focus card stays centered) into the viewport; clamped to
- *  [ZOOM_MIN, 1] so card size stays stable across focuses. */
+/** Ortho zoom fitting the layout's CROSS-axis symmetric envelope
+ *  (origin-centered, so the focus card stays centered) into the viewport;
+ *  clamped to [ZOOM_MIN, 1]. The band axis never participates — it is
+ *  scrollable, so a longer band must not shrink the cards: the focus keeps
+ *  its scale and off-window cards fade behind the overflow indicators. */
 export function fitZoom(
   b: CardLayout["bounds"],
   vw: number,
   vh: number,
+  flow: CardFlow = "v",
   pad = 0.85,
 ): number {
-  const w = 2 * Math.max(Math.abs(b.minX), Math.abs(b.maxX));
-  const h = 2 * Math.max(Math.abs(b.minY), Math.abs(b.maxY));
-  if (!(w > 0) || !(h > 0)) return 1;
-  return Math.min(1, Math.max(ZOOM_MIN, pad * Math.min(vw / w, vh / h)));
+  const cross =
+    flow === "v"
+      ? 2 * Math.max(Math.abs(b.minY), Math.abs(b.maxY))
+      : 2 * Math.max(Math.abs(b.minX), Math.abs(b.maxX));
+  const avail = flow === "v" ? vh : vw;
+  if (!(cross > 0)) return 1;
+  return Math.min(1, Math.max(ZOOM_MIN, (pad * avail) / cross));
 }

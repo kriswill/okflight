@@ -456,32 +456,38 @@ describe("bundleCardGraph", () => {
   });
 });
 
+// Zoom is driven by the CROSS axis alone (ring count): the band axis is
+// scrollable, so its length must never shrink the cards — the focus keeps
+// its scale no matter how many cards ride the scroll.
 describe("fitZoom", () => {
-  const bounds = { minX: -300, maxX: 300, minY: -100, maxY: 100 };
+  const bounds = { minX: -3000, maxX: 3000, minY: -100, maxY: 100 };
 
-  test("scales down to fit the wider axis", () => {
-    // Symmetric 600x200 envelope in a 450x400 viewport: x limits, 450/600.
-    expect(fitZoom(bounds, 450, 400, 1)).toBeCloseTo(0.75);
+  test("vertical flow fits the vertical (cross) extent; band length is ignored", () => {
+    // Cross envelope 200 in a 400-high viewport: 400/200 -> clamped to 1,
+    // despite a 6000-wide band.
+    expect(fitZoom(bounds, 450, 400, "v", 1)).toBe(1);
+    // Cross 800 in a 400-high viewport: 0.5 -> clamped to ZOOM_MIN.
+    expect(fitZoom({ ...bounds, minY: -400, maxY: 400 }, 450, 400, "v", 1)).toBe(ZOOM_MIN);
+    // Cross 500 in a 400-high viewport: 0.8.
+    expect(fitZoom({ ...bounds, minY: -250, maxY: 250 }, 450, 400, "v", 1)).toBeCloseTo(0.8);
+  });
+
+  test("horizontal flow fits the horizontal (cross) extent instead", () => {
+    const b = { minX: -250, maxX: 250, minY: -3000, maxY: 3000 };
+    expect(fitZoom(b, 400, 300, "h", 1)).toBeCloseTo(0.8);
+    expect(fitZoom(b, 800, 300, "h", 1)).toBe(1);
   });
 
   test("fits the symmetric envelope so the origin stays centered", () => {
-    // Asymmetric bounds: envelope doubles the far side (|maxX|=300 -> 600 wide).
-    const asym = { minX: -50, maxX: 300, minY: -100, maxY: 100 };
-    expect(fitZoom(asym, 450, 400, 1)).toBeCloseTo(0.75);
+    // Asymmetric cross: envelope doubles the far side (|maxY|=250 -> 500).
+    const asym = { minX: 0, maxX: 0, minY: -50, maxY: 250 };
+    expect(fitZoom(asym, 450, 400, "v", 1)).toBeCloseTo(0.8);
   });
 
-  test("pad shrinks proportionally, small scenes never zoom past 1", () => {
-    expect(fitZoom(bounds, 450, 400, 0.9)).toBeCloseTo(0.675);
-    expect(fitZoom({ minX: -10, maxX: 10, minY: -5, maxY: 5 }, 800, 600, 0.85)).toBe(1);
-  });
-
-  test("never shrinks below ZOOM_MIN — cards stay readable over full fit", () => {
+  test("pad shrinks proportionally; never below ZOOM_MIN; degenerate bounds -> 1", () => {
+    expect(fitZoom({ ...bounds, minY: -250, maxY: 250 }, 450, 400, "v", 0.9)).toBeCloseTo(0.72);
     expect(ZOOM_MIN).toBeGreaterThanOrEqual(0.5);
-    expect(fitZoom(bounds, 120, 400, 0.85)).toBe(ZOOM_MIN);
-    expect(fitZoom({ minX: -2000, maxX: 2000, minY: -500, maxY: 500 }, 800, 600, 0.85)).toBe(ZOOM_MIN);
-  });
-
-  test("zero-size bounds clamp to 1 instead of Infinity", () => {
-    expect(fitZoom({ minX: 0, maxX: 0, minY: 0, maxY: 0 }, 800, 600, 0.85)).toBe(1);
+    expect(fitZoom({ ...bounds, minY: -2000, maxY: 2000 }, 800, 600, "v", 0.85)).toBe(ZOOM_MIN);
+    expect(fitZoom({ minX: 0, maxX: 0, minY: 0, maxY: 0 }, 800, 600, "v", 0.85)).toBe(1);
   });
 });

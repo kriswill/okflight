@@ -9,7 +9,7 @@ import { buildModel } from "../data";
 import { cfg, node } from "../test-helpers";
 import { edgeTangent } from "./arrowFrame";
 import { BAND_Y, CARD_W, cardGraph, FOCUS_Z, layoutCards } from "./cardLayout";
-import { arcFade, arcScale, CYL_R, cylPose, FADE_END, FADE_START } from "./cylinder";
+import { arcFade, arcScale, CYL_R, cylPose, FADE_END, FADE_START, SCALE_MIN } from "./cylinder";
 import { createCardMotion, HEAD_H } from "./motion.svelte";
 import { DURATION_MS, easeOutCubic } from "./transition";
 
@@ -347,6 +347,62 @@ describe("scroll", () => {
     m.setLayout(layoutCards(cardGraph(wideModel, "n06", 1, all)!));
     close(m.scroll.in, 0);
     expect(m.sample("n06")!.pos.distanceTo(dragged)).toBeLessThan(1e-6); // continuity
+  });
+});
+
+// The focus card keeps its scale no matter the band length: the visible
+// window derives from the viewport (setWindow), and cards hidden past its
+// edges are surfaced by per-edge overflow chips with counts.
+describe("viewport window & overflow", () => {
+  const start = () => {
+    const m = createCardMotion({ reducedMotion: () => false });
+    m.setLayout(wideLayout());
+    return m;
+  };
+  // wideLayout ring-1 in band: 13 cards at ±232 pitch (±1392 extremes),
+  // plus gp (ring 2) anchored at band -1392.
+
+  test("setWindow pulls the fade edge in: far cards hide, scroll room grows", () => {
+    const m = start();
+    const flat = wideLayout();
+    const id696 = flat.cards.find((c) => c.ring === 1 && Math.abs(c.x - 696) < 1)!.id;
+    expect(m.sample(id696)!.opacity).toBeGreaterThan(0); // default 920 window
+    const limitBefore = m.scrollLimit("in");
+    m.setWindow(500);
+    expect(m.window.fadeEnd).toBe(500);
+    expect(m.sample(id696)!.opacity).toBe(0);
+    expect(m.sample(id696)!.scale).toBeCloseTo(SCALE_MIN, 6); // aperture follows
+    expect(m.scrollLimit("in")).toBeGreaterThan(limitBefore);
+  });
+
+  test("overflow chips count hidden cards per band edge and track the scroll", () => {
+    const m = start();
+    m.setWindow(500);
+    // Visible: bands 0, ±232, ±464. Hidden ring 1: ±696..±1392 (4 a side);
+    // gp (ring 2, band -1392) joins the negative side.
+    const neg = m.overflow.find((c) => c.lane === "in" && c.dir === -1)!;
+    const pos = m.overflow.find((c) => c.lane === "in" && c.dir === 1)!;
+    expect(neg.count).toBe(5);
+    expect(pos.count).toBe(4);
+    expect(m.overflow.some((c) => c.lane === "out")).toBe(false); // nothing there
+    m.scrollBy("in", 232); // one pitch toward the positive edge
+    expect(m.overflow.find((c) => c.lane === "in" && c.dir === -1)!.count).toBe(6);
+    expect(m.overflow.find((c) => c.lane === "in" && c.dir === 1)!.count).toBe(3);
+  });
+
+  test("chips clear during a transition and recompute at settle", () => {
+    const m = start();
+    m.setWindow(500);
+    expect(m.overflow.length).toBeGreaterThan(0);
+    m.setLayout(layoutCards(cardGraph(wideModel, "n00", 1, all)!));
+    expect(m.overflow).toEqual([]); // mid-flight: counts would lie
+    for (let i = 0; i < 42; i++) m.step(10);
+    expect(m.settled).toBe(true);
+    // n00's neighborhood is tiny — everything fits, no chips.
+    expect(m.overflow).toEqual([]);
+    m.setLayout(wideLayout());
+    for (let i = 0; i < 42; i++) m.step(10);
+    expect(m.overflow.length).toBeGreaterThan(0); // recomputed at settle
   });
 });
 

@@ -274,7 +274,28 @@ try {
   });
   await settleMotion(page);
   l = (await layout(page))!;
-  check("mega-hub keeps every in-link on one scrollable band (no grid, no chip)", l.cards.filter((c) => c.lane === "in" && c.ring === 1).length === 29);
+  check("mega-hub keeps every in-link on one scrollable band (no grid)", l.cards.filter((c) => c.lane === "in" && c.ring === 1).length === 29);
+  check("focus keeps full scale on the mega-hub (zoom pinned at 1)", (await okf(page, "window.__okf.cards.zoom")) === 1);
+  type Ovf = { lane: string; dir: number; count: number }[];
+  const ovf = await okf<Ovf>(page, "window.__okf.cards.overflow");
+  const neg0 = ovf.find((o) => o.lane === "in" && o.dir === -1)?.count ?? 0;
+  const pos0 = ovf.find((o) => o.lane === "in" && o.dir === 1)?.count ?? 0;
+  check("overflow chips flag hidden cards on both band edges", neg0 > 0 && pos0 > 0 && neg0 + pos0 < 29, JSON.stringify(ovf));
+  await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window as any).__okf.cards.scrollBy("in", 232); // exactly one card pitch
+  });
+  const ovf2 = await okf<Ovf>(page, "window.__okf.cards.overflow");
+  check(
+    "chip counts track the scroll",
+    (ovf2.find((o) => o.lane === "in" && o.dir === -1)?.count ?? 0) === neg0 + 1 &&
+      (ovf2.find((o) => o.lane === "in" && o.dir === 1)?.count ?? 0) === pos0 - 1,
+    JSON.stringify(ovf2),
+  );
+  await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window as any).__okf.cards.scrollBy("in", -232);
+  });
   const focusBefore = await okf<{ x: number; y: number }>(page, 'window.__okf.cards.project("services/core-platform")');
   // Wheel over the in-band (above the focus card).
   await page.mouse.move(focusBefore.x, focusBefore.y - 220);

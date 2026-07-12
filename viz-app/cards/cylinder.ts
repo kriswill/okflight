@@ -47,19 +47,21 @@ export function cylPose(
 /** Aperture scale by arc distance from the band center: full size in the
  *  middle, smoothstepped down to SCALE_MIN by the fade edge. The dead-on
  *  orthographic camera has no perspective of its own, so this supplies the
- *  depth cue as cards recede along the cylinder. */
-export function arcScale(dist: number): number {
-  const t = Math.min(1, Math.abs(dist) / FADE_END);
+ *  depth cue as cards recede along the cylinder. `end` defaults to the
+ *  reference window; the motion store passes its viewport-derived edge. */
+export function arcScale(dist: number, end = FADE_END): number {
+  const t = Math.min(1, Math.abs(dist) / end);
   const s = t * t * (3 - 2 * t);
   return 1 - (1 - SCALE_MIN) * s;
 }
 
 /** Visibility by arc distance from the band center: 1 inside the window,
  *  smoothstepped to 0 past the edge — cards (and their lines) fade in and
- *  out as they scroll through. */
-export function arcFade(dist: number): number {
+ *  out as they scroll through. The [start, end] ramp defaults to the
+ *  reference window; the motion store passes its viewport-derived one. */
+export function arcFade(dist: number, start = FADE_START, end = FADE_END): number {
   const d = Math.abs(dist);
-  const t = (FADE_END - d) / (FADE_END - FADE_START);
+  const t = (end - d) / (end - start);
   const c = Math.min(1, Math.max(0, t));
   return c * c * (3 - 2 * c);
 }

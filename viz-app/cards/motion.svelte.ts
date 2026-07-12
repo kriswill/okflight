@@ -25,6 +25,14 @@ const DRIFT_CLAMP = 0.85;
 
 export type ScrollSide = "in" | "out";
 
+/** One band-edge overflow indicator: `count` cards live past that edge. */
+export interface OverflowChip {
+  key: string;
+  lane: ScrollSide;
+  dir: 1 | -1;
+  count: number;
+}
+
 export interface RenderEntry {
   id: string;
   kind: CardPlacement["kind"];
@@ -100,6 +108,9 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
   let renderList = $state<RenderEntry[]>([]);
   let arrowList = $state<{ key: string; fromId: string; toId: string; dir: "in" | "out"; twoWay: boolean }[]>([]);
   let settled = $state(true);
+  /** Band-edge overflow indicators — cleared while a transition is in
+   *  flight (mid-flight counts would lie), recomputed at settle/scroll. */
+  let overflow = $state<OverflowChip[]>([]);
 
   // Plain per-frame state — no reactivity at 60fps.
   let flow: CardFlow = "v";
@@ -111,6 +122,12 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
   let arrows: ArrowState[] = [];
   const scroll: Record<ScrollSide, number> = { in: 0, out: 0 };
   const limits: Record<ScrollSide, number> = { in: 0, out: 0 };
+  // Visible-window fade ramp along the band axis. Defaults to the reference
+  // window; setWindow derives it from the live viewport so the focus card
+  // keeps its scale and cards vanish BEFORE the screen edge, however long
+  // the band.
+  let fadeStart = FADE_START;
+  let fadeEnd = FADE_END;
   const view = { zoom: 1, shift: 0 };
   let viewTarget: { zoom: number; shift: number } | null = null;
   let viewSeeded = false;
@@ -127,8 +144,8 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
     s.pos = p.pos;
     s.quat = p.quat;
     s.effBand = eff;
-    s.opacity = s.baseOpacity * arcFade(eff);
-    s.scale = arcScale(eff);
+    s.opacity = s.baseOpacity * arcFade(eff, fadeStart, fadeEnd);
+    s.scale = arcScale(eff, fadeEnd);
   };
   const reprojectAll = () => {
     for (const s of samples.values()) reproject(s);
@@ -141,7 +158,7 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
       let maxAbs = 0;
       for (const c of layout.cards)
         if (c.lane === side) maxAbs = Math.max(maxAbs, Math.abs(bandOf(c.x, c.y)));
-      limits[side] = Math.max(0, maxAbs - FADE_START);
+      limits[side] = Math.max(0, maxAbs - fadeStart);
     }
   };
 
@@ -260,7 +277,7 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
     other: CardSample,
   ): { x: number; y: number } => {
     const limit = ((flow === "v" ? focusSample.w : focusSample.h) / 2) * DRIFT_CLAMP;
-    const drift = limit * Math.min(1, Math.max(-1, other.effBand / FADE_END));
+    const drift = limit * Math.min(1, Math.max(-1, other.effBand / fadeEnd));
     return flow === "v" ? { x: drift, y: local.y } : { x: local.x, y: drift };
   };
 
@@ -322,6 +339,28 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
     arrows = out;
   };
 
+  /** Count settled cards past each band edge (they render at opacity 0). */
+  const computeOverflow = () => {
+    if (!flat) {
+      overflow = [];
+      return;
+    }
+    const counts = { in: { neg: 0, pos: 0 }, out: { neg: 0, pos: 0 } };
+    for (const s of samples.values()) {
+      if (s.lane !== "in" && s.lane !== "out") continue;
+      if (s.effBand >= fadeEnd - 1e-6) counts[s.lane].pos++;
+      else if (s.effBand <= -(fadeEnd - 1e-6)) counts[s.lane].neg++;
+    }
+    overflow = (["in", "out"] as const).flatMap((lane) =>
+      ([
+        [-1, counts[lane].neg],
+        [1, counts[lane].pos],
+      ] as const)
+        .filter(([, count]) => count > 0)
+        .map(([dir, count]) => ({ key: `${lane}:${dir}`, lane, dir, count })),
+    );
+  };
+
   const settleAt = (layout: CardLayout) => {
     samples.clear();
     for (const p of layout.cards) samples.set(p.id, sampleOf(p));
@@ -330,6 +369,7 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
     renderList = layout.cards.map((p) => entryOf(p, false));
     retargetArrows(null, layout);
     computeArrows(1);
+    computeOverflow();
     settled = viewAtTarget();
   };
 
@@ -367,6 +407,7 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
         arrowList = arrowList.filter((a) => arrowTracks.some((tr) => tr.key === a.key));
         spec = null;
         computeArrows(1);
+        computeOverflow();
       }
     }
     if (viewTarget && !viewAtTarget()) {
@@ -424,6 +465,7 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
         arrows = [];
         renderList = [];
         arrowList = [];
+        overflow = [];
         scroll.in = 0;
         scroll.out = 0;
         settled = true;
@@ -454,6 +496,7 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
       scroll.out = 0;
       spec = buildTransition(snap, next, flow);
       t = 0;
+      overflow = [];
       const prevEntries = new Map(renderList.map((r) => [r.id, r]));
       renderList = [
         ...next.cards.map((p) => entryOf(p, false)),
@@ -500,6 +543,30 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
       scroll[side] = next;
       reprojectAll();
       computeArrows(spec ? easeOutCubic(Math.min(1, t)) : 1);
+      if (!spec) computeOverflow();
+    },
+
+    /** Visible half-extent along the band axis (world units), derived from
+     *  the live viewport: the fade ramp ends there, so cards vanish before
+     *  the screen edge instead of being clipped by it. */
+    setWindow(halfBand: number) {
+      const end = Math.min(FADE_END, Math.max(360, halfBand));
+      if (end === fadeEnd) return;
+      fadeEnd = end;
+      fadeStart = Math.max(end - (FADE_END - FADE_START), end / 2);
+      if (!flat) return;
+      computeLimits(flat);
+      scroll.in = Math.min(limits.in, Math.max(-limits.in, scroll.in));
+      scroll.out = Math.min(limits.out, Math.max(-limits.out, scroll.out));
+      reprojectAll();
+      computeArrows(spec ? easeOutCubic(Math.min(1, t)) : 1);
+      if (!spec) computeOverflow();
+    },
+    get window() {
+      return { fadeStart, fadeEnd };
+    },
+    get overflow() {
+      return overflow;
     },
 
     sample(id: string): CardSample | null {

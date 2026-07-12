@@ -1,5 +1,9 @@
 # okflight
 
+[![Version](https://badgen.net/npm/v/@kriswill/okflight?color=green)](https://www.npmjs.com/package/@kriswill/okflight) [![FlakeHub](https://img.shields.io/endpoint?url=https://flakehub.com/f/kriswill/okflight/badge)](https://flakehub.com/flake/kriswill/okflight) [![License](https://badgen.net/npm/license/@kriswill/okflight)](LICENSE)
+[![ci](https://github.com/kriswill/okflight/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/kriswill/okflight/actions/workflows/ci.yml)
+[![release](https://github.com/kriswill/okflight/actions/workflows/release.yml/badge.svg)](https://github.com/kriswill/okflight/actions/workflows/release.yml)
+
 `okf` — a CLI for maintaining an [OKF v0.1](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md)
 knowledge bundle: `scaffold` stubs catalog docs from the repo sources, `index`
 regenerates progressive-disclosure `index.md` listings, `validate` checks

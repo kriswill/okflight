@@ -194,9 +194,25 @@ function bandCoords(
   return { x: sign * BAND_X[ring], y: anchor + ((len - 1) / 2 - i) * (CARD_H + GAP_Y) };
 }
 
+/** Greedy 1D de-overlap along the band axis: sort, enforce the pitch left
+ *  to right, then re-center the whole set on its intended mean so clusters
+ *  stay as close to their parents as spacing allows. */
+function spreadAlongBand(placed: CardPlacement[], flow: CardFlow, pitch: number) {
+  if (placed.length < 2) return;
+  const get = (c: CardPlacement) => (flow === "v" ? c.x : c.y);
+  const set = (c: CardPlacement, v: number) => (flow === "v" ? (c.x = v) : (c.y = v));
+  const sorted = [...placed].sort((a, b) => get(a) - get(b));
+  const wantedMean = sorted.reduce((n, c) => n + get(c), 0) / sorted.length;
+  for (let i = 1; i < sorted.length; i++) {
+    if (get(sorted[i]!) - get(sorted[i - 1]!) < pitch) set(sorted[i]!, get(sorted[i - 1]!) + pitch);
+  }
+  const gotMean = sorted.reduce((n, c) => n + get(c), 0) / sorted.length;
+  for (const c of sorted) set(c, get(c) - (gotMean - wantedMean));
+}
+
 /** Ring 2: per-parent clusters on the outer band, centered on the parent's
  *  band position so grandparents/grandchildren track their parent as the
- *  side scrolls. */
+ *  side scrolls; a de-overlap sweep keeps neighboring clusters apart. */
 function placeRing2(
   links: { parent: string; id: string }[],
   lane: "in" | "out",
@@ -226,6 +242,7 @@ function placeRing2(
       });
     });
   }
+  spreadAlongBand(placed, flow, flow === "v" ? CARD_W + GAP_X : CARD_H + GAP_Y);
   cards.push(...placed);
   return placed;
 }

@@ -192,6 +192,40 @@ describe("layoutCards", () => {
     expect(Math.min(...xs)).toBe(-Math.max(...xs));
   });
 
+  test("neighboring ring-2 clusters never overlap: a band-axis sweep spaces them", () => {
+    // p1 has two kids (cluster spans past its slot); p2, one slot over, has
+    // one kid. Without the sweep, k2 and k3 would sit ~116 apart (< card
+    // width). After it, every ring-2 pair is at least one pitch apart.
+    const m = buildModel({
+      nodes: [
+        node("f", "Decision", "Focus"),
+        node("p1", "Pattern", "Alpha"),
+        node("p2", "Pattern", "Beta"),
+        node("k1", "Term", "K1"),
+        node("k2", "Term", "K2"),
+        node("k3", "Term", "K3"),
+      ],
+      edges: [
+        { s: "p1", t: "f" },
+        { s: "p2", t: "f" },
+        { s: "k1", t: "p1" },
+        { s: "k2", t: "p1" },
+        { s: "k3", t: "p2" },
+      ],
+      cfg: cfg(),
+    });
+    const l = layoutCards(cardGraph(m, "f", 2, all)!);
+    const ring2 = l.cards.filter((c) => c.ring === 2).sort((a, b) => a.x - b.x);
+    const pitch = CARD_W + GAP_X;
+    for (let i = 1; i < ring2.length; i++) {
+      expect(ring2[i]!.x - ring2[i - 1]!.x).toBeGreaterThanOrEqual(pitch - 1e-9);
+    }
+    // The spread stays centered where the clusters wanted to be.
+    const meanWanted = (l.byId["p1"]!.x * 2 + l.byId["p2"]!.x) / 3;
+    const meanGot = ring2.reduce((n, c) => n + c.x, 0) / ring2.length;
+    expect(Math.abs(meanGot - meanWanted)).toBeLessThan(1e-6);
+  });
+
   test("ring 2 clusters center on their parent and its arrows attach to the parent card edge", () => {
     const l = layoutCards(cardGraph(model(), "hub", 2, all)!);
     // Children track their parent: the cluster centers on the parent's band position.

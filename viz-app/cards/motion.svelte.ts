@@ -10,7 +10,7 @@
 import * as THREE from "three";
 import type { ArrowSpec, CardFlow, CardLayout, CardPlacement } from "./cardLayout";
 import { arrowAnchors, edgeHead, edgeTangent, elbowPath3 } from "./arrowFrame";
-import { arcFade, cylPose, FADE_START } from "./cylinder";
+import { arcFade, cylPose, FADE_END, FADE_START } from "./cylinder";
 import { buildTransition, easeOutCubic, sampleTrack, type FlatSnapshot, type TransitionSpec } from "./transition";
 import type { PickItem } from "./picking";
 
@@ -246,15 +246,16 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
   };
 
   /** Anchors on the focus edge drift with the linked card's scrolled band
-   *  position (clamped inside the edge) — arrows slide along the focus card
-   *  as their band scrolls. */
+   *  position, COMPRESSED so the whole fade window maps onto the edge:
+   *  every visible arrow gets a distinct, ordered anchor with spacing (no
+   *  corner pile-ups), and all of them slide as the band scrolls. */
   const driftFocusLocal = (
     local: { x: number; y: number },
     focusSample: CardSample,
     other: CardSample,
   ): { x: number; y: number } => {
-    const half = (flow === "v" ? focusSample.w : focusSample.h) / 2;
-    const drift = Math.min(half * DRIFT_CLAMP, Math.max(-half * DRIFT_CLAMP, other.effBand));
+    const limit = ((flow === "v" ? focusSample.w : focusSample.h) / 2) * DRIFT_CLAMP;
+    const drift = limit * Math.min(1, Math.max(-1, other.effBand / FADE_END));
     return flow === "v" ? { x: drift, y: local.y } : { x: local.x, y: drift };
   };
 

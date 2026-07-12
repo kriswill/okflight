@@ -8,7 +8,7 @@ import * as THREE from "three";
 import { buildModel } from "../data";
 import { cfg, node } from "../test-helpers";
 import { edgeTangent } from "./arrowFrame";
-import { BAND_Y, cardGraph, FOCUS_Z, layoutCards } from "./cardLayout";
+import { BAND_Y, CARD_W, cardGraph, FOCUS_Z, layoutCards } from "./cardLayout";
 import { arcFade, cylPose, FADE_END, FADE_START } from "./cylinder";
 import { createCardMotion, HEAD_H } from "./motion.svelte";
 import { DURATION_MS, easeOutCubic } from "./transition";
@@ -265,18 +265,28 @@ describe("scroll", () => {
     expect(kidDelta.distanceTo(parentDelta)).toBeLessThan(1);
   });
 
-  test("focus-edge arrow anchors drift with the scrolled card and clamp at the edge", () => {
+  test("focus-edge anchors spread the fade window across the edge and drift with scroll", () => {
     const m = start();
     const arrowFor = (id: string) => m.arrowStates().find((a) => a.fromId === id)!;
+    const limit = (m.sample("f")!.w / 2) * 0.85;
     // The card sitting exactly over the focus starts anchored dead-center.
-    const centerId = wideLayout().cards.find((c) => c.ring === 1 && c.x === 0)!.id;
+    const flat = wideLayout();
+    const ring1 = flat.cards.filter((c) => c.ring === 1).sort((a, b) => a.x - b.x);
+    const centerId = ring1.find((c) => c.x === 0)!.id;
     close(arrowFor(centerId).toLocal.x, 0, 1e-9);
-    m.scrollBy("in", 60); // small enough to stay inside the clamp
-    close(arrowFor(centerId).toLocal.x, -60, 1e-6); // drifts opposite the scroll, 1:1
+    // Anchors are the window position compressed onto the edge: ordered and
+    // SPACED — neighbors never stack on one corner point.
+    const nextId = ring1[ring1.indexOf(ring1.find((c) => c.x === 0)!) + 1]!.id;
+    const a0 = arrowFor(centerId).toLocal.x;
+    const a1 = arrowFor(nextId).toLocal.x;
+    expect(a1).toBeGreaterThan(a0);
+    close(a1 - a0, (limit * (CARD_W + 52)) / FADE_END, 1); // one pitch of spacing, scaled
+    // Scrolling drifts every anchor proportionally.
+    m.scrollBy("in", 120);
+    close(arrowFor(centerId).toLocal.x, (limit * -120) / FADE_END, 1e-6);
+    // Far past the window they clamp at the edge, with lines fully faded.
     m.scrollBy("in", 1e9);
-    const half = (m.sample("f")!.w / 2) * 0.85;
-    expect(Math.abs(arrowFor("n00").toLocal.x)).toBeLessThanOrEqual(half + 1e-9);
-    // Fully faded cards carry fully faded lines.
+    expect(Math.abs(arrowFor("n00").toLocal.x)).toBeLessThanOrEqual(limit + 1e-9);
     close(arrowFor("n00").opacity, 0, 1e-6);
   });
 

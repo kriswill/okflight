@@ -13,7 +13,10 @@ const model = () =>
     edges: [{ s: "a", t: "b" }],
     files: { "flakes/okf/viz.ts": { html: "", lines: 1, size: 10, date: "", lang: "ts", refs: ["a"] } },
     dirs: { "flakes/ccglass": { files: ["flakes/ccglass/flake.nix"], dirs: [], date: "2026-01-01", refs: ["a"] } },
-    bundles: { notes: { title: "Notes", desc: "", links: [{ kind: "concept" as const, id: "a" }] } },
+    root: { title: "KB", desc: "", body: "# kb\nroot body", links: [{ kind: "dir" as const, path: "notes" }] },
+    bundles: {
+      notes: { title: "Notes", desc: "", body: "# notes\nnotes body", links: [{ kind: "concept" as const, id: "a" }] },
+    },
   });
 
 beforeEach(() => localStorage.clear());
@@ -91,6 +94,40 @@ describe("selection", () => {
     s.focusBundle("notes");
     s.selectFile("flakes/okf/viz.ts");
     expect(s.cardsBundle).toBe("notes");
+  });
+
+  test("cardsIndexDoc: the focused index doc, cards view only, no selection open", () => {
+    const s = createVizState(model());
+    expect(s.cardsIndexDoc).toBeNull(); // graph view
+    s.setViewMode("cards");
+    expect(s.cardsIndexDoc?.title).toBe("KB"); // root focus
+    s.focusBundle("notes");
+    expect(s.cardsIndexDoc?.title).toBe("Notes");
+    s.selectFile("flakes/okf/viz.ts"); // a file panel takes over
+    expect(s.cardsIndexDoc).toBeNull();
+    s.clearSelection();
+    s.selectConcept("a"); // concept panel takes over
+    expect(s.cardsIndexDoc).toBeNull();
+  });
+
+  test("hideIndexPanel dismisses until the next navigation", () => {
+    const s = createVizState(model());
+    s.setViewMode("cards");
+    s.hideIndexPanel();
+    expect(s.cardsIndexDoc).toBeNull();
+    s.focusBundle("notes"); // navigating reopens
+    expect(s.cardsIndexDoc?.title).toBe("Notes");
+    s.hideIndexPanel();
+    expect(s.cardsIndexDoc).toBeNull();
+    s.clearSelection(); // background click: stays hidden at the root
+    expect(s.cardsIndexDoc).toBeNull();
+    s.selectConcept("a"); // any panel navigation re-arms it…
+    s.clearSelection();
+    expect(s.cardsIndexDoc?.title).toBe("KB"); // …so closing lands back on the index
+    s.hideIndexPanel();
+    s.setViewMode("graph");
+    s.setViewMode("cards"); // re-entering the view reopens too
+    expect(s.cardsIndexDoc?.title).toBe("KB");
   });
 });
 

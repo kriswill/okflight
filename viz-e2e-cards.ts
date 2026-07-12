@@ -112,6 +112,40 @@ try {
   );
   check("root view has no in-row", l.cards.every((c) => c.lane !== "in"));
 
+  console.log("2a. the focused index.md reads in the details panel");
+  check(
+    "root focus renders the root index.md",
+    await page.evaluate(() => document.querySelector("#panel .md-doc h3")?.textContent === "knowledge"),
+  );
+  const linked = await page.evaluate(() => {
+    const a = document.querySelector('#panel a[data-bundle="decisions"]') as HTMLElement | null;
+    a?.click();
+    return !!a;
+  });
+  check("subdirectory listing links are bundle navigations", linked);
+  await settleMotion(page);
+  l = (await layout(page))!;
+  check("panel link refocuses onto the bundle", l.focusId === "decisions");
+  check(
+    "bundle focus renders its own index.md",
+    await page.evaluate(() => document.querySelector("#panel .md-doc h3")?.textContent === "decisions"),
+  );
+  await page.click("#panel .close");
+  await settle(page);
+  l = (await layout(page))!;
+  check(
+    "closing the index panel dismisses it without changing focus",
+    l.focusId === "decisions" && (await page.evaluate(() => !document.querySelector("#panel"))),
+  );
+  await page.evaluate(() => {
+    location.hash = "#?view=cards"; // back to the root focus (a clear, not a navigation)
+  });
+  await settleMotion(page);
+  check(
+    "a non-navigation clear keeps the panel dismissed",
+    await page.evaluate(() => !document.querySelector("#panel")),
+  );
+
   console.log("2b. dir cards are bundle indexes: click focuses the bundle, root card walks back");
   const dirPt = await okf<{ x: number; y: number }>(page, 'window.__okf.cards.project("decisions")');
   await page.mouse.click(dirPt.x, dirPt.y);

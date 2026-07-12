@@ -102,6 +102,9 @@ export type RootLink = { kind: "concept"; id: string } | { kind: "dir"; path: st
 export interface RootDoc {
   title: string;
   desc: string;
+  /** Raw markdown body (after frontmatter), rendered in the details panel
+   *  while this index is the cards focus (absent on pre-body embeds). */
+  body?: string;
   links: RootLink[];
 }
 

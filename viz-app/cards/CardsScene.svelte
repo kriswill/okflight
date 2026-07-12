@@ -152,7 +152,7 @@
     }
   });
 
-  const rightInset = $derived(viz.sel.kind !== "none" ? viz.panelPx($size.width) : 0);
+  const rightInset = $derived(viz.sel.kind !== "none" || viz.cardsIndexDoc ? viz.panelPx($size.width) : 0);
   const zoomTarget = $derived(
     fitZoom(layout.bounds, Math.max(160, $size.width - SIDEBAR_W - rightInset), Math.max(160, $size.height - 48)),
   );

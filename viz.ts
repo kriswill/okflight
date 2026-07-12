@@ -130,6 +130,7 @@ if (existsSync(join(bundle, "index.md"))) {
   root = {
     title: (doc.fm?.title as string) ?? "",
     desc: (doc.fm?.description as string) ?? firstSentence(indexBlurb(doc.body)),
+    body: doc.body,
     links: indexLinks(doc.body, "index.md"),
   };
 }
@@ -148,6 +149,7 @@ for (const rel of walkMd(bundle)) {
   bundles[path] = {
     title: (doc.fm?.title as string) ?? (h1 && h1 !== base ? h1 : titleFromSlug(base)),
     desc: (doc.fm?.description as string) ?? firstSentence(indexBlurb(doc.body)),
+    body: doc.body,
     // A self-link would render a dir card pointing at its own focus — drop it.
     links: indexLinks(doc.body, rel).filter((l) => !(l.kind === "dir" && l.path === path)),
   };

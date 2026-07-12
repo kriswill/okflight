@@ -86,16 +86,29 @@ try {
   let l = (await layout(page))!;
   check("root focus layout", l.rootFocus === true && l.byId[l.focusId]?.kind === "focus");
   check(
-    "root out-row: index.md links in authored order, dirs as dir cards",
-    eq(
-      l.cards.filter((c) => c.lane === "out").map((c) => [c.id, c.kind]),
-      [
-        ["hub", "card"],
-        ["island", "card"],
-        ["notes", "dir"],
-      ],
-    ),
-    JSON.stringify(l.cards),
+    "root out-row: concept cards first, then one dir card per bundle",
+    (() => {
+      const out = l.cards.filter((c) => c.lane === "out");
+      const cards = out.filter((c) => c.kind === "card").map((c) => c.id);
+      const dirs = out.filter((c) => c.kind === "dir").map((c) => c.id);
+      return (
+        cards.length === 9 &&
+        cards.includes("hub") &&
+        cards.includes("island") &&
+        eq(dirs, [
+          "decisions",
+          "experiments",
+          "glossary",
+          "notes",
+          "patterns",
+          "playbooks",
+          "references",
+          "runbooks",
+          "services",
+        ])
+      );
+    })(),
+    JSON.stringify(l.cards.map((c) => [c.id, c.kind])),
   );
   check("root view has no in-row", l.cards.every((c) => c.lane !== "in"));
 

@@ -31,6 +31,10 @@ export function createVizState(model: VizModel) {
   const hidden = new SvelteSet<string>();
   let query = $state("");
   let isolateDepth = $state<0 | 1 | 2>(0);
+  // Stage rendering format: the sphere graph or the TheBrain-style card
+  // layout. Filter-class state (rides the hash as `view=cards`), independent
+  // of selection so it survives select/clear cycles.
+  let viewMode = $state<"graph" | "cards">("graph");
   // facet name -> "all" or one of that facet's values; keyed in model.facets
   // order (load-bearing: hash.ts's encode walks this same order). Always
   // replaced wholesale (never mutated in place) so effects tracking the
@@ -197,12 +201,19 @@ export function createVizState(model: VizModel) {
       soloTypes(model.groupTypes[g] ?? []);
     },
     /** Replace the whole filter state (hash navigation). */
-    setFilters(hiddenTypes: string[], q: string, isolate: 0 | 1 | 2 = 0, sel: Record<string, string> = {}) {
+    setFilters(
+      hiddenTypes: string[],
+      q: string,
+      isolate: 0 | 1 | 2 = 0,
+      sel: Record<string, string> = {},
+      view: "graph" | "cards" = "graph",
+    ) {
       const want = new Set(hiddenTypes);
       for (const t of [...hidden]) if (!want.has(t)) hidden.delete(t);
       for (const t of want) hidden.add(t);
       query = q;
       isolateDepth = isolate;
+      viewMode = view;
       facetSel = Object.fromEntries(
         model.facets.map((f) => {
           const v = sel[f.name];
@@ -222,6 +233,18 @@ export function createVizState(model: VizModel) {
     },
     get neighborIds() {
       return neighborIds;
+    },
+
+    get viewMode() {
+      return viewMode;
+    },
+    setViewMode(v: "graph" | "cards") {
+      if (v === "graph" || v === "cards") viewMode = v;
+    },
+    /** Card-layout ring depth: the view inherently shows the direct ring, so
+     *  only 2-hop isolation widens it (hops "off" and "1-hop" both mean 1). */
+    get cardsDepth(): 1 | 2 {
+      return isolateDepth === 2 ? 2 : 1;
     },
 
     get facetSel() {

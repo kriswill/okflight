@@ -5,6 +5,7 @@
   import Legend from "./Legend.svelte";
   import Search from "./Search.svelte";
   import type { VizState } from "./state.svelte";
+  import ViewToggle from "./ViewToggle.svelte";
 
   const { viz }: { viz: VizState } = $props();
 </script>
@@ -23,6 +24,7 @@
         {viz.model.nodes.length} concepts · {viz.model.edges.length} links
       {/if}
     </div>
+    <ViewToggle {viz} />
     <Search {viz} />
     <Legend {viz} />
   </div>

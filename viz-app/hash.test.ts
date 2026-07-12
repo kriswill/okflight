@@ -95,24 +95,55 @@ describe("encodeViewHash", () => {
   });
 });
 
+// The cards view is a filter-class hash param: selection-independent,
+// "graph" (the default) never emitted so pre-cards links stay canonical.
+describe("view mode param", () => {
+  const f = (view: "graph" | "cards") => ({ hidden: [], q: "", isolate: 0 as const, facets: {}, view });
+
+  test("view=cards encodes with or without a selection; graph adds nothing", () => {
+    expect(encodeViewHash({ sel: { kind: "none" }, filters: f("cards") })).toBe("?view=cards");
+    expect(encodeViewHash({ sel: { kind: "concept", id: "wiki/architecture" }, filters: f("cards") })).toBe(
+      "c/wiki/architecture?view=cards",
+    );
+    expect(encodeViewHash({ sel: { kind: "none" }, filters: f("graph") })).toBe("");
+  });
+
+  test("composes with the other filter params, after isolate", () => {
+    expect(
+      encodeViewHash({
+        sel: { kind: "concept", id: "wiki/architecture" },
+        filters: { hidden: ["Decision"], q: "arch", isolate: 1, facets: { platform: "macos" }, view: "cards" },
+      }),
+    ).toBe("c/wiki/architecture?hide=Decision&q=arch&isolate=1&view=cards&platform=macos");
+  });
+
+  test("round-trips; absent or garbage decodes to graph", () => {
+    const view = { sel: { kind: "none" } as const, filters: f("cards") };
+    expect(decodeViewHash(encodeViewHash(view), model).filters.view).toBe("cards");
+    expect(decodeViewHash("c/wiki/architecture", model).filters.view).toBe("graph");
+    expect(decodeViewHash("?view=bogus", model).filters.view).toBe("graph");
+    expect(decodeViewHash("", model).filters.view).toBe("graph");
+  });
+});
+
 describe("decodeViewHash", () => {
   test("selection + filters round-trip, including '%' paths", () => {
     for (const view of [
       {
         sel: { kind: "concept", id: "wiki/architecture" },
-        filters: { hidden: ["Alpha Module", "Decision"], q: "", isolate: 0, facets: { platform: "all", status: "all" } },
+        filters: { hidden: ["Alpha Module", "Decision"], q: "", isolate: 0, facets: { platform: "all", status: "all" }, view: "graph" },
       },
       {
         sel: { kind: "none" },
-        filters: { hidden: [], q: "a?b&c=%", isolate: 0, facets: { platform: "macos", status: "all" } },
+        filters: { hidden: [], q: "a?b&c=%", isolate: 0, facets: { platform: "macos", status: "all" }, view: "graph" },
       },
       {
         sel: { kind: "file", path: "docs/50%.md" },
-        filters: { hidden: ["Decision"], q: "tmux", isolate: 0, facets: { platform: "linux", status: "draft" } },
+        filters: { hidden: ["Decision"], q: "tmux", isolate: 0, facets: { platform: "linux", status: "draft" }, view: "graph" },
       },
       {
         sel: { kind: "concept", id: "wiki/architecture" },
-        filters: { hidden: ["Decision"], q: "tmux", isolate: 1, facets: { platform: "macos", status: "all" } },
+        filters: { hidden: ["Decision"], q: "tmux", isolate: 1, facets: { platform: "macos", status: "all" }, view: "graph" },
       },
     ] as const) {
       const decoded = decodeViewHash(encodeViewHash(view as never), model);
@@ -124,7 +155,7 @@ describe("decodeViewHash", () => {
   test("bare selection hashes decode with empty filters, every facet 'all' (old links stay valid)", () => {
     expect(decodeViewHash("c/wiki/architecture", model)).toEqual({
       sel: { kind: "concept", id: "wiki/architecture" },
-      filters: { hidden: [], q: "", isolate: 0, facets: { platform: "all", status: "all" } },
+      filters: { hidden: [], q: "", isolate: 0, facets: { platform: "all", status: "all" }, view: "graph" },
     });
   });
 

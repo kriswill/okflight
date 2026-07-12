@@ -1,21 +1,17 @@
-// The single source of per-frame truth for the animated card view. Owns the
-// dome layout, refocus transition tracks, live per-card samples, arrow
-// states, the drag orientation, and the camera tween — all stepped with an
-// explicit dt so behavior is deterministic under bun test. Svelte reactivity
-// is used ONLY for structure (renderList) and boundary flags (settled);
-// per-frame numbers live in plain fields that the scene's frame task reads
-// and applies imperatively (single-writer rule).
+// The single source of per-frame truth for the animated card view. Cards
+// live at FLAT layout coordinates (tweened by transitions), get a per-band
+// SCROLL offset (the in-side and out-side scroll independently; ring-2
+// clusters sit at parent-anchored coordinates so they track automatically),
+// and are mapped through the cylinder scaffolding with a scroll-window fade.
+// All stepped with explicit dt so behavior is deterministic under bun test.
+// Svelte reactivity is used ONLY for structure (renderList/arrowList) and
+// boundary flags (settled); per-frame numbers live in plain fields that the
+// scene's frame task reads and applies imperatively (single-writer rule).
 import * as THREE from "three";
-import type { ArrowSpec, CardLayout, CardPlacement } from "./cardLayout";
+import type { ArrowSpec, CardFlow, CardLayout, CardPlacement } from "./cardLayout";
 import { arrowAnchors, edgeHead, edgeTangent, elbowPath3 } from "./arrowFrame";
-import { domeProject, frameFromDir, type DomeLayout } from "./dome";
-import {
-  buildTransition,
-  easeOutCubic,
-  sampleTrack,
-  type DomeSnapshot,
-  type TransitionSpec,
-} from "./transition";
+import { arcFade, cylPose, FADE_START } from "./cylinder";
+import { buildTransition, easeOutCubic, sampleTrack, type FlatSnapshot, type TransitionSpec } from "./transition";
 import type { PickItem } from "./picking";
 
 export const HEAD_H = 12;
@@ -23,13 +19,11 @@ export const HEAD_H = 12;
 const HEAD_STEM = 8;
 const ARROW_BASE_OPACITY = 0.85;
 const VIEW_TAU_MS = 90;
-// Drag is a subtle reorientation about the FOCUS card (the origin), not a
-// globe spin about the far-away sphere center: tight clamps and a fixed
-// per-pixel sensitivity keep the focus centered and neighbors at a gentle
-// parallax — the dome is scaffolding, not a trackball.
-const YAW_CLAMP = 0.18;
-const PITCH_CLAMP = 0.12;
-const DRAG_SENS = 0.0009; // rad per pixel
+/** Focus-edge anchors drift with the scrolled card, clamped to this
+ *  fraction of the focus edge half-extent. */
+const DRIFT_CLAMP = 0.85;
+
+export type ScrollSide = "in" | "out";
 
 export interface RenderEntry {
   id: string;
@@ -37,21 +31,28 @@ export interface RenderEntry {
   lane: CardPlacement["lane"];
   w: number;
   h: number;
-  overflow: number;
   /** Leaving the layout: kept mounted while it fades/rolls out. */
   exiting: boolean;
 }
 
 export interface CardSample {
-  pos: THREE.Vector3;
-  quat: THREE.Quaternion;
-  dir: THREE.Vector3;
+  /** Flat layout coordinates (scroll NOT included). */
+  flatX: number;
+  flatY: number;
+  lane: CardPlacement["lane"];
   lift: number;
-  opacity: number;
+  /** Track opacity before the scroll-window fade. */
+  baseOpacity: number;
   sx: number;
   sy: number;
   w: number;
   h: number;
+  /** Derived on every reproject: */
+  pos: THREE.Vector3;
+  quat: THREE.Quaternion;
+  opacity: number;
+  /** Band coordinate after scroll — what fades and drift anchors read. */
+  effBand: number;
 }
 
 export interface ArrowState {
@@ -62,7 +63,6 @@ export interface ArrowState {
   twoWay: boolean;
   fromLocal: { x: number; y: number };
   toLocal: { x: number; y: number };
-  /** Tube samples (end tucked under the head base). */
   path: THREE.Vector3[];
   head: { pos: THREE.Vector3; quat: THREE.Quaternion };
   tailHead: { pos: THREE.Vector3; quat: THREE.Quaternion } | null;
@@ -99,17 +99,47 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
   let settled = $state(true);
 
   // Plain per-frame state — no reactivity at 60fps.
-  let dome: DomeLayout | null = null;
+  let flow: CardFlow = "v";
+  let flat: CardLayout | null = null;
   let spec: TransitionSpec | null = null;
   let t = 0;
-  let liveR = 0;
   const samples = new Map<string, CardSample>();
   let arrowTracks: ArrowTrack[] = [];
   let arrows: ArrowState[] = [];
-  const drag = { yaw: 0, pitch: 0 };
+  const scroll: Record<ScrollSide, number> = { in: 0, out: 0 };
+  const limits: Record<ScrollSide, number> = { in: 0, out: 0 };
   const view = { zoom: 1, shift: 0 };
   let viewTarget: { zoom: number; shift: number } | null = null;
   let viewSeeded = false;
+
+  const bandOf = (x: number, y: number) => (flow === "v" ? x : y);
+  const crossOf = (x: number, y: number) => (flow === "v" ? y : x);
+
+  /** Map a sample's flat coords through scroll + cylinder + window fade. */
+  const reproject = (s: CardSample) => {
+    const band = bandOf(s.flatX, s.flatY);
+    const sc = s.lane === "in" || s.lane === "out" ? scroll[s.lane] : 0;
+    const eff = band - sc;
+    const p = cylPose(eff, crossOf(s.flatX, s.flatY), s.lift, flow);
+    s.pos = p.pos;
+    s.quat = p.quat;
+    s.effBand = eff;
+    s.opacity = s.baseOpacity * arcFade(eff);
+  };
+  const reprojectAll = () => {
+    for (const s of samples.values()) reproject(s);
+  };
+
+  /** Scroll room per side: zero when the band fits the window, else enough
+   *  to bring the farthest card fully inside it. */
+  const computeLimits = (layout: CardLayout) => {
+    for (const side of ["in", "out"] as const) {
+      let maxAbs = 0;
+      for (const c of layout.cards)
+        if (c.lane === side) maxAbs = Math.max(maxAbs, Math.abs(bandOf(c.x, c.y)));
+      limits[side] = Math.max(0, maxAbs - FADE_START);
+    }
+  };
 
   const entryOf = (p: CardPlacement, exiting: boolean): RenderEntry => ({
     id: p.id,
@@ -117,56 +147,47 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
     lane: p.lane,
     w: p.w,
     h: p.h,
-    overflow: p.overflow,
     exiting,
   });
 
-  const settledSample = (d: DomeLayout, p: CardPlacement): CardSample => {
-    const c = d.byId[p.id]!;
-    return {
-      pos: c.pos.clone(),
-      quat: c.quat.clone(),
-      dir: c.dir.clone(),
+  const sampleOf = (p: CardPlacement): CardSample => {
+    const s: CardSample = {
+      flatX: p.x,
+      flatY: p.y,
+      lane: p.lane,
       lift: p.z,
-      opacity: 1,
+      baseOpacity: 1,
       sx: 1,
       sy: 1,
       w: p.w,
       h: p.h,
+      pos: new THREE.Vector3(),
+      quat: new THREE.Quaternion(),
+      opacity: 1,
+      effBand: 0,
     };
+    reproject(s);
+    return s;
   };
 
-  /** Live state with the drag baked in — the `from` of every transition.
-   *  Drag rotates about the ORIGIN, so the baked sphere direction comes
-   *  from the rendered world position, re-expressed against the center. */
-  const snapshot = (): DomeSnapshot => {
-    const qDrag = dragQuat();
-    const C = new THREE.Vector3(0, 0, -liveR);
-    return {
-      R: liveR,
-      cards: [...samples.entries()].map(([id, s]) => {
-        const world = s.pos.clone().applyQuaternion(qDrag);
-        const rel = world.sub(C);
-        const dist = rel.length();
-        return {
-          id,
-          dir: rel.multiplyScalar(1 / dist),
-          opacity: s.opacity,
-          sx: s.sx,
-          sy: s.sy,
-          w: s.w,
-          h: s.h,
-          lift: dist - liveR,
-        };
-      }),
-    };
-  };
-
-  function dragQuat(): THREE.Quaternion {
-    return new THREE.Quaternion()
-      .setFromAxisAngle(new THREE.Vector3(0, 1, 0), drag.yaw)
-      .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), drag.pitch));
-  }
+  /** Live state with the scroll baked into the flat coords — the `from` of
+   *  every transition (position-continuous; scroll then resets to zero). */
+  const snapshot = (): FlatSnapshot => ({
+    cards: [...samples.entries()].map(([id, s]) => {
+      const sc = s.lane === "in" || s.lane === "out" ? scroll[s.lane] : 0;
+      return {
+        id,
+        x: flow === "v" ? s.flatX - sc : s.flatX,
+        y: flow === "v" ? s.flatY : s.flatY - sc,
+        opacity: s.opacity,
+        sx: s.sx,
+        sy: s.sy,
+        w: s.w,
+        h: s.h,
+        lift: s.lift,
+      };
+    }),
+  });
 
   /** Rebuild the arrow track set for a transition (or a settled layout). */
   const retargetArrows = (prevFlat: CardLayout | null, nextFlat: CardLayout) => {
@@ -224,8 +245,22 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
     }));
   };
 
+  /** Anchors on the focus edge drift with the linked card's scrolled band
+   *  position (clamped inside the edge) — arrows slide along the focus card
+   *  as their band scrolls. */
+  const driftFocusLocal = (
+    local: { x: number; y: number },
+    focusSample: CardSample,
+    other: CardSample,
+  ): { x: number; y: number } => {
+    const half = (flow === "v" ? focusSample.w : focusSample.h) / 2;
+    const drift = Math.min(half * DRIFT_CLAMP, Math.max(-half * DRIFT_CLAMP, other.effBand));
+    return flow === "v" ? { x: drift, y: local.y } : { x: local.x, y: drift };
+  };
+
   /** Recompute every arrow from the live card samples at eased progress e. */
   const computeArrows = (e: number) => {
+    const focusId = flat?.focusId ?? null;
     const out: ArrowState[] = [];
     for (const tr of arrowTracks) {
       const from = samples.get(tr.spec.fromId);
@@ -235,29 +270,24 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
         x: a.x + (b.x - a.x) * e,
         y: a.y + (b.y - a.y) * e,
       });
-      const fl = tr.kind === "shared" ? lerp(tr.from0, tr.from1) : tr.from0;
-      const tl = tr.kind === "shared" ? lerp(tr.to0, tr.to1) : tr.to0;
-      const fromWorld = new THREE.Vector3(fl.x, fl.y, 0).applyQuaternion(from.quat).add(from.pos);
-      const toWorld = new THREE.Vector3(tl.x, tl.y, 0).applyQuaternion(to.quat).add(to.pos);
-      // Which edge each anchor sits on decides the flow tangent — the same
-      // arrow code serves vertical and horizontal layouts.
+      let fl = tr.kind === "shared" ? lerp(tr.from0, tr.from1) : tr.from0;
+      let tl = tr.kind === "shared" ? lerp(tr.to0, tr.to1) : tr.to0;
+      if (focusId !== null && tr.spec.toId === focusId) tl = driftFocusLocal(tl, to, from);
+      if (focusId !== null && tr.spec.fromId === focusId) fl = driftFocusLocal(fl, from, to);
       const ft = edgeTangent(fl, from.w, from.h);
       const tt = edgeTangent(tl, to.w, to.h);
       const fromTan = new THREE.Vector3(ft.x, ft.y, 0).applyQuaternion(from.quat);
       const toTan = new THREE.Vector3(tt.x, tt.y, 0).applyQuaternion(to.quat);
-      // Heads are pinned 90° to the card edges (apex on the anchor); the
-      // tube runs anchor→stub as a bezier, then a dead-straight stem into
-      // each cone's base center — it never touches the card itself.
+      const fromWorld = new THREE.Vector3(fl.x, fl.y, 0).applyQuaternion(from.quat).add(from.pos);
+      const toWorld = new THREE.Vector3(tl.x, tl.y, 0).applyQuaternion(to.quat).add(to.pos);
       const head = edgeHead(toWorld, toTan, HEAD_H);
       const tailHead = tr.spec.twoWay ? edgeHead(fromWorld, fromTan, HEAD_H) : null;
       const endStub = toWorld.clone().addScaledVector(toTan, HEAD_H + HEAD_STEM);
       const startPoint = tailHead ? tailHead.base : fromWorld;
-      const startStub = tailHead
-        ? fromWorld.clone().addScaledVector(fromTan, HEAD_H + HEAD_STEM)
-        : fromWorld;
+      const startStub = tailHead ? fromWorld.clone().addScaledVector(fromTan, HEAD_H + HEAD_STEM) : fromWorld;
       const bez = elbowPath3(startStub, fromTan, endStub, toTan);
       const path = tailHead ? [startPoint.clone(), ...bez, head.base] : [...bez, head.base];
-      const opacity =
+      const ramp =
         tr.kind === "exit"
           ? ARROW_BASE_OPACITY * (1 - Math.min(1, e / 0.5))
           : tr.kind === "enter"
@@ -274,20 +304,20 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
         path,
         head,
         tailHead,
-        opacity,
+        // Lines fade with their cards as they scroll through the window.
+        opacity: ramp * Math.min(from.opacity, to.opacity, 1),
       });
     }
     arrows = out;
   };
 
-  const settleAt = (d: DomeLayout) => {
+  const settleAt = (layout: CardLayout) => {
     samples.clear();
-    for (const p of d.flat.cards) samples.set(p.id, settledSample(d, p));
-    liveR = d.R;
+    for (const p of layout.cards) samples.set(p.id, sampleOf(p));
     spec = null;
     t = 0;
-    renderList = d.flat.cards.map((p) => entryOf(p, false));
-    retargetArrows(null, d.flat);
+    renderList = layout.cards.map((p) => entryOf(p, false));
+    retargetArrows(null, layout);
     computeArrows(1);
     settled = viewAtTarget();
   };
@@ -304,20 +334,19 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
     if (spec) {
       t = spec.duration === 0 ? 1 : Math.min(1, t + dtMs / spec.duration);
       const e = easeOutCubic(t);
-      liveR = spec.R0 + (spec.R1 - spec.R0) * e;
       for (const track of spec.tracks) {
-        const s = sampleTrack(track, liveR, e);
-        samples.set(track.id, {
-          pos: s.pos,
-          quat: s.quat,
-          dir: s.dir,
-          lift: track.lift0 + (track.lift1 - track.lift0) * e,
-          opacity: s.opacity,
-          sx: s.sx,
-          sy: s.sy,
-          w: track.w,
-          h: track.h,
-        });
+        const v = sampleTrack(track, e);
+        const s = samples.get(track.id);
+        if (!s) continue;
+        s.flatX = v.x;
+        s.flatY = v.y;
+        s.lift = v.lift;
+        s.baseOpacity = v.opacity;
+        s.sx = v.sx;
+        s.sy = v.sy;
+        s.w = track.w;
+        s.h = track.h;
+        reproject(s);
       }
       computeArrows(e);
       if (t >= 1) {
@@ -356,73 +385,81 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
     get progress() {
       return spec ? easeOutCubic(Math.min(1, t)) : 1;
     },
-    get drag() {
-      return drag;
-    },
     get view() {
       return view;
     },
-    get R() {
-      return liveR;
+    get flow() {
+      return flow;
+    },
+    get scroll() {
+      return { ...scroll };
+    },
+    scrollLimit(side: ScrollSide) {
+      return limits[side];
     },
     get rootFocus() {
-      return dome?.rootFocus ?? false;
+      return flat?.rootFocus ?? false;
     },
     get focusId() {
-      return dome?.focusId ?? null;
+      return flat?.focusId ?? null;
     },
-    dragQuat,
 
-    setLayout(flat: CardLayout | null) {
-      if (!flat) {
-        dome = null;
+    setLayout(next: CardLayout | null, flowArg: CardFlow = "v") {
+      if (!next) {
+        flat = null;
         spec = null;
         samples.clear();
         arrowTracks = [];
         arrows = [];
         renderList = [];
         arrowList = [];
+        scroll.in = 0;
+        scroll.out = 0;
         settled = true;
         return;
       }
-      const prevFlat = dome?.flat ?? null;
-      if (prevFlat && sameLayout(prevFlat, flat)) {
+      const prevFlat = flat;
+      if (prevFlat && flow === flowArg && sameLayout(prevFlat, next)) {
         // Same placements re-derived (theme flip, no-op filter churn):
-        // adopt the new references without animating.
-        dome = domeProject(flat);
-        retargetArrows(null, flat);
-        if (!spec) {
-          for (const p of flat.cards) samples.set(p.id, settledSample(dome, p));
-          computeArrows(1);
-        }
+        // adopt the new references without animating or resetting scroll.
+        flat = next;
+        retargetArrows(null, next);
+        if (!spec) computeArrows(1);
         return;
       }
-      const next = domeProject(flat);
-      if (!dome || reduced()) {
-        dome = next;
+      if (!prevFlat || reduced()) {
+        flow = flowArg;
+        flat = next;
+        scroll.in = 0;
+        scroll.out = 0;
+        computeLimits(next);
         settleAt(next);
         return;
       }
-      // Live refocus: from the drag-baked live state, drag renormalized.
+      // Live refocus/reflow: from the scroll-baked live state, scroll reset.
       const snap = snapshot();
-      drag.yaw = 0;
-      drag.pitch = 0;
-      spec = buildTransition(snap, next);
+      flow = flowArg;
+      scroll.in = 0;
+      scroll.out = 0;
+      spec = buildTransition(snap, next, flow);
       t = 0;
-      // Exit entries come from the CURRENT render list, not the previous
-      // flat layout: under cascading interrupts an exiting card may belong
-      // to a layout two retargets back — samples and renderList are the
-      // only structures guaranteed to still know it.
       const prevEntries = new Map(renderList.map((r) => [r.id, r]));
       renderList = [
-        ...flat.cards.map((p) => entryOf(p, false)),
+        ...next.cards.map((p) => entryOf(p, false)),
         ...spec.tracks
           .filter((tr) => tr.kind === "exit" && prevEntries.has(tr.id))
           .map((tr) => ({ ...prevEntries.get(tr.id)!, exiting: true })),
       ];
-      retargetArrows(prevFlat, flat);
-      dome = next;
-      // Seed t=0 samples so reads before the first step are already live.
+      // Ensure every track id has a sample shell to tween.
+      for (const track of spec.tracks) {
+        if (!samples.has(track.id)) {
+          const p = next.byId[track.id]!;
+          samples.set(track.id, sampleOf(p));
+        }
+      }
+      retargetArrows(prevFlat, next);
+      flat = next;
+      computeLimits(next);
       step(0);
       updateSettled();
     },
@@ -439,26 +476,29 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
       updateSettled();
     },
 
-    dragBy(dxPx: number, dyPx: number) {
-      drag.yaw = Math.min(YAW_CLAMP, Math.max(-YAW_CLAMP, drag.yaw + dxPx * DRAG_SENS));
-      drag.pitch = Math.min(PITCH_CLAMP, Math.max(-PITCH_CLAMP, drag.pitch + dyPx * DRAG_SENS));
+    /** Scroll one band by a world-unit delta, clamped to its limit. Ring-2
+     *  clusters share their parent band's lane, so they track for free. */
+    scrollBy(side: ScrollSide, delta: number) {
+      const L = limits[side];
+      const next = Math.min(L, Math.max(-L, scroll[side] + delta));
+      if (next === scroll[side]) return;
+      scroll[side] = next;
+      reprojectAll();
+      computeArrows(spec ? easeOutCubic(Math.min(1, t)) : 1);
     },
 
     sample(id: string): CardSample | null {
       return samples.get(id) ?? null;
     },
 
-    /** Drag-composed world center of a card (what the user actually sees).
-     *  Rotation about the origin: the focus card never leaves center. */
+    /** World center of a card as rendered. */
     pose(id: string): THREE.Vector3 | null {
       const s = samples.get(id);
-      if (!s) return null;
-      return s.pos.clone().applyQuaternion(dragQuat());
+      return s ? s.pos.clone() : null;
     },
 
-    /** Live pickable poses: drag-composed transforms, live footprints. */
+    /** Live pickable poses (faded cards are unpickable via the opacity gate). */
     pickItems(): PickItem[] {
-      const qDrag = dragQuat();
       const items: PickItem[] = [];
       for (const r of renderList) {
         const s = samples.get(r.id);
@@ -466,8 +506,8 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
         items.push({
           id: r.id,
           kind: r.kind,
-          pos: s.pos.clone().applyQuaternion(qDrag),
-          quat: qDrag.clone().multiply(s.quat),
+          pos: s.pos,
+          quat: s.quat,
           w: s.w * s.sx,
           h: s.h * s.sy,
           opacity: s.opacity,

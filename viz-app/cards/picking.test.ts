@@ -75,13 +75,11 @@ describe("pickCard3 — flat bridge (identity quats)", () => {
     expect(pickCard3({ x: 0, y: 0 }, camera(false), items)).toBe("front");
   });
 
-  test("'more' chips are inert; dir cards pick", () => {
+  test("dir cards pick like concept cards", () => {
     const a = layout.byId["a"]!;
     const items: PickItem[] = [
-      { id: "chip", kind: "more", pos: new THREE.Vector3(0, 0, 0), quat: new THREE.Quaternion(), w: CARD_W, h: CARD_H, opacity: 1 },
       { id: "dir", kind: "dir", pos: new THREE.Vector3(a.x, a.y, 0), quat: new THREE.Quaternion(), w: a.w, h: a.h, opacity: 1 },
     ];
-    expect(pickCard3({ x: 0, y: 0 }, camera(false), items)).toBeNull();
     const cam = camera(false);
     expect(pickCard3(ndcOf(new THREE.Vector3(a.x, a.y, 0), cam), cam, items)).toBe("dir");
   });

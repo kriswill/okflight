@@ -21,7 +21,7 @@ export interface PickItem {
 /** Cards faded below this are ghosts on their way out — never pickable. */
 const MIN_PICK_OPACITY = 0.15;
 
-/** Topmost pickable card under the pointer (ndc), or null. "more" chips are
+/** Topmost pickable card under the pointer (ndc), or null. Faded cards are
  *  inert; dir cards pick like concept cards; nearest ray-hit wins. */
 export function pickCard3(ndc: Pt, camera: THREE.OrthographicCamera, items: PickItem[]): string | null {
   const ray = new THREE.Raycaster();
@@ -31,7 +31,7 @@ export function pickCard3(ndc: Pt, camera: THREE.OrthographicCamera, items: Pick
   const dL = new THREE.Vector3();
   let best: { id: string; t: number } | null = null;
   for (const c of items) {
-    if (c.kind === "more" || c.opacity < MIN_PICK_OPACITY) continue;
+    if (c.opacity < MIN_PICK_OPACITY) continue;
     invQuat.copy(c.quat).invert();
     oL.copy(ray.ray.origin).sub(c.pos).applyQuaternion(invQuat);
     dL.copy(ray.ray.direction).applyQuaternion(invQuat);

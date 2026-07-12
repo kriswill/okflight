@@ -1,26 +1,22 @@
-// Refocus transition tracks: one rigid sphere-turn. Every card slerps along
-// a great circle over the same eased 420ms — the new focus's slerp IS the
-// rotation that brings it to the pole; exiting cards are carried with that
-// turn and pushed a further EXIT_DIST world units over their meridian while
-// fading; entering cards run the same path in reverse. The motion store owns
-// time; this module owns geometry. Pure three math.
-import * as THREE from "three";
-import { extendFromPole, frameFromDir, horizonFade, type DomeLayout } from "./dome";
+// Refocus transition tracks in FLAT layout space: every card lerps its
+// (band, cross) coordinates over the same eased 420ms; the motion store maps
+// samples through the cylinder and composes per-band scroll, so one track
+// model serves both flows. Exits keep their cross lane and roll a fixed
+// EXIT_DIST further along the band axis while fading; enters run the same
+// path in reverse. Pure 2D math — no three.js needed here anymore.
+import type { CardFlow, CardLayout } from "./cardLayout";
 
 export const DURATION_MS = 420;
-/** Exit/enter roll-out travel along the dome surface, in world units — a
- *  fixed distance, because on the big scaffold dome a fixed ANGLE would
- *  scale with R and fling cards across the stage. */
+/** Exit/enter roll-out travel along the band axis, world units. */
 export const EXIT_DIST = 420;
 /** Matches GraphScene.stepFly — fast start, gentle landing. */
 export const easeOutCubic = (t: number) => 1 - (1 - t) ** 3;
 
-const POLE = new THREE.Vector3(0, 0, 1);
-
-/** Live card state at transition start (drag already baked into dir). */
+/** Live card state at transition start (scroll already baked in). */
 export interface SnapshotCard {
   id: string;
-  dir: THREE.Vector3;
+  x: number;
+  y: number;
   opacity: number;
   sx: number;
   sy: number;
@@ -29,27 +25,34 @@ export interface SnapshotCard {
   lift: number;
 }
 
-export interface DomeSnapshot {
-  R: number;
+export interface FlatSnapshot {
   cards: SnapshotCard[];
 }
 
-/** The settled snapshot of a dome layout (scale 1, full opacity). */
-export function snapshotOf(dome: DomeLayout): DomeSnapshot {
+/** The settled snapshot of a flat layout (scale 1, full opacity). */
+export function snapshotOf(flat: CardLayout): FlatSnapshot {
   return {
-    R: dome.R,
-    cards: dome.cards.map((c) => {
-      const p = dome.flat.byId[c.id]!;
-      return { id: c.id, dir: c.dir.clone(), opacity: 1, sx: 1, sy: 1, w: p.w, h: p.h, lift: p.z };
-    }),
+    cards: flat.cards.map((p) => ({
+      id: p.id,
+      x: p.x,
+      y: p.y,
+      opacity: 1,
+      sx: 1,
+      sy: 1,
+      w: p.w,
+      h: p.h,
+      lift: p.z,
+    })),
   };
 }
 
 export interface CardTrack {
   id: string;
   kind: "shared" | "enter" | "exit";
-  v0: THREE.Vector3;
-  v1: THREE.Vector3;
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
   o0: number;
   o1: number;
   s0x: number;
@@ -64,36 +67,35 @@ export interface CardTrack {
 }
 
 export interface TransitionSpec {
-  R0: number;
-  R1: number;
   duration: number;
   tracks: CardTrack[];
 }
 
+/** Offset a point EXIT_DIST further from the band center along the band
+ *  axis — where exits go and enters come from. */
+const rollOut = (x: number, y: number, flow: CardFlow): { x: number; y: number } => {
+  if (flow === "v") return { x: x + (Math.sign(x) || 1) * EXIT_DIST, y };
+  return { x, y: y + (Math.sign(y) || 1) * EXIT_DIST };
+};
+
 export function buildTransition(
-  prev: DomeSnapshot,
-  next: DomeLayout,
+  prev: FlatSnapshot,
+  next: CardLayout,
+  flow: CardFlow,
   opts?: { duration?: number },
 ): TransitionSpec {
   const prevById = new Map(prev.cards.map((c) => [c.id, c]));
-  // The turn: the minimal rotation carrying the new focus's live direction
-  // to the pole (identity when the focus wasn't on screen — plain relayout).
-  const prevFocus = prevById.get(next.focusId);
-  const qPole = prevFocus
-    ? new THREE.Quaternion().setFromUnitVectors(prevFocus.dir.clone().normalize(), POLE)
-    : new THREE.Quaternion();
-  const qPoleInv = qPole.clone().invert();
-
   const tracks: CardTrack[] = [];
-  for (const nc of next.cards) {
-    const target = next.flat.byId[nc.id]!;
-    const pc = prevById.get(nc.id);
+  for (const target of next.cards) {
+    const pc = prevById.get(target.id);
     if (pc) {
       tracks.push({
-        id: nc.id,
+        id: target.id,
         kind: "shared",
-        v0: pc.dir.clone(),
-        v1: nc.dir.clone(),
+        x0: pc.x,
+        y0: pc.y,
+        x1: target.x,
+        y1: target.y,
         o0: pc.opacity,
         o1: 1,
         // Size morphs render as scale on the final (already re-detailed)
@@ -108,11 +110,14 @@ export function buildTransition(
         h: target.h,
       });
     } else {
+      const from = rollOut(target.x, target.y, flow);
       tracks.push({
-        id: nc.id,
+        id: target.id,
         kind: "enter",
-        v0: extendFromPole(nc.dir.clone().applyQuaternion(qPoleInv), EXIT_DIST / next.R),
-        v1: nc.dir.clone(),
+        x0: from.x,
+        y0: from.y,
+        x1: target.x,
+        y1: target.y,
         o0: 0,
         o1: 1,
         s0x: 0.9,
@@ -128,11 +133,14 @@ export function buildTransition(
   }
   for (const pc of prev.cards) {
     if (next.byId[pc.id]) continue;
+    const to = rollOut(pc.x, pc.y, flow);
     tracks.push({
       id: pc.id,
       kind: "exit",
-      v0: pc.dir.clone(),
-      v1: extendFromPole(pc.dir.clone().applyQuaternion(qPole), EXIT_DIST / next.R),
+      x0: pc.x,
+      y0: pc.y,
+      x1: to.x,
+      y1: to.y,
       o0: pc.opacity,
       o1: 0,
       s0x: pc.sx,
@@ -145,45 +153,29 @@ export function buildTransition(
       h: pc.h,
     });
   }
-  return { R0: prev.R, R1: next.R, duration: opts?.duration ?? DURATION_MS, tracks };
+  return { duration: opts?.duration ?? DURATION_MS, tracks };
 }
 
 export interface TrackSample {
-  dir: THREE.Vector3;
-  pos: THREE.Vector3;
-  quat: THREE.Quaternion;
+  x: number;
+  y: number;
   opacity: number;
   sx: number;
   sy: number;
+  lift: number;
 }
 
-/** Sample a track at eased progress `e` on the sphere of radius `R` (the
- *  caller interpolates R). Orientation is re-derived from the live dir every
- *  sample — cards genuinely roll with the surface. */
-export function sampleTrack(t: CardTrack, R: number, e: number): TrackSample {
-  const omega = t.v0.angleTo(t.v1);
-  const dir =
-    omega < 1e-9
-      ? t.v1.clone()
-      : t.v0
-          .clone()
-          .multiplyScalar(Math.sin((1 - e) * omega) / Math.sin(omega))
-          .addScaledVector(t.v1, Math.sin(e * omega) / Math.sin(omega))
-          .normalize();
-  const lift = t.lift0 + (t.lift1 - t.lift0) * e;
-  const pos = new THREE.Vector3(0, 0, -R).addScaledVector(dir, R + lift);
-  const { quat } = frameFromDir(dir);
-  const fade = horizonFade(dir.z);
+/** Sample a track at eased progress `e` in flat space. The caller maps the
+ *  result through the cylinder and multiplies the scroll-window fade. */
+export function sampleTrack(t: CardTrack, e: number): TrackSample {
   const opacity =
-    t.kind === "exit"
-      ? t.o0 * (1 - Math.min(1, e / 0.8)) * fade
-      : (t.o0 + (t.o1 - t.o0) * e) * fade;
+    t.kind === "exit" ? t.o0 * (1 - Math.min(1, e / 0.8)) : t.o0 + (t.o1 - t.o0) * e;
   return {
-    dir,
-    pos,
-    quat,
+    x: t.x0 + (t.x1 - t.x0) * e,
+    y: t.y0 + (t.y1 - t.y0) * e,
     opacity,
     sx: t.s0x + (t.s1x - t.s0x) * e,
     sy: t.s0y + (t.s1y - t.s0y) * e,
+    lift: t.lift0 + (t.lift1 - t.lift0) * e,
   };
 }

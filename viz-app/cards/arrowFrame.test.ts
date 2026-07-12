@@ -8,7 +8,6 @@ import * as THREE from "three";
 import { buildModel } from "../data";
 import { cfg, node } from "../test-helpers";
 import { cardGraph, layoutCards } from "./cardLayout";
-import { domePoint, frameFromDir } from "./dome";
 import { elbowPath } from "./elbow";
 import { arrowAnchors, edgeHead, edgeTangent, elbowPath3 } from "./arrowFrame";
 
@@ -69,12 +68,12 @@ describe("elbowPath3", () => {
   });
 
   test("exact endpoints and tangent alignment for tilted card frames", () => {
-    const fa = frameFromDir(domePoint(300, 350, 1000).dir);
-    const fb = frameFromDir(domePoint(-100, 0, 1000).dir);
+    const qa = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.35, 0.2, 0));
+    const qb = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.1, -0.3, 0));
     const from = v3(280, 320, -60);
     const to = v3(-90, 10, -5);
-    const fromTan = fa.north.clone().negate(); // leaving a's bottom edge
-    const toTan = fb.north.clone(); // entering b's top edge
+    const fromTan = v3(0, -1, 0).applyQuaternion(qa); // leaving a's bottom edge
+    const toTan = v3(0, 1, 0).applyQuaternion(qb); // entering b's top edge
     const path = elbowPath3(from, fromTan, to, toTan);
     expect(path).toHaveLength(25);
     expect(path[0]!.distanceTo(from)).toBeLessThan(1e-9);
@@ -104,14 +103,14 @@ describe("edgeTangent", () => {
 
 describe("edgeHead", () => {
   test("apex sits exactly on the card-edge anchor, axis perpendicular to the edge", () => {
-    for (const [x, y] of [
+    for (const [rx, ry] of [
       [0, 0],
-      [300, 350],
-      [-500, -200],
+      [0.3, 0.35],
+      [-0.5, -0.2],
     ] as const) {
-      const { dir } = domePoint(x, y, 1000);
-      const outward = frameFromDir(dir).north; // out of a card's top edge
-      const anchor = v3(x, y, -30);
+      const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, 0));
+      const outward = v3(0, 1, 0).applyQuaternion(q); // out of a card's top edge
+      const anchor = v3(rx * 100, ry * 100, -30);
       const h = edgeHead(anchor, outward, 12);
       // Cone geometry: apex at +h/2 on local +Y.
       const apex = v3(0, 6, 0).applyQuaternion(h.quat).add(h.pos);

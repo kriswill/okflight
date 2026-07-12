@@ -45,7 +45,6 @@
       w: entry.w,
       h: entry.h,
       dpr: Math.min(Math.max(devicePixelRatio || 1, 1), 2),
-      muted: entry.kind === "more",
     }),
   );
   $effect(() => {

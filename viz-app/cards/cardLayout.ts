@@ -1,8 +1,8 @@
 // TheBrain-style card layout: the focused concept at the origin, cards that
-// link INTO it in rows above, cards it links OUT to in rows below, second
-// ring continuing the same direction (directional flow — a 2-hop neighbor
-// connected against the flow gets no card). All arrows are downward elbows,
-// so the whole picture reads as one top-to-bottom stream through the focus.
+// link INTO it on one scrollable band before it, cards it links OUT to on a
+// band after it, ring-2 clusters anchored to their ring-1 parent (they track
+// it under scroll). Directional flow — a 2-hop neighbor connected against
+// the flow gets no card; arrows always run in-to-out through the focus.
 // Pure data -> geometry; rendering (Threlte) and reactivity live elsewhere.
 
 import type { ConceptNode, VizModel } from "../data";
@@ -18,20 +18,14 @@ export const FOCUS_H = 96;
 export const GAP_X = 52;
 /** Row band centers by ring: [focus, ring 1, ring 2] (vertical flow). */
 export const BAND_Y = [0, 180, 350] as const;
-/** Extra rows of a wrapped band step outward by this much. */
-export const SUB_GAP = 96;
 
 /** Horizontal flow (in-links left, out-links right): column band centers by
- *  ring, vertical gap inside a column, and the outward step for wrapped
- *  columns (must exceed CARD_W so columns never overlap). */
+ *  ring and the vertical gap inside a column. */
 export const BAND_X = [0, 320, 620] as const;
 export const GAP_Y = 28;
-export const SUB_GAP_X = 220;
 
 /** Card flow orientation: "v" = TheBrain top-down (default), "h" = left-to-right. */
 export type CardFlow = "v" | "h";
-export const ROW_CAP = 8;
-export const MAX_PER_SIDE = 24;
 export const FOCUS_Z = 6;
 const HEAD_SIZE = 10;
 
@@ -54,7 +48,7 @@ export interface CardGraph {
 
 export interface CardPlacement {
   id: string;
-  kind: "focus" | "card" | "dir" | "more";
+  kind: "focus" | "card" | "dir";
   lane: "focus" | "in" | "out";
   ring: 0 | 1 | 2;
   x: number;
@@ -65,8 +59,6 @@ export interface CardPlacement {
   /** Arrow anchor: focus id for ring 1, the ring-1 parent for ring 2. */
   parentId: string | null;
   twoWay: boolean;
-  /** kind "more" only: how many cards the side cap hid. */
-  overflow: number;
 }
 
 export interface ArrowSpec {
@@ -153,8 +145,9 @@ export function rootCardGraph(model: VizModel, visible: (n: ConceptNode) => bool
   return { focusId: "", root: true, in1: [], out1, in2: [], out2: [] };
 }
 
-/** Chunk one side's entries into centered rows stepping outward from the
- *  focus; hard-cap with a "+N more" chip so hub nodes can't melt the GPU. */
+/** One side's ring-1 entries as a SINGLE centered band — never a grid,
+ *  never a cap: long bands are explored by scrolling, with cards fading at
+ *  the window edge. */
 function placeSide(
   entries: CardEntry[],
   lane: "in" | "out",
@@ -162,80 +155,76 @@ function placeSide(
   cards: CardPlacement[],
   flow: CardFlow,
 ): CardPlacement[] {
-  const kept = entries.slice(0, MAX_PER_SIDE);
-  const overflow = entries.length - kept.length;
-  const items: (CardEntry | { id: string; kind: "more"; twoWay: false })[] = [...kept];
-  if (overflow > 0) items.push({ id: `__more:${lane}`, kind: "more", twoWay: false });
-
   const placed: CardPlacement[] = [];
-  for (let r = 0; r * ROW_CAP < items.length; r++) {
-    const row = items.slice(r * ROW_CAP, (r + 1) * ROW_CAP);
-    for (let i = 0; i < row.length; i++) {
-      const e = row[i]!;
-      placed.push({
-        id: e.id,
-        kind: e.kind,
-        lane,
-        ring: 1,
-        ...bandCoords(flow, lane, 1, r, i, row.length),
-        z: 0,
-        w: CARD_W,
-        h: CARD_H,
-        parentId: e.kind === "more" ? null : parentId,
-        twoWay: e.twoWay,
-        overflow: e.kind === "more" ? overflow : 0,
-      });
-    }
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i]!;
+    placed.push({
+      id: e.id,
+      kind: e.kind,
+      lane,
+      ring: 1,
+      ...bandCoords(flow, lane, 1, i, entries.length, 0),
+      z: 0,
+      w: CARD_W,
+      h: CARD_H,
+      parentId,
+      twoWay: e.twoWay,
+    });
   }
   cards.push(...placed);
-  return placed.filter((c) => c.kind !== "more");
+  return placed;
 }
 
-/** Position within a band for either flow: vertical = centered rows above/
- *  below stepping outward in y; horizontal = centered columns left/right
- *  stepping outward in x (sorted order reads top→bottom). */
+/** Position within a band: centered spread along the band axis at the
+ *  ring's cross offset, plus an optional band-axis anchor (ring-2 clusters
+ *  center on their parent so they track it under scroll). */
 function bandCoords(
   flow: CardFlow,
   lane: "in" | "out",
   ring: 1 | 2,
-  wrap: number,
   i: number,
   len: number,
+  anchor: number,
 ): { x: number; y: number } {
   if (flow === "v") {
     const sign = lane === "in" ? 1 : -1;
-    return { x: (i - (len - 1) / 2) * (CARD_W + GAP_X), y: sign * (BAND_Y[ring] + wrap * SUB_GAP) };
+    return { x: anchor + (i - (len - 1) / 2) * (CARD_W + GAP_X), y: sign * BAND_Y[ring] };
   }
   const sign = lane === "in" ? -1 : 1;
-  return { x: sign * (BAND_X[ring] + wrap * SUB_GAP_X), y: ((len - 1) / 2 - i) * (CARD_H + GAP_Y) };
+  return { x: sign * BAND_X[ring], y: anchor + ((len - 1) / 2 - i) * (CARD_H + GAP_Y) };
 }
 
-/** Ring 2: one band further out, wrapped the same way. */
+/** Ring 2: per-parent clusters on the outer band, centered on the parent's
+ *  band position so grandparents/grandchildren track their parent as the
+ *  side scrolls. */
 function placeRing2(
   links: { parent: string; id: string }[],
   lane: "in" | "out",
+  ring1: CardPlacement[],
   cards: CardPlacement[],
   flow: CardFlow,
 ): CardPlacement[] {
   const placed: CardPlacement[] = [];
-  for (let r = 0; r * ROW_CAP < links.length; r++) {
-    const row = links.slice(r * ROW_CAP, (r + 1) * ROW_CAP);
-    for (let i = 0; i < row.length; i++) {
-      const l = row[i]!;
+  const byParent = new Map<string, string[]>();
+  for (const l of links) (byParent.get(l.parent) ?? byParent.set(l.parent, []).get(l.parent)!).push(l.id);
+  for (const [parentId, kidIds] of byParent) {
+    const parent = ring1.find((c) => c.id === parentId);
+    if (!parent) continue;
+    const anchor = flow === "v" ? parent.x : parent.y;
+    kidIds.forEach((id, i) => {
       placed.push({
-        id: l.id,
+        id,
         kind: "card",
         lane,
         ring: 2,
-        ...bandCoords(flow, lane, 2, r, i, row.length),
+        ...bandCoords(flow, lane, 2, i, kidIds.length, anchor),
         z: 0,
         w: CARD_W,
         h: CARD_H,
-        parentId: l.parent,
+        parentId,
         twoWay: false,
-        overflow: 0,
       });
-    }
+    });
   }
   cards.push(...placed);
   return placed;
@@ -258,14 +247,13 @@ export function layoutCards(g: CardGraph, opts?: { flow?: CardFlow }): CardLayou
     h: FOCUS_H,
     parentId: null,
     twoWay: false,
-    overflow: 0,
   };
   cards.push(focus);
 
   const inPlaced = placeSide(g.in1, "in", g.focusId, cards, flow);
   const outPlaced = placeSide(g.out1, "out", g.focusId, cards, flow);
-  const in2Placed = placeRing2(g.in2, "in", cards, flow);
-  const out2Placed = placeRing2(g.out2, "out", cards, flow);
+  const in2Placed = placeRing2(g.in2, "in", inPlaced, cards, flow);
+  const out2Placed = placeRing2(g.out2, "out", outPlaced, cards, flow);
   const byId = Object.fromEntries(cards.map((c) => [c.id, c]));
 
   // Ring 1 in: card exit-edge center to its own slot on the focus entry
@@ -357,7 +345,7 @@ export function layoutCards(g: CardGraph, opts?: { flow?: CardFlow }): CardLayou
 }
 
 /** Card scale never drops below this: readable cards beat fitting every
- *  last rim card on screen (rows are capped, so overflow is bounded). */
+ *  last band card on screen (long bands are explored by scrolling). */
 export const ZOOM_MIN = 0.6;
 
 /** Ortho zoom fitting the layout's symmetric envelope (origin-centered, so

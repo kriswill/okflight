@@ -19,13 +19,9 @@ import {
   fitZoom,
   GAP_X,
   GAP_Y,
-  SUB_GAP_X,
   ZOOM_MIN,
   layoutCards,
-  MAX_PER_SIDE,
-  ROW_CAP,
   rootCardGraph,
-  SUB_GAP,
 } from "./cardLayout";
 
 const all = (_n: ConceptNode) => true;
@@ -177,21 +173,7 @@ describe("layoutCards", () => {
     expect(l.arrows.find((a) => a.fromId === "in-a")!.tailHead).toBeNull();
   });
 
-  test("rows wrap outward at ROW_CAP, each row centered", () => {
-    const many = buildModel({
-      nodes: [node("f", "Decision", "Focus"), ...Array.from({ length: 9 }, (_, i) => node(`n${i}`, "Pattern", `N${i}`))],
-      edges: Array.from({ length: 9 }, (_, i) => ({ s: `n${i}`, t: "f" })),
-      cfg: cfg(),
-    });
-    const l = layoutCards(cardGraph(many, "f", 1, all)!);
-    const row1 = l.cards.filter((c) => c.y === BAND_Y[1]);
-    const row2 = l.cards.filter((c) => c.y === BAND_Y[1]! + SUB_GAP);
-    expect(row1).toHaveLength(ROW_CAP);
-    expect(row2).toHaveLength(9 - ROW_CAP);
-    expect(row2[0]!.x).toBe(0); // single remaining card re-centers
-  });
-
-  test("a side hard-caps at MAX_PER_SIDE with a 'more' chip and no arrow to it", () => {
+  test("large in-sets stay one scrollable band — never a grid, never a cap", () => {
     const many = buildModel({
       nodes: [
         node("f", "Decision", "Focus"),
@@ -201,17 +183,20 @@ describe("layoutCards", () => {
       cfg: cfg(),
     });
     const l = layoutCards(cardGraph(many, "f", 1, all)!);
-    const inCards = l.cards.filter((c) => c.lane === "in" && c.kind === "card");
-    const more = l.cards.find((c) => c.kind === "more")!;
-    expect(inCards).toHaveLength(MAX_PER_SIDE);
-    expect(more.overflow).toBe(6);
-    expect(l.arrows.filter((a) => a.dir === "in")).toHaveLength(MAX_PER_SIDE);
+    const inCards = l.cards.filter((c) => c.lane === "in");
+    expect(inCards).toHaveLength(30);
+    expect(inCards.every((c) => c.y === BAND_Y[1])).toBe(true); // one band
+    expect(l.arrows.filter((a) => a.dir === "in")).toHaveLength(30);
+    // Centered spread: symmetric extremes.
+    const xs = inCards.map((c) => c.x);
+    expect(Math.min(...xs)).toBe(-Math.max(...xs));
   });
 
-  test("ring 2 sits beyond ring 1 and its arrows attach to the parent card edge", () => {
+  test("ring 2 clusters center on their parent and its arrows attach to the parent card edge", () => {
     const l = layoutCards(cardGraph(model(), "hub", 2, all)!);
-    expect(l.byId["in2-f"]).toMatchObject({ ring: 2, y: BAND_Y[2], parentId: "in-a" });
-    expect(l.byId["out2-g"]).toMatchObject({ ring: 2, y: -BAND_Y[2]!, parentId: "out-c" });
+    // Children track their parent: the cluster centers on the parent's band position.
+    expect(l.byId["in2-f"]).toMatchObject({ ring: 2, y: BAND_Y[2], x: l.byId["in-a"]!.x, parentId: "in-a" });
+    expect(l.byId["out2-g"]).toMatchObject({ ring: 2, y: -BAND_Y[2]!, x: l.byId["out-c"]!.x, parentId: "out-c" });
     const a = l.arrows.find((a) => a.fromId === "in2-f")!;
     expect(a.toId).toBe("in-a");
     expect(a.path[a.path.length - 1]!.y).toBe(BAND_Y[1]! + CARD_H / 2);
@@ -273,25 +258,23 @@ describe("horizontal flow", () => {
 
   test("ring 2 sits one band further out on each side", () => {
     const l = h("hub", 2);
-    expect(l.byId["in2-f"]).toMatchObject({ ring: 2, x: -BAND_X[2]!, parentId: "in-a" });
-    expect(l.byId["out2-g"]).toMatchObject({ ring: 2, x: BAND_X[2]!, parentId: "out-c" });
+    expect(l.byId["in2-f"]).toMatchObject({ ring: 2, x: -BAND_X[2]!, y: l.byId["in-a"]!.y, parentId: "in-a" });
+    expect(l.byId["out2-g"]).toMatchObject({ ring: 2, x: BAND_X[2]!, y: l.byId["out-c"]!.y, parentId: "out-c" });
     const a = l.arrows.find((x) => x.fromId === "in2-f")!;
     expect(a.path[0]!.x).toBe(-BAND_X[2]! + CARD_W / 2);
     expect(a.path[a.path.length - 1]!.x).toBe(-BAND_X[1]! - CARD_W / 2);
   });
 
-  test("columns wrap outward at ROW_CAP", () => {
+  test("large sets stay one scrollable column", () => {
     const many = buildModel({
       nodes: [node("f", "Decision", "Focus"), ...Array.from({ length: 9 }, (_, i) => node(`n${i}`, "Pattern", `N${i}`))],
       edges: Array.from({ length: 9 }, (_, i) => ({ s: `n${i}`, t: "f" })),
       cfg: cfg(),
     });
     const l = layoutCards(cardGraph(many, "f", 1, all)!, { flow: "h" });
-    const col1 = l.cards.filter((c) => c.x === -BAND_X[1]!);
-    const col2 = l.cards.filter((c) => c.x === -(BAND_X[1]! + SUB_GAP_X));
-    expect(col1).toHaveLength(ROW_CAP);
-    expect(col2).toHaveLength(9 - ROW_CAP);
-    expect(col2[0]!.y).toBe(0);
+    const col = l.cards.filter((c) => c.lane === "in");
+    expect(col).toHaveLength(9);
+    expect(col.every((c) => c.x === -BAND_X[1]!)).toBe(true);
   });
 
   test("same card set as vertical; only the geometry changes", () => {

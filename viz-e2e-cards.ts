@@ -212,23 +212,55 @@ try {
     }),
   );
 
-  console.log("6b. dragging the dome reorients without selecting");
-  await page.mouse.move(700, 840);
+  console.log("6b. band scrolling on the mega-hub (wheel + drag under the mouse, no orbit)");
+  await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window as any).__okf.select("services/core-platform", false);
+  });
+  await settleMotion(page);
+  l = (await layout(page))!;
+  check("mega-hub keeps every in-link on one scrollable band (no grid, no chip)", l.cards.filter((c) => c.lane === "in" && c.ring === 1).length === 29);
+  const focusBefore = await okf<{ x: number; y: number }>(page, 'window.__okf.cards.project("services/core-platform")');
+  // Wheel over the in-band (above the focus card).
+  await page.mouse.move(focusBefore.x, focusBefore.y - 220);
+  await page.mouse.wheel({ deltaY: 400 });
+  const afterWheel = await okf<{ in: number; out: number }>(page, "window.__okf.cards.scroll");
+  check("wheel over the in-band scrolls it", Math.abs(afterWheel.in) > 50);
+  check("wheel never scrolls the other band", afterWheel.out === 0);
+  const focusAfter = await okf<{ x: number; y: number }>(page, 'window.__okf.cards.project("services/core-platform")');
+  check("the focus card never moves while scrolling", Math.hypot(focusAfter.x - focusBefore.x, focusAfter.y - focusBefore.y) < 1);
+  // Drag the in-band: content follows the pointer; a drag never selects.
+  await page.mouse.move(focusBefore.x, focusBefore.y - 220);
   await page.mouse.down();
-  await page.mouse.move(820, 880, { steps: 8 });
+  await page.mouse.move(focusBefore.x + 180, focusBefore.y - 220, { steps: 6 });
   await page.mouse.up();
-  const dragState = await okf<{ yaw: number; pitch: number }>(page, "window.__okf.cards.drag");
-  check("drag rotates the dome", Math.abs(dragState.yaw) > 0.01);
-  check("a drag never selects", (await layout(page))!.focusId === "in-a");
-  const jiggleTarget = await okf<{ x: number; y: number }>(page, 'window.__okf.cards.project("hub")');
-  await page.mouse.move(jiggleTarget.x, jiggleTarget.y);
+  const afterDrag = await okf<{ in: number; out: number }>(page, "window.__okf.cards.scroll");
+  check("dragging the band scrolls it", Math.abs(afterDrag.in - afterWheel.in) > 50);
+  check("a band drag never selects", (await layout(page))!.focusId === "services/core-platform");
+  // A sub-threshold press on a visible band card still selects, and resets
+  // the scroll. Pick whichever in-card currently sits nearest the window
+  // center (long bands fade their far cards out).
+  const centerCard = await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const okf = (window as any).__okf;
+    const inCards = okf.cards.layout.cards.filter(
+      (c: { lane: string; ring: number }) => c.lane === "in" && c.ring === 1,
+    );
+    const scrolled = okf.cards.scroll.in;
+    inCards.sort(
+      (a: { x: number }, b: { x: number }) => Math.abs(a.x - scrolled) - Math.abs(b.x - scrolled),
+    );
+    const id = inCards[0].id;
+    return { id, px: okf.cards.project(id) };
+  });
+  await page.mouse.move(centerCard.px.x, centerCard.px.y);
   await page.mouse.down();
-  await page.mouse.move(jiggleTarget.x + 2, jiggleTarget.y + 1);
+  await page.mouse.move(centerCard.px.x + 2, centerCard.px.y + 1);
   await page.mouse.up();
   await settleMotion(page);
-  check("a sub-threshold press still selects (through the dragged pose)", (await layout(page))!.focusId === "hub");
-  const dragAfter = await okf<{ yaw: number; pitch: number }>(page, "window.__okf.cards.drag");
-  check("refocus renormalizes the drag to neutral", Math.abs(dragAfter.yaw) < 1e-9 && Math.abs(dragAfter.pitch) < 1e-9);
+  check("a sub-threshold press still selects", (await layout(page))!.focusId === centerCard.id);
+  const scrollAfter = await okf<{ in: number; out: number }>(page, "window.__okf.cards.scroll");
+  check("refocus resets band scrolls", scrollAfter.in === 0 && scrollAfter.out === 0);
   await page.evaluate(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (window as any).__okf.select("in-a", false);

@@ -49,10 +49,6 @@
   const motion = createCardMotion();
 
   let cam = $state<THREE.OrthographicCamera | undefined>();
-  // Drag pivot at the ORIGIN — the focus card's home — so reorienting the
-  // dome never displaces the focus from the center of the viewport.
-  let pivot = $state<THREE.Group | undefined>();
-  let dragging = $state(false);
 
   /* --- registries + frame application ------------------------------------ */
   const cardRefs = new Map<string, CardRefs>();
@@ -68,9 +64,10 @@
     refs.group.scale.setScalar(hovered === id ? 1.03 : 1);
     refs.boxMesh.scale.set(s.w * s.sx, s.h * s.sy, DEPTH);
     refs.faceMesh.scale.set(s.w * s.sx, s.h * s.sy, 1);
-    const mute = refs.entry.kind === "more" ? 0.55 : 1;
-    refs.boxMat.opacity = s.opacity * mute;
+    refs.boxMat.opacity = s.opacity;
     refs.faceMat.opacity = s.opacity;
+    // Fully faded cards should not catch the eye as z-fighting ghosts.
+    refs.group.visible = s.opacity > 0.004;
   };
 
   const applyArrow = (a: ArrowState, refs: ArrowRefs, rebuildTube: boolean) => {
@@ -103,10 +100,6 @@
     cam.updateProjectionMatrix();
   };
 
-  const applyPivot = () => {
-    pivot?.quaternion.copy(motion.dragQuat());
-  };
-
   const applyFrame = (forceArrows = false) => {
     const rebuildTubes = forceArrows || !motion.settled;
     for (const [id, refs] of cardRefs) applyCard(id, refs);
@@ -115,7 +108,6 @@
       if (refs) applyArrow(a, refs, rebuildTubes);
     }
     applyCamera();
-    applyPivot();
   };
 
   const registerCard = (id: string, refs: CardRefs) => {
@@ -143,12 +135,12 @@
       motion.step(delta * 1000);
       applyFrame();
     },
-    { running: () => !motion.settled || dragging },
+    { running: () => !motion.settled },
   );
 
   /* --- retarget + view targets -------------------------------------------- */
   $effect(() => {
-    motion.setLayout(layout);
+    motion.setLayout(layout, viz.cardFlow);
     if (motion.settled) {
       // Snap paths (first mount, reduced motion, no-op relayout): apply once.
       applyFrame(true);
@@ -185,7 +177,6 @@
     return m;
   });
   const titleFor = (r: RenderEntry): string => {
-    if (r.kind === "more") return `+${r.overflow} more`;
     if (r.kind === "dir") return r.id + "/";
     if (r.kind === "focus" && r.id === "") return viz.model.root?.title || viz.model.displayName;
     return viz.model.byId[r.id]?.title ?? r.id;
@@ -214,58 +205,83 @@
 
   $effect(() => {
     const el = renderer.domElement;
-    const ndc = (e: PointerEvent) => {
+    const ndc = (cx: number, cy: number) => {
       const r = el.getBoundingClientRect();
-      return { x: ((e.clientX - r.left) / r.width) * 2 - 1, y: -(((e.clientY - r.top) / r.height) * 2 - 1) };
+      return { x: ((cx - r.left) / r.width) * 2 - 1, y: -(((cy - r.top) / r.height) * 2 - 1) };
     };
-    const pick = (e: PointerEvent) => (cam ? pickCard3(ndc(e), cam, motion.pickItems()) : null);
+    const pick = (e: PointerEvent) => {
+      if (!cam) return null;
+      return pickCard3(ndc(e.clientX, e.clientY), cam, motion.pickItems());
+    };
+    // Which scrollable band the pointer is over: intersect the pointer ray
+    // with the z=0 stage plane (a plain unproject drifts under the skewed
+    // camera) and classify by the cross coordinate.
+    const ray = new THREE.Raycaster();
+    const sideAt = (cx: number, cy: number): "in" | "out" | null => {
+      if (!cam) return null;
+      const n = ndc(cx, cy);
+      ray.setFromCamera(new THREE.Vector2(n.x, n.y), cam);
+      const tZ = -ray.ray.origin.z / ray.ray.direction.z;
+      const wx = ray.ray.origin.x + ray.ray.direction.x * tZ;
+      const wy = ray.ray.origin.y + ray.ray.direction.y * tZ;
+      const cross = motion.flow === "v" ? wy : wx;
+      const inSign = motion.flow === "v" ? 1 : -1; // in-band: above (v) / left (h)
+      if (cross * inSign > 60) return "in";
+      if (cross * inSign < -60) return "out";
+      return null;
+    };
     let press: { x: number; y: number } | null = null;
+    let dragSide: "in" | "out" | null = null;
+    let dragging = false;
     let last = { x: 0, y: 0 };
 
     const down = (e: PointerEvent) => {
       if (e.button !== 0) return;
       press = { x: e.clientX, y: e.clientY };
       last = { x: e.clientX, y: e.clientY };
+      dragSide = sideAt(e.clientX, e.clientY);
     };
     const move = (e: PointerEvent) => {
       if (press && !dragging && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 4) {
         dragging = true;
-        // Capture can race pointer release (and synthetic pointers in
-        // automation have no capture target) — losing it only degrades to
-        // an ended drag, never an error worth surfacing.
         try {
           el.setPointerCapture(e.pointerId);
         } catch {
           /* no active pointer */
         }
         setHovered(null);
-        el.style.cursor = "grabbing";
+        if (dragSide) el.style.cursor = "grabbing";
       }
       if (dragging) {
-        motion.dragBy(e.clientX - last.x, e.clientY - last.y);
+        if (dragSide) {
+          // Direct manipulation: the band's content follows the pointer.
+          const zoom = cam?.zoom ?? 1;
+          const worldD =
+            motion.flow === "v" ? (e.clientX - last.x) / zoom : -(e.clientY - last.y) / zoom;
+          motion.scrollBy(dragSide, -worldD);
+          applyFrame(true);
+          invalidate();
+        }
         last = { x: e.clientX, y: e.clientY };
-        // Event-driven apply: the pivot is one transform, and waiting on the
-        // frame task would drop the last move of a fast drag.
-        applyPivot();
-        invalidate();
         return;
       }
       if (!motion.settled) return; // hover disabled mid-animation
       const id = pick(e);
       const c = id ? motion.renderList.find((r) => r.id === id) : null;
       setHovered(c && clickableKinds.has(c.kind) ? id : null);
-      el.style.cursor = hovered ? "pointer" : "grab";
+      el.style.cursor = hovered ? "pointer" : sideAt(e.clientX, e.clientY) ? "grab" : "default";
     };
     const up = (e: PointerEvent) => {
       const wasDragging = dragging;
       dragging = false;
+      dragSide = null;
       if (wasDragging) {
         try {
           el.releasePointerCapture(e.pointerId);
         } catch {
           /* no active pointer */
         }
-        el.style.cursor = "grab";
+        el.style.cursor = "default";
         press = null;
         return; // a drag never selects
       }
@@ -283,17 +299,32 @@
     const cancel = () => {
       press = null;
       dragging = false;
+      dragSide = null;
       el.style.cursor = "default";
+    };
+    const wheel = (e: WheelEvent) => {
+      const side = sideAt(e.clientX, e.clientY);
+      if (!side) return;
+      e.preventDefault();
+      const zoom = cam?.zoom ?? 1;
+      // Dominant wheel axis drives the band; trackpad horizontal swipes map
+      // naturally in vertical flow.
+      const raw = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      motion.scrollBy(side, raw / zoom);
+      applyFrame(true);
+      invalidate();
     };
     el.addEventListener("pointerdown", down);
     el.addEventListener("pointermove", move);
     el.addEventListener("pointerup", up);
     el.addEventListener("pointercancel", cancel);
+    el.addEventListener("wheel", wheel, { passive: false });
     return () => {
       el.removeEventListener("pointerdown", down);
       el.removeEventListener("pointermove", move);
       el.removeEventListener("pointerup", up);
       el.removeEventListener("pointercancel", cancel);
+      el.removeEventListener("wheel", wheel);
       el.style.cursor = "default";
     };
   });
@@ -312,8 +343,13 @@
       get progress() {
         return motion.progress;
       },
-      get drag() {
-        return { ...motion.drag };
+      get scroll() {
+        return { ...motion.scroll };
+      },
+      scrollBy: (side: "in" | "out", d: number) => {
+        motion.scrollBy(side, d);
+        applyFrame(true);
+        invalidate();
       },
       pose: (id: string) => {
         const p = motion.pose(id);
@@ -353,11 +389,9 @@
 
 <T.OrthographicCamera makeDefault bind:ref={cam} position={[EYE.x, EYE.y, EYE.z]} near={0.1} far={6000} />
 
-<T.Group bind:ref={pivot}>
-  {#each motion.renderList as r (r.id)}
-    <Card entry={r} bg={colorFor.get(r.id) ?? NEUTRAL} title={titleFor(r)} desc={descFor(r)} {registerCard} />
-  {/each}
-  {#each motion.arrowList as a (a.key)}
-    <ElbowArrow arrowKey={a.key} twoWay={a.twoWay} color={arrowColor(a.fromId, a.toId, a.dir)} {registerArrow} />
-  {/each}
-</T.Group>
+{#each motion.renderList as r (r.id)}
+  <Card entry={r} bg={colorFor.get(r.id) ?? NEUTRAL} title={titleFor(r)} desc={descFor(r)} {registerCard} />
+{/each}
+{#each motion.arrowList as a (a.key)}
+  <ElbowArrow arrowKey={a.key} twoWay={a.twoWay} color={arrowColor(a.fromId, a.toId, a.dir)} {registerArrow} />
+{/each}

@@ -119,6 +119,20 @@ describe("refocus transition", () => {
     expect(m.sample("a")!.pos.distanceTo(live)).toBeLessThan(1e-6); // position-continuous
   });
 
+  test("cascading interrupts keep exiting cards from older layouts renderable", () => {
+    // f -> a puts b in exit flight; retargeting to c while b is still
+    // exiting must keep a render entry for b (it lives in samples, not in
+    // either the previous or the next flat layout).
+    const m = start(); // f -> a in flight; b exiting
+    m.step(10);
+    m.setLayout(layoutCards(cardGraph(model, "c", 1, all)!));
+    expect(m.renderList.find((r) => r.id === "b")?.exiting).toBe(true);
+    expect(m.sample("b")).not.toBeNull();
+    for (let i = 0; i < 43; i++) m.step(10);
+    expect(m.settled).toBe(true);
+    expect(m.sample("b")).toBeNull();
+  });
+
   test("a re-derived but identical layout never animates (theme flips)", () => {
     const m = createCardMotion({ reducedMotion: () => false });
     m.setLayout(layoutF());
@@ -137,6 +151,17 @@ describe("refocus transition", () => {
 });
 
 describe("arrows during transition", () => {
+  test("arrowList mirrors the tracked keys for structural mounting", () => {
+    const m = createCardMotion({ reducedMotion: () => false });
+    m.setLayout(layoutF());
+    expect(m.arrowList.map((a) => a.key).sort()).toEqual(["a→f", "f→b"]);
+    m.setLayout(layoutA());
+    // During the transition the exiting arrow stays mounted.
+    expect(m.arrowList.map((a) => a.key).sort()).toEqual(["a→f", "c→a", "f→b"]);
+    for (let i = 0; i < 42; i++) m.step(10);
+    expect(m.arrowList.map((a) => a.key).sort()).toEqual(["a→f", "c→a"]);
+  });
+
   test("glue invariant holds mid-flight; enter/exit opacity ramps", () => {
     const m = createCardMotion({ reducedMotion: () => false });
     m.setLayout(layoutF());

@@ -89,6 +89,7 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
   const reduced = opts?.reducedMotion ?? defaultReducedMotion;
 
   let renderList = $state<RenderEntry[]>([]);
+  let arrowList = $state<{ key: string; fromId: string; toId: string; dir: "in" | "out"; twoWay: boolean }[]>([]);
   let settled = $state(true);
 
   // Plain per-frame state — no reactivity at 60fps.
@@ -200,6 +201,13 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
       }
     }
     arrowTracks = tracks;
+    arrowList = tracks.map((tr) => ({
+      key: tr.key,
+      fromId: tr.spec.fromId,
+      toId: tr.spec.toId,
+      dir: tr.spec.dir,
+      twoWay: tr.spec.twoWay,
+    }));
   };
 
   /** Recompute every arrow from the live card samples at eased progress e. */
@@ -287,6 +295,7 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
         for (const track of spec.tracks) if (track.kind === "exit") samples.delete(track.id);
         renderList = renderList.filter((r) => !r.exiting);
         arrowTracks = arrowTracks.filter((a) => a.kind !== "exit");
+        arrowList = arrowList.filter((a) => arrowTracks.some((tr) => tr.key === a.key));
         spec = null;
         computeArrows(1);
       }
@@ -307,6 +316,9 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
   return {
     get renderList() {
       return renderList;
+    },
+    get arrowList() {
+      return arrowList;
     },
     get settled() {
       return settled;
@@ -340,6 +352,7 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
         arrowTracks = [];
         arrows = [];
         renderList = [];
+        arrowList = [];
         settled = true;
         return;
       }
@@ -367,10 +380,16 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
       drag.pitch = 0;
       spec = buildTransition(snap, next);
       t = 0;
-      const prevById = new Map(prevFlat!.cards.map((c) => [c.id, c]));
+      // Exit entries come from the CURRENT render list, not the previous
+      // flat layout: under cascading interrupts an exiting card may belong
+      // to a layout two retargets back — samples and renderList are the
+      // only structures guaranteed to still know it.
+      const prevEntries = new Map(renderList.map((r) => [r.id, r]));
       renderList = [
         ...flat.cards.map((p) => entryOf(p, false)),
-        ...spec.tracks.filter((tr) => tr.kind === "exit").map((tr) => entryOf(prevById.get(tr.id)!, true)),
+        ...spec.tracks
+          .filter((tr) => tr.kind === "exit" && prevEntries.has(tr.id))
+          .map((tr) => ({ ...prevEntries.get(tr.id)!, exiting: true })),
       ];
       retargetArrows(prevFlat, flat);
       dome = next;

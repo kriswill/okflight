@@ -15,7 +15,15 @@ import { extractLinks, isExternal, nowISO, parseDoc, resolveLink, walkMd } from 
 import { layout3d } from "./layout3d";
 import { collectLicenses, generatorInfo } from "./licenses";
 import { displayName } from "./viz-app/config";
-import { parsePackagePlatforms, repoNameFromUrl, type BuildStats, type DepLicense } from "./viz-app/data";
+import {
+  classifyRootLink,
+  parsePackagePlatforms,
+  repoNameFromUrl,
+  type BuildStats,
+  type DepLicense,
+  type RootDoc,
+  type RootLink,
+} from "./viz-app/data";
 import { esc } from "./viz-app/markdown";
 import { THEMES } from "./viz-app/themes";
 
@@ -89,6 +97,32 @@ const dedupedEdges = edges.filter((e) => {
   seen.add(k);
   return true;
 });
+
+// --- Root card source ------------------------------------------------------
+// The bundle-root index.md is reserved (never a node), but the cards view
+// centers its no-selection layout on it: embed its identity plus resolved
+// links (concept docs and sub-bundle dirs) as RawData.root.
+let root: RootDoc | null = null;
+if (existsSync(join(bundle, "index.md"))) {
+  const doc = parseDoc(bundle, "index.md");
+  const links: RootLink[] = [];
+  const linkSeen = new Set<string>();
+  for (const target of extractLinks(doc.body)) {
+    if (isExternal(target)) continue;
+    const resolved = resolveLink(bundle, "index.md", target);
+    if (!resolved || !resolved.endsWith(".md")) continue;
+    const l = classifyRootLink(resolved, ids);
+    const k = l && (l.kind === "concept" ? `c:${l.id}` : `d:${l.path}`);
+    if (!l || linkSeen.has(k!)) continue;
+    linkSeen.add(k!);
+    links.push(l);
+  }
+  root = {
+    title: (doc.fm?.title as string) ?? "",
+    desc: (doc.fm?.description as string) ?? "",
+    links,
+  };
+}
 lap("graph");
 
 // --- Embed referenced source files, highlighted at generation time ----------
@@ -410,7 +444,7 @@ const themeCss = (name: string) =>
 
 const assemble = (totalBytes: number) => {
   const stats: BuildStats = { generatedAt, totalBytes, bytes: sectionBytes };
-  const data = JSON.stringify({ nodes, edges: dedupedEdges, files, dirs, repoUrl, commitUrl, commits, facetMaps, cfg, stats, licenses, generator }).replace(
+  const data = JSON.stringify({ nodes, edges: dedupedEdges, files, dirs, repoUrl, commitUrl, commits, facetMaps, cfg, stats, licenses, generator, root }).replace(
     /<\//g,
     "<\\/",
   );

@@ -1,0 +1,13 @@
+# Fixture workspace for the cards-view e2e checks (viz-e2e-cards.ts).
+# Small graph exercising every card-layout shape: in/out/mutual ring-1 links,
+# directional ring-2 above and below, a hideable type, an island, and a
+# sub-bundle dir for root-view dir cards.
+
+[bundle]
+dir = "knowledge"
+
+[display]
+title = "Cards Fixture"
+
+[taxonomy]
+types = ["Decision", "Pattern", "Playbook", "Reference", "Host"]

@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { FacetConfig } from "./config";
 import {
   buildModel,
+  classifyRootLink,
   conceptTree,
   dirOf,
   facetValueOf,
@@ -578,5 +579,51 @@ describe("generic (no-config) mode", () => {
     expect(m.displayName).toBe("acme/widgets");
     expect(m.cfg.display.badge).toBe("OKFlight");
     expect(buildModel({ nodes: [], edges: [] }).displayName).toBe("OKF bundle");
+  });
+});
+
+// The bundle-root index.md is a reserved file (never a node), but the cards
+// view uses it as the synthetic root card: its links, resolved at generation
+// time, become the root card's out-links. classifyRootLink maps one resolved
+// bundle-relative path to a typed link; buildModel threads/validates the
+// embedded root doc.
+describe("root card data", () => {
+  const ids = new Set(["hub", "notes/note-1"]);
+
+  test("classifyRootLink: known concept doc", () => {
+    expect(classifyRootLink("hub.md", ids)).toEqual({ kind: "concept", id: "hub" });
+    expect(classifyRootLink("notes/note-1.md", ids)).toEqual({ kind: "concept", id: "notes/note-1" });
+  });
+
+  test("classifyRootLink: sub-bundle index.md becomes a dir link", () => {
+    expect(classifyRootLink("notes/index.md", ids)).toEqual({ kind: "dir", path: "notes" });
+    expect(classifyRootLink("a/b/index.md", ids)).toEqual({ kind: "dir", path: "a/b" });
+  });
+
+  test("classifyRootLink: unknown docs and the root index itself drop", () => {
+    expect(classifyRootLink("ghost.md", ids)).toBeNull();
+    expect(classifyRootLink("index.md", ids)).toBeNull();
+  });
+
+  test("buildModel threads root through; absent -> null", () => {
+    const root = { title: "kb", desc: "d", links: [{ kind: "concept" as const, id: "a" }] };
+    expect(buildModel({ ...raw, root }).root).toEqual(root);
+    expect(buildModel(raw).root).toBeNull();
+  });
+
+  test("buildModel drops root concept links pointing at unknown ids", () => {
+    const root = {
+      title: "kb",
+      desc: "",
+      links: [
+        { kind: "concept" as const, id: "ghost" },
+        { kind: "concept" as const, id: "a" },
+        { kind: "dir" as const, path: "notes" },
+      ],
+    };
+    expect(buildModel({ ...raw, root }).root!.links).toEqual([
+      { kind: "concept", id: "a" },
+      { kind: "dir", path: "notes" },
+    ]);
   });
 });

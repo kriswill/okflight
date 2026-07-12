@@ -1,7 +1,9 @@
 // Stage bridge tests: reactive state changes must reach the imperative
-// GraphScene API. A recording stub replaces the WebGL scene.
+// GraphScene API. A recording stub replaces the WebGL scene; a DOM-only
+// stub component stands in for the Threlte cards view.
 import { afterEach, describe, expect, test } from "bun:test";
 import { flushSync, mount, unmount } from "svelte";
+import CardsStub from "./CardsStub.svelte";
 import { buildModel } from "./data";
 import Stage from "./Stage.svelte";
 import { createVizState } from "./state.svelte";
@@ -138,5 +140,41 @@ describe("Stage bridges", () => {
     state.repaint();
     flushSync();
     expect(stub.calls.filter(([m]) => m === "applyTheme").length).toBe(before + 2);
+  });
+});
+
+describe("cards view integration", () => {
+  test("cards mode mounts the injected component and hides + pauses the graph; graph mode reverses it", () => {
+    const state = createVizState(model());
+    const stub = makeStub();
+    const app = mount(Stage, {
+      target: document.body,
+      props: { viz: state, createScene: () => stub, cards: CardsStub },
+    });
+    cleanup = () => unmount(app);
+    flushSync();
+    expect(document.querySelector("[data-testid=cards-stub]")).toBeNull();
+
+    state.setViewMode("cards");
+    flushSync();
+    expect(document.querySelector("[data-testid=cards-stub]")).not.toBeNull();
+    // Graph host stays mounted (GraphScene has no dispose and a live RAF
+    // loop) but goes invisible and stops compositing.
+    expect(document.getElementById("graph-host")!.classList.contains("hidden")).toBe(true);
+    expect(stub.calls.at(-1)).toEqual(["setPaused", true]);
+
+    state.setViewMode("graph");
+    flushSync();
+    expect(document.querySelector("[data-testid=cards-stub]")).toBeNull();
+    expect(document.getElementById("graph-host")!.classList.contains("hidden")).toBe(false);
+    expect(stub.calls.at(-1)).toEqual(["setPaused", false]);
+  });
+
+  test("without a cards component, cards mode renders nothing and never throws", () => {
+    const { state } = mountStage();
+    state.setViewMode("cards");
+    flushSync();
+    expect(document.querySelector("[data-testid=cards-stub]")).toBeNull();
+    expect(document.getElementById("graph-host")!.classList.contains("hidden")).toBe(true);
   });
 });

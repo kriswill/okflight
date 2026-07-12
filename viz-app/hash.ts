@@ -21,6 +21,8 @@ export interface ViewFilters {
   isolate: 0 | 1 | 2;
   /** Facet name -> "all" (encodes to nothing) or one of that facet's values. */
   facets: Record<string, string>;
+  /** Stage rendering format; "graph" (the default) never encodes. */
+  view: "graph" | "cards";
 }
 
 export interface ViewState {
@@ -60,6 +62,7 @@ export function encodeViewHash(view: ViewState): string {
   if (view.filters.hidden.length) p.set("hide", [...view.filters.hidden].sort().join(","));
   if (view.filters.q) p.set("q", view.filters.q);
   if (view.sel.kind === "concept" && view.filters.isolate) p.set("isolate", String(view.filters.isolate));
+  if (view.filters.view === "cards") p.set("view", "cards");
   for (const [name, v] of Object.entries(view.filters.facets)) if (v && v !== "all") p.set(name, v);
   const qs = p.toString();
   return encodeHash(view.sel) + (qs ? "?" + qs : "");
@@ -96,5 +99,6 @@ export function decodeViewHash(raw: string, model: HashModel): ViewState {
     const v = p.get(f.name) ?? (f.name === "platform" && !p.has("platform") ? p.get("os") : null);
     facets[f.name] = v && f.values.includes(v) ? v : "all";
   }
-  return { sel, filters: { hidden, q, isolate, facets } };
+  const view: "graph" | "cards" = p.get("view") === "cards" ? "cards" : "graph";
+  return { sel, filters: { hidden, q, isolate, facets, view } };
 }

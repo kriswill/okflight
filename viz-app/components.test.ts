@@ -15,6 +15,7 @@ import Sidebar from "./Sidebar.svelte";
 import { createVizState } from "./state.svelte";
 import { cfg, node } from "./test-helpers";
 import Tooltip from "./Tooltip.svelte";
+import ViewToggle from "./ViewToggle.svelte";
 
 const model = () =>
   buildModel({
@@ -286,6 +287,33 @@ describe("ConceptList", () => {
     flushSync();
     expect([...document.querySelectorAll("#list a")].map((a) => a.textContent)).toEqual(["Alpha", "Beta"]);
     expect(document.querySelector(".tree-divider")).toBeNull(); // isolation leaves no rest
+  });
+});
+
+describe("ViewToggle", () => {
+  test("renders both segments with the active one highlighted; clicks flip the mode", () => {
+    const state = createVizState(model());
+    mountC(ViewToggle, { viz: state });
+    const [graph, cards] = [...document.querySelectorAll("#viewtoggle .seg")] as HTMLElement[];
+    expect([graph!.textContent?.trim(), cards!.textContent?.trim()]).toEqual(["3D", "cards"]);
+    expect(graph!.classList.contains("active")).toBe(true);
+    expect(cards!.classList.contains("active")).toBe(false);
+
+    cards!.click();
+    flushSync();
+    expect(state.viewMode).toBe("cards");
+    expect(cards!.classList.contains("active")).toBe(true);
+    expect(graph!.classList.contains("active")).toBe(false);
+
+    graph!.click();
+    flushSync();
+    expect(state.viewMode).toBe("graph");
+  });
+
+  test("Sidebar hosts the toggle", () => {
+    const state = createVizState(model());
+    mountC(Sidebar, { viz: state });
+    expect(document.querySelector("#side #viewtoggle")).not.toBeNull();
   });
 });
 

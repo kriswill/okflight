@@ -1,0 +1,282 @@
+// The card view's TDD core: cardGraph picks and classifies neighbors
+// (directional flow — in-links above, out-links below, ring 2 continues the
+// same direction outward), layoutCards turns that into deterministic world
+// placements + elbow arrows, fitZoom fits the ortho camera. The e2e script
+// asserts against exactly these outputs via window.__okf.cards.
+import { describe, expect, test } from "bun:test";
+import type { ConceptNode } from "../data";
+import { buildModel } from "../data";
+import { cfg, node } from "../test-helpers";
+import {
+  BAND_Y,
+  CARD_H,
+  CARD_W,
+  cardGraph,
+  FOCUS_H,
+  FOCUS_W,
+  FOCUS_Z,
+  fitZoom,
+  GAP_X,
+  layoutCards,
+  MAX_PER_SIDE,
+  ROW_CAP,
+  rootCardGraph,
+  SUB_GAP,
+} from "./cardLayout";
+
+const all = (_n: ConceptNode) => true;
+
+// Titles pick the alphabetical order on purpose: in-row sorts to
+// [in-a, in-b, both-e], out-row to [out-d, out-c].
+const model = () =>
+  buildModel({
+    nodes: [
+      node("hub", "Decision", "Hub"),
+      node("in-a", "Pattern", "Alpha In"),
+      node("in-b", "Playbook", "Beta In"),
+      node("out-c", "Reference", "Gamma Out"),
+      node("out-d", "Pattern", "Delta Out"),
+      node("both-e", "Playbook", "Epsilon Both"),
+      node("in2-f", "Decision", "F Deep"),
+      node("out2-g", "Reference", "G Deep"),
+      node("island", "Host", "Island"),
+    ],
+    edges: [
+      { s: "in-a", t: "hub" },
+      { s: "in-b", t: "hub" },
+      { s: "hub", t: "out-c" },
+      { s: "hub", t: "out-d" },
+      { s: "hub", t: "both-e" },
+      { s: "both-e", t: "hub" },
+      { s: "in2-f", t: "in-a" },
+      { s: "out-c", t: "out2-g" },
+    ],
+    root: {
+      title: "KB",
+      desc: "",
+      links: [
+        { kind: "concept" as const, id: "hub" },
+        { kind: "concept" as const, id: "island" },
+        { kind: "dir" as const, path: "notes" },
+      ],
+    },
+    cfg: cfg(),
+  });
+
+describe("cardGraph", () => {
+  test("unknown focus id -> null", () => {
+    expect(cardGraph(model(), "ghost", 1, all)).toBeNull();
+  });
+
+  test("ring 1: in-links above (title-sorted), out-links below, mutual joins the in row", () => {
+    const g = cardGraph(model(), "hub", 1, all)!;
+    expect(g.in1.map((e) => e.id)).toEqual(["in-a", "in-b", "both-e"]);
+    expect(g.out1.map((e) => e.id)).toEqual(["out-d", "out-c"]);
+    expect(g.in1.find((e) => e.id === "both-e")!.twoWay).toBe(true);
+    expect(g.in1.find((e) => e.id === "in-a")!.twoWay).toBe(false);
+  });
+
+  test("visible predicate trims both rows", () => {
+    const g = cardGraph(model(), "hub", 1, (n) => n.type !== "Playbook")!;
+    expect(g.in1.map((e) => e.id)).toEqual(["in-a"]);
+    expect(g.out1.map((e) => e.id)).toEqual(["out-d", "out-c"]);
+  });
+
+  test("depth 1 has no ring 2; depth 2 flows directionally", () => {
+    const g1 = cardGraph(model(), "hub", 1, all)!;
+    expect(g1.in2).toEqual([]);
+    expect(g1.out2).toEqual([]);
+    const g2 = cardGraph(model(), "hub", 2, all)!;
+    expect(g2.in2).toEqual([{ parent: "in-a", id: "in2-f" }]);
+    expect(g2.out2).toEqual([{ parent: "out-c", id: "out2-g" }]);
+  });
+
+  test("ring 2 skips already-placed cards and picks the alphabetically-first parent", () => {
+    const m = buildModel({
+      nodes: [
+        node("f", "Decision", "Focus"),
+        node("p", "Pattern", "Alpha"),
+        node("q", "Pattern", "Beta"),
+        node("deep", "Pattern", "Deep"),
+      ],
+      edges: [
+        { s: "p", t: "f" },
+        { s: "q", t: "f" },
+        // q also links into p: q is ring 1, must NOT reappear as ring 2 under p.
+        { s: "q", t: "p" },
+        // deep links into both ring-1 parents: attaches only under Alpha (p).
+        { s: "deep", t: "p" },
+        { s: "deep", t: "q" },
+      ],
+      cfg: cfg(),
+    });
+    const g = cardGraph(m, "f", 2, all)!;
+    expect(g.in2).toEqual([{ parent: "p", id: "deep" }]);
+  });
+});
+
+describe("layoutCards", () => {
+  test("focus card at the origin", () => {
+    const l = layoutCards(cardGraph(model(), "hub", 1, all)!);
+    const f = l.byId["hub"]!;
+    expect(f).toMatchObject({ kind: "focus", lane: "focus", ring: 0, x: 0, y: 0, z: FOCUS_Z, w: FOCUS_W, h: FOCUS_H });
+  });
+
+  test("edge-less focus: one card, no arrows, bounds = its rect", () => {
+    const l = layoutCards(cardGraph(model(), "island", 1, all)!);
+    expect(l.cards).toHaveLength(1);
+    expect(l.arrows).toHaveLength(0);
+    expect(l.bounds).toEqual({ minX: -FOCUS_W / 2, maxX: FOCUS_W / 2, minY: -FOCUS_H / 2, maxY: FOCUS_H / 2 });
+  });
+
+  test("ring-1 rows sit at ±BAND_Y[1], centered and symmetric", () => {
+    const l = layoutCards(cardGraph(model(), "hub", 1, all)!);
+    const pitch = CARD_W + GAP_X;
+    // Three in-cards: centered around x=0 in sorted order.
+    expect(l.byId["in-a"]).toMatchObject({ lane: "in", ring: 1, x: -pitch, y: BAND_Y[1], parentId: "hub" });
+    expect(l.byId["in-b"]).toMatchObject({ x: 0, y: BAND_Y[1] });
+    expect(l.byId["both-e"]).toMatchObject({ x: pitch, y: BAND_Y[1], twoWay: true });
+    // Two out-cards: symmetric halves below.
+    expect(l.byId["out-d"]).toMatchObject({ lane: "out", ring: 1, x: -pitch / 2, y: -BAND_Y[1]! });
+    expect(l.byId["out-c"]).toMatchObject({ x: pitch / 2, y: -BAND_Y[1]! });
+  });
+
+  test("arrows: in flows card-bottom -> focus-top slot, out flows focus-bottom slot -> card-top; heads point down", () => {
+    const l = layoutCards(cardGraph(model(), "hub", 1, all)!);
+    const inArrow = l.arrows.find((a) => a.fromId === "in-a")!;
+    expect(inArrow.dir).toBe("in");
+    expect(inArrow.toId).toBe("hub");
+    expect(inArrow.path[0]).toEqual({ x: l.byId["in-a"]!.x, y: BAND_Y[1]! - CARD_H / 2 });
+    // Lands on the focus top edge, inside its width.
+    const end = inArrow.path[inArrow.path.length - 1]!;
+    expect(end.y).toBe(FOCUS_H / 2);
+    expect(Math.abs(end.x)).toBeLessThan(FOCUS_W / 2);
+    // Head at the lower end, wings trailing above: downward flow.
+    expect(inArrow.head.tip.y).toBe(end.y);
+    expect(inArrow.head.left.y).toBeGreaterThan(inArrow.head.tip.y);
+
+    const outArrow = l.arrows.find((a) => a.toId === "out-c")!;
+    expect(outArrow.dir).toBe("out");
+    expect(outArrow.fromId).toBe("hub");
+    expect(outArrow.path[0]!.y).toBe(-FOCUS_H / 2);
+    expect(outArrow.path[outArrow.path.length - 1]).toEqual({
+      x: l.byId["out-c"]!.x,
+      y: -BAND_Y[1]! + CARD_H / 2,
+    });
+  });
+
+  test("multiple in-arrows land on distinct focus-top slots; only the mutual arrow carries a tail head", () => {
+    const l = layoutCards(cardGraph(model(), "hub", 1, all)!);
+    const ends = l.arrows.filter((a) => a.dir === "in").map((a) => a.path[a.path.length - 1]!.x);
+    expect(new Set(ends).size).toBe(ends.length);
+    expect(l.arrows.find((a) => a.fromId === "both-e")!.tailHead).not.toBeNull();
+    expect(l.arrows.find((a) => a.fromId === "in-a")!.tailHead).toBeNull();
+  });
+
+  test("rows wrap outward at ROW_CAP, each row centered", () => {
+    const many = buildModel({
+      nodes: [node("f", "Decision", "Focus"), ...Array.from({ length: 9 }, (_, i) => node(`n${i}`, "Pattern", `N${i}`))],
+      edges: Array.from({ length: 9 }, (_, i) => ({ s: `n${i}`, t: "f" })),
+      cfg: cfg(),
+    });
+    const l = layoutCards(cardGraph(many, "f", 1, all)!);
+    const row1 = l.cards.filter((c) => c.y === BAND_Y[1]);
+    const row2 = l.cards.filter((c) => c.y === BAND_Y[1]! + SUB_GAP);
+    expect(row1).toHaveLength(ROW_CAP);
+    expect(row2).toHaveLength(9 - ROW_CAP);
+    expect(row2[0]!.x).toBe(0); // single remaining card re-centers
+  });
+
+  test("a side hard-caps at MAX_PER_SIDE with a 'more' chip and no arrow to it", () => {
+    const many = buildModel({
+      nodes: [
+        node("f", "Decision", "Focus"),
+        ...Array.from({ length: 30 }, (_, i) => node(`n${String(i).padStart(2, "0")}`, "Pattern", `N${i}`)),
+      ],
+      edges: Array.from({ length: 30 }, (_, i) => ({ s: `n${String(i).padStart(2, "0")}`, t: "f" })),
+      cfg: cfg(),
+    });
+    const l = layoutCards(cardGraph(many, "f", 1, all)!);
+    const inCards = l.cards.filter((c) => c.lane === "in" && c.kind === "card");
+    const more = l.cards.find((c) => c.kind === "more")!;
+    expect(inCards).toHaveLength(MAX_PER_SIDE);
+    expect(more.overflow).toBe(6);
+    expect(l.arrows.filter((a) => a.dir === "in")).toHaveLength(MAX_PER_SIDE);
+  });
+
+  test("ring 2 sits beyond ring 1 and its arrows attach to the parent card edge", () => {
+    const l = layoutCards(cardGraph(model(), "hub", 2, all)!);
+    expect(l.byId["in2-f"]).toMatchObject({ ring: 2, y: BAND_Y[2], parentId: "in-a" });
+    expect(l.byId["out2-g"]).toMatchObject({ ring: 2, y: -BAND_Y[2]!, parentId: "out-c" });
+    const a = l.arrows.find((a) => a.fromId === "in2-f")!;
+    expect(a.toId).toBe("in-a");
+    expect(a.path[a.path.length - 1]!.y).toBe(BAND_Y[1]! + CARD_H / 2);
+    const b = l.arrows.find((a) => a.toId === "out2-g")!;
+    expect(b.fromId).toBe("out-c");
+    expect(b.path[0]!.y).toBe(-BAND_Y[1]! - CARD_H / 2);
+  });
+
+  test("bounds enclose every card rect exactly", () => {
+    const l = layoutCards(cardGraph(model(), "hub", 2, all)!);
+    const minX = Math.min(...l.cards.map((c) => c.x - c.w / 2));
+    const maxX = Math.max(...l.cards.map((c) => c.x + c.w / 2));
+    const minY = Math.min(...l.cards.map((c) => c.y - c.h / 2));
+    const maxY = Math.max(...l.cards.map((c) => c.y + c.h / 2));
+    expect(l.bounds).toEqual({ minX, maxX, minY, maxY });
+  });
+
+  test("deterministic: same input, deeply equal output", () => {
+    const a = layoutCards(cardGraph(model(), "hub", 2, all)!);
+    const b = layoutCards(cardGraph(model(), "hub", 2, all)!);
+    expect(a).toEqual(b);
+  });
+});
+
+describe("rootCardGraph", () => {
+  test("no embedded root -> null", () => {
+    const m = buildModel({ nodes: [node("a", "T", "A")], edges: [], cfg: cfg() });
+    expect(rootCardGraph(m, all)).toBeNull();
+  });
+
+  test("root layout: no in-row, authored link order below, dirs as dir cards", () => {
+    const g = rootCardGraph(model(), all)!;
+    expect(g.in1).toEqual([]);
+    expect(g.out1.map((e) => ({ id: e.id, kind: e.kind }))).toEqual([
+      { id: "hub", kind: "card" },
+      { id: "island", kind: "card" },
+      { id: "notes", kind: "dir" },
+    ]);
+    const l = layoutCards(g);
+    expect(l.rootFocus).toBe(true);
+    expect(l.byId["notes"]).toMatchObject({ kind: "dir", lane: "out" });
+  });
+
+  test("hidden types drop concept cards but never dir cards", () => {
+    const g = rootCardGraph(model(), (n) => n.type !== "Decision")!;
+    expect(g.out1.map((e) => e.id)).toEqual(["island", "notes"]);
+  });
+});
+
+describe("fitZoom", () => {
+  const bounds = { minX: -300, maxX: 300, minY: -100, maxY: 100 };
+
+  test("scales down to fit the wider axis", () => {
+    // Symmetric 600x200 envelope in a 300x400 viewport: x limits, 300/600.
+    expect(fitZoom(bounds, 300, 400, 1)).toBeCloseTo(0.5);
+  });
+
+  test("fits the symmetric envelope so the origin stays centered", () => {
+    // Asymmetric bounds: envelope doubles the far side (|maxX|=300 -> 600 wide).
+    const asym = { minX: -50, maxX: 300, minY: -100, maxY: 100 };
+    expect(fitZoom(asym, 300, 400, 1)).toBeCloseTo(0.5);
+  });
+
+  test("pad shrinks proportionally, small scenes never zoom past 1", () => {
+    expect(fitZoom(bounds, 300, 400, 0.8)).toBeCloseTo(0.4);
+    expect(fitZoom({ minX: -10, maxX: 10, minY: -5, maxY: 5 }, 800, 600, 0.85)).toBe(1);
+  });
+
+  test("zero-size bounds clamp to 1 instead of Infinity", () => {
+    expect(fitZoom({ minX: 0, maxX: 0, minY: 0, maxY: 0 }, 800, 600, 0.85)).toBe(1);
+  });
+});

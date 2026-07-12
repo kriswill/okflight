@@ -37,6 +37,9 @@ export interface SceneApi {
   setSelected(i: number | null, fly?: boolean): void;
   applyTheme(theme: Theme): void;
   setViewShift(leftInset: number, rightInset: number): void;
+  /** Stop compositing while another view (cards) owns the stage; the RAF
+   *  loop keeps ticking so unpausing resumes instantly. */
+  setPaused(paused: boolean): void;
   resize(): void;
 }
 
@@ -201,6 +204,7 @@ export class GraphScene {
     let firstFrame = true;
     const loop = () => {
       requestAnimationFrame(loop);
+      if (this.paused) return;
       this.stepFly();
       this.controls.update();
       this.composer.render();
@@ -210,6 +214,11 @@ export class GraphScene {
       }
     };
     requestAnimationFrame(loop);
+  }
+
+  private paused = false;
+  setPaused(paused: boolean) {
+    this.paused = paused;
   }
 
   private hoverLabel: number | null = null;

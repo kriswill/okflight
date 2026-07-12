@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Component } from "svelte";
   import { decodeViewHash, encodeViewHash } from "./hash";
   import { installPerf, mark, summary } from "./perf";
   import type { CreateScene, SceneApi } from "./scene";
@@ -10,8 +11,10 @@
     viz: VizState;
     /** Test seam, forwarded to Stage. */
     createScene?: CreateScene;
+    /** Cards view component, injected by main.ts and forwarded to Stage. */
+    cards?: Component<{ viz: VizState }>;
   }
-  const { viz, createScene }: Props = $props();
+  const { viz, createScene, cards }: Props = $props();
 
   /* --- URL state (hash) — selection + filters survive reload/back/forward - */
   let currentState: string | null = null;
@@ -29,7 +32,7 @@
     const h = encodeViewHash(view);
     if (h === currentState) return;
     currentState = h;
-    viz.setFilters(view.filters.hidden, view.filters.q, view.filters.isolate, view.filters.facets);
+    viz.setFilters(view.filters.hidden, view.filters.q, view.filters.isolate, view.filters.facets, view.filters.view);
     const sel = view.sel;
     if (sel.kind === "concept") viz.selectConcept(sel.id, true);
     else if (sel.kind === "file") viz.selectFile(sel.path);
@@ -40,7 +43,13 @@
   $effect(() => {
     const h = encodeViewHash({
       sel: viz.sel,
-      filters: { hidden: [...viz.hidden], q: viz.query, isolate: viz.isolateDepth, facets: { ...viz.facetSel } },
+      filters: {
+        hidden: [...viz.hidden],
+        q: viz.query,
+        isolate: viz.isolateDepth,
+        facets: { ...viz.facetSel },
+        view: viz.viewMode,
+      },
     });
     if (currentState === h) return;
     const selChanged = currentState == null || selPart(h) !== selPart(currentState);
@@ -84,6 +93,10 @@
     get scene() {
       return sceneRef;
     },
+    get view() {
+      return viz.viewMode;
+    },
+    setView: (v: "graph" | "cards") => viz.setViewMode(v),
     // svelte-ignore state_referenced_locally -- viz's identity never changes
     nodes: viz.model.nodes,
   };
@@ -111,4 +124,4 @@
 <svelte:window onhashchange={applyHash} onpopstate={applyHash} />
 
 <Sidebar {viz} />
-<Stage {viz} {createScene} {onSceneReady} {onFirstFrame} />
+<Stage {viz} {createScene} {cards} {onSceneReady} {onFirstFrame} />

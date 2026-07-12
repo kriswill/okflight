@@ -579,3 +579,42 @@ describe("theme toggle", () => {
     expect(s.themeIndex).toBe(0); // explicit pick wins
   });
 });
+
+describe("view mode", () => {
+  test("defaults to graph; setViewMode flips; invalid values ignored", () => {
+    const s = createVizState(model());
+    expect(s.viewMode).toBe("graph");
+    s.setViewMode("cards");
+    expect(s.viewMode).toBe("cards");
+    s.setViewMode("nope" as never);
+    expect(s.viewMode).toBe("cards");
+    s.setViewMode("graph");
+    expect(s.viewMode).toBe("graph");
+  });
+
+  test("cardsDepth: the cards view is inherently one ring; only 2-hop isolation widens it", () => {
+    const s = createVizState(model());
+    s.selectConcept("a");
+    expect(s.cardsDepth).toBe(1); // isolate off
+    s.setIsolate(1);
+    expect(s.cardsDepth).toBe(1);
+    s.setIsolate(2);
+    expect(s.cardsDepth).toBe(2);
+  });
+
+  test("setFilters applies the view param; omitted keeps the graph default", () => {
+    const s = createVizState(model());
+    s.setFilters([], "", 0, {}, "cards");
+    expect(s.viewMode).toBe("cards");
+    s.setFilters([], "");
+    expect(s.viewMode).toBe("graph");
+  });
+
+  test("clearSelection leaves the view mode alone", () => {
+    const s = createVizState(model());
+    s.setViewMode("cards");
+    s.selectConcept("a");
+    s.clearSelection();
+    expect(s.viewMode).toBe("cards");
+  });
+});

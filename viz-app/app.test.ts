@@ -202,3 +202,38 @@ describe("App filter persistence", () => {
     expect(viz.sel).toEqual({ kind: "concept", id: "wiki/architecture" });
   });
 });
+
+describe("cards view mode", () => {
+  test("a deep link with view=cards applies on mount, selection intact", () => {
+    location.hash = "#c/wiki/architecture?view=cards";
+    const viz = createVizState(model());
+    mountApp(viz);
+    expect(viz.viewMode).toBe("cards");
+    expect(viz.sel).toEqual({ kind: "concept", id: "wiki/architecture" });
+  });
+
+  test("setViewMode amends the URL in place (filter-class: replaceState, no history entry)", () => {
+    const viz = createVizState(model());
+    mountApp(viz);
+    const pushes = spyOn(history, "pushState");
+    viz.setViewMode("cards");
+    flushSync();
+    expect(location.hash).toBe("#?view=cards");
+    expect(pushes).not.toHaveBeenCalled();
+    pushes.mockRestore();
+    viz.setViewMode("graph");
+    flushSync();
+    expect(location.hash).toBe("");
+  });
+
+  test("__okf exposes view accessors for browser automation", () => {
+    const viz = createVizState(model());
+    mountApp(viz);
+    const okf = (window as unknown as { __okf: { view: string; setView(v: string): void } }).__okf;
+    expect(okf.view).toBe("graph");
+    okf.setView("cards");
+    flushSync();
+    expect(viz.viewMode).toBe("cards");
+    expect(okf.view).toBe("cards");
+  });
+});

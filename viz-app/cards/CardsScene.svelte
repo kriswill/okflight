@@ -169,8 +169,14 @@
   });
 
   /* --- colors / titles (structure-time reactivity) ------------------------ */
-  const NEUTRAL = $derived(viz.themeDark ? "#3d4350" : "#c9ced8");
-  const INK = $derived(viz.themeDark ? "#f6f7f9" : "#16181d");
+  // Same central source as the graph: the applied theme's CSS vars
+  // (themes.ts stops), re-read on every palette bump — never hardcoded.
+  const themeVars = $derived.by(() => {
+    void viz.paletteVersion;
+    return viz.theme();
+  });
+  const NEUTRAL = $derived(themeVars.neutral);
+  const INK = $derived(themeVars.ink);
   // A dir card wears its bundle's dominant concept type color (an empty
   // bundle stays neutral) — the same hue the legend gives those concepts.
   const bundleColor = (path: string): string => {
@@ -187,7 +193,6 @@
   const isBundle = (r: RenderEntry) => !isRoot(r) && !viz.model.byId[r.id];
   const colorFor = $derived.by(() => {
     void viz.paletteVersion;
-    void viz.themeDark;
     const m = new Map<string, string>();
     for (const r of motion.renderList) {
       const n = viz.model.byId[r.id];

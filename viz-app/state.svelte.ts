@@ -363,12 +363,6 @@ export function createVizState(model: VizModel) {
     set dark(v: boolean) {
       dark = v;
     },
-    /** Whether the APPLIED theme is the dark stop. `dark` only mirrors the
-     *  OS scheme (it picks the un-picked default); an explicit toggle pick
-     *  overrides it, so canvas-drawn colors must key off this instead. */
-    get themeDark() {
-      return THEMES[themeIndex]!.name === "dark";
-    },
     get paletteVersion() {
       return paletteVersion;
     },
@@ -396,8 +390,20 @@ export function createVizState(model: VizModel) {
       // generated color at the theme's lightness/chroma.
       return slots[t] || nameColor(t, THEMES[themeIndex]!.gen);
     },
+    /** Canvas-drawn colors, read live from the APPLIED theme's CSS vars —
+     *  the single source in themes.ts — so every surface (graph labels,
+     *  card faces) follows the same stops. `dark` only mirrors the OS
+     *  scheme; a toggle pick overrides it, and these track the pick. */
     theme() {
-      return { bg: cssVar("--page"), labelInk: cssVar("--ink-2"), labelStroke: cssVar("--surface-1") };
+      return {
+        bg: cssVar("--page"),
+        labelInk: cssVar("--ink-2"),
+        labelStroke: cssVar("--surface-1"),
+        /** Primary page ink — card-face text. */
+        ink: cssVar("--ink-1"),
+        /** Structural neutral — root/dir card fill and borders. */
+        neutral: cssVar("--baseline"),
+      };
     },
   };
 }

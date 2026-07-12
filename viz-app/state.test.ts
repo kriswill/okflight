@@ -110,16 +110,6 @@ describe("selection", () => {
     expect(s.cardsIndexDoc).toBeNull();
   });
 
-  test("themeDark tracks the picked theme, not the OS scheme", () => {
-    const s = createVizState(model());
-    s.systemSchemeChanged(false); // light OS…
-    s.setTheme(1); // …but the dark theme picked via the toggle
-    expect(s.dark).toBe(false);
-    expect(s.themeDark).toBe(true);
-    s.setTheme(0);
-    expect(s.themeDark).toBe(false);
-  });
-
   test("hideIndexPanel dismisses until the next navigation", () => {
     const s = createVizState(model());
     s.setViewMode("cards");
@@ -625,6 +615,18 @@ describe("theme toggle", () => {
     const s = createVizState(model());
     expect(s.themeIndex).toBe(0);
     expect(rootVar("--page")).toBe(""); // no inline override until a pick
+  });
+
+  test("theme() serves the cards' ink/neutral from the applied stop's vars", () => {
+    const s = createVizState(model());
+    s.systemSchemeChanged(false); // light OS…
+    s.setTheme(1); // …dark theme picked: values come from THEMES[1], not the scheme
+    expect(s.dark).toBe(false);
+    expect(s.theme().ink).toBe("#ffffff");
+    expect(s.theme().neutral).toBe("#383835");
+    s.setTheme(0);
+    expect(s.theme().ink).toBe("#0b0b0b");
+    expect(s.theme().neutral).toBe("#c0bfb2");
   });
 
   test("setTheme applies inline vars, persists, and bumps the palette", () => {

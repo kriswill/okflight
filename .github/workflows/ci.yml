@@ -1,0 +1,44 @@
+# Nix CI: `nix flake check` builds the okf package and runs the unit-test
+# check, pushing everything built to the account's private FlakeHub cache
+# (pulled back by later runs, by kriswill/dotfiles CI — which consumes okf
+# as a flake input — and by the machines via `determinate-nixd login`).
+#
+# Both platforms dotfiles actually consumes okf on: x86_64-linux (nebula)
+# and aarch64-darwin (the Macs; macos-latest is arm64). Free on public
+# repos, macOS included.
+#
+# Auth is the job's OIDC JWT (`id-token: write`) — the cache is
+# account-scoped, so no secret and no per-repo registration exist. Fork
+# PRs get no id-token: they build fine, only the cache push is skipped.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # the FlakeHub Cache credential
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  nix:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: DeterminateSystems/determinate-nix-action@v3
+
+      - uses: DeterminateSystems/flakehub-cache-action@main
+
+      - run: nix flake check -L

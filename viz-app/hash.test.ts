@@ -36,6 +36,7 @@ describe("encodeViewHash", () => {
     q: "",
     isolate: 0 as const,
     facets: {},
+    view: "graph" as const,
     ...o,
   });
 

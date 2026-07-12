@@ -9,7 +9,7 @@
   import Card from "./Card.svelte";
   import { fitZoom, type ArrowSpec, type CardLayout, type CardPlacement } from "./cardLayout";
   import ElbowArrow from "./ElbowArrow.svelte";
-  import { pickCard } from "./picking";
+  import { pickCard3, type PickItem } from "./picking";
 
   const { viz, layout }: { viz: VizState; layout: CardLayout } = $props();
 
@@ -76,6 +76,18 @@
     const c = layout.byId[id];
     return !!c && (c.kind === "card" || c.kind === "dir");
   };
+  // Flat identity poses until the motion store owns live transforms.
+  const pickItems: PickItem[] = $derived(
+    layout.cards.map((c) => ({
+      id: c.id,
+      kind: c.kind,
+      pos: new THREE.Vector3(c.x, c.y, c.z),
+      quat: new THREE.Quaternion(),
+      w: c.w,
+      h: c.h,
+      opacity: 1,
+    })),
+  );
   $effect(() => {
     const el = renderer.domElement;
     const ndc = (e: PointerEvent) => {
@@ -84,13 +96,13 @@
     };
     const move = (e: PointerEvent) => {
       if (!cam) return;
-      const id = pickCard(ndc(e), cam, layout);
+      const id = pickCard3(ndc(e), cam, pickItems);
       hovered = id && clickable(id) ? id : null;
       el.style.cursor = hovered ? "pointer" : "default";
     };
     const up = (e: PointerEvent) => {
       if (!cam || e.button !== 0) return;
-      const id = pickCard(ndc(e), cam, layout);
+      const id = pickCard3(ndc(e), cam, pickItems);
       if (!id) {
         viz.clearSelection();
         return;

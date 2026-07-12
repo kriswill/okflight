@@ -43,7 +43,7 @@
   import { tubeGradient } from "./arrowFrame";
   import Card from "./Card.svelte";
   import { inkFor } from "./cardFace";
-  import { BAND_X, BAND_Y, fitZoom, type CardLayout } from "./cardLayout";
+  import { BAND_X, BAND_Y, fitView, type CardLayout } from "./cardLayout";
   import { cylPose } from "./cylinder";
   import ElbowArrow from "./ElbowArrow.svelte";
   import { createCardMotion, type ArrowState } from "./motion.svelte";
@@ -125,8 +125,8 @@
   const applyCamera = () => {
     if (!cam) return;
     const v = motion.view;
-    cam.position.set(EYE.x + v.shift, EYE.y, EYE.z);
-    cam.lookAt(v.shift, 0, 0);
+    cam.position.set(EYE.x + v.cx, EYE.y + v.cy, EYE.z);
+    cam.lookAt(v.cx, v.cy, 0);
     cam.zoom = v.zoom;
     cam.updateProjectionMatrix();
   };
@@ -192,19 +192,22 @@
   const rightInset = $derived(viz.sel.kind !== "none" || viz.cardsIndexDoc ? viz.panelPx($size.width) : 0);
   const stageW = $derived(Math.max(160, $size.width - SIDEBAR_W - rightInset));
   const stageH = $derived(Math.max(160, $size.height - 48));
-  const zoomTarget = $derived(fitZoom(layout.bounds, stageW, stageH, viz.cardFlow));
-  const shiftTarget = $derived.by(() => {
-    const z = zoomTarget;
-    return (rightInset - SIDEBAR_W) / 2 / z;
-  });
+  const fit = $derived(fitView(layout.bounds, stageW, stageH, viz.cardFlow));
+  // Look-at center: the panel inset rides screen-x; the occupied-extent
+  // cross center rides whichever world axis the rings extend along, so a
+  // one-sided node balances instead of hugging the stage center.
+  const cxTarget = $derived(
+    (rightInset - SIDEBAR_W) / 2 / fit.zoom + (viz.cardFlow === "h" ? fit.cross : 0),
+  );
+  const cyTarget = $derived(viz.cardFlow === "v" ? fit.cross : 0);
   // The visible half-extent along the band axis (world units at the target
   // zoom): the motion store fades cards out BEFORE the screen edge and
   // surfaces the hidden remainder as overflow chips.
   const halfBandTarget = $derived(
-    ((viz.cardFlow === "v" ? stageW : stageH) / 2 - 24) / zoomTarget,
+    ((viz.cardFlow === "v" ? stageW : stageH) / 2 - 24) / fit.zoom,
   );
   $effect(() => {
-    motion.setViewTargets(zoomTarget, shiftTarget);
+    motion.setViewTargets(fit.zoom, cxTarget, cyTarget);
     motion.setWindow(halfBandTarget);
     if (motion.settled) {
       applyFrame(true);

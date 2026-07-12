@@ -276,6 +276,14 @@ try {
   l = (await layout(page))!;
   check("mega-hub keeps every in-link on one scrollable band (no grid)", l.cards.filter((c) => c.lane === "in" && c.ring === 1).length === 29);
   check("focus keeps full scale on the mega-hub (zoom pinned at 1)", (await okf(page, "window.__okf.cards.zoom")) === 1);
+  check(
+    "one-sided layout rebalances: focus rides below stage center (all links above, none below)",
+    await page.evaluate(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const p = (window as any).__okf.cards.project("services/core-platform");
+      return p.y > 900 / 2 + 40;
+    }),
+  );
   type Ovf = { lane: string; dir: number; count: number }[];
   const ovf = await okf<Ovf>(page, "window.__okf.cards.overflow");
   const neg0 = ovf.find((o) => o.lane === "in" && o.dir === -1)?.count ?? 0;

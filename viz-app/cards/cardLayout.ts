@@ -483,23 +483,32 @@ export function layoutCards(g: CardGraph, opts?: { flow?: CardFlow }): CardLayou
  *  last band card on screen (long bands are explored by scrolling). */
 export const ZOOM_MIN = 0.6;
 
-/** Ortho zoom fitting the layout's CROSS-axis symmetric envelope
- *  (origin-centered, so the focus card stays centered) into the viewport;
- *  clamped to [ZOOM_MIN, 1]. The band axis never participates — it is
+export interface FitView {
+  zoom: number;
+  /** World cross-axis center of the occupied extent — where the camera
+   *  should look. 0 keeps the focus centered; a one-sided layout (a node
+   *  with links in only one direction) shifts it toward the occupied side
+   *  so the visualization balances instead of leaving half the stage empty. */
+  cross: number;
+}
+
+/** Fit the layout's CROSS-axis extent (ring count) into the viewport;
+ *  zoom clamped to [ZOOM_MIN, 1]. The band axis never participates — it is
  *  scrollable, so a longer band must not shrink the cards: the focus keeps
  *  its scale and off-window cards fade behind the overflow indicators. */
-export function fitZoom(
+export function fitView(
   b: CardLayout["bounds"],
   vw: number,
   vh: number,
   flow: CardFlow = "v",
   pad = 0.85,
-): number {
-  const cross =
-    flow === "v"
-      ? 2 * Math.max(Math.abs(b.minY), Math.abs(b.maxY))
-      : 2 * Math.max(Math.abs(b.minX), Math.abs(b.maxX));
+): FitView {
+  const [lo, hi] = flow === "v" ? [b.minY, b.maxY] : [b.minX, b.maxX];
+  const extent = hi - lo;
   const avail = flow === "v" ? vh : vw;
-  if (!(cross > 0)) return 1;
-  return Math.min(1, Math.max(ZOOM_MIN, (pad * avail) / cross));
+  if (!(extent > 0)) return { zoom: 1, cross: 0 };
+  return {
+    zoom: Math.min(1, Math.max(ZOOM_MIN, (pad * avail) / extent)),
+    cross: (lo + hi) / 2,
+  };
 }

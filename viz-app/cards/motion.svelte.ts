@@ -128,8 +128,12 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
   // the band.
   let fadeStart = FADE_START;
   let fadeEnd = FADE_END;
-  const view = { zoom: 1, shift: 0 };
-  let viewTarget: { zoom: number; shift: number } | null = null;
+  // Camera state: zoom plus a world-space look-at center. cx composes the
+  // panel inset with the h-flow occupied-extent center; cy carries the
+  // v-flow one — refocusing onto a one-sided node glides the view toward
+  // its occupied side instead of pinning the focus to the stage center.
+  const view = { zoom: 1, cx: 0, cy: 0 };
+  let viewTarget: { zoom: number; cx: number; cy: number } | null = null;
   let viewSeeded = false;
 
   const bandOf = (x: number, y: number) => (flow === "v" ? x : y);
@@ -374,7 +378,10 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
   };
 
   const viewAtTarget = () =>
-    !viewTarget || (Math.abs(view.zoom - viewTarget.zoom) < 1e-4 && Math.abs(view.shift - viewTarget.shift) < 0.1);
+    !viewTarget ||
+    (Math.abs(view.zoom - viewTarget.zoom) < 1e-4 &&
+      Math.abs(view.cx - viewTarget.cx) < 0.1 &&
+      Math.abs(view.cy - viewTarget.cy) < 0.1);
 
   const updateSettled = () => {
     settled = !spec && viewAtTarget();
@@ -413,10 +420,12 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
     if (viewTarget && !viewAtTarget()) {
       const k = 1 - Math.exp(-dtMs / VIEW_TAU_MS);
       view.zoom += (viewTarget.zoom - view.zoom) * k;
-      view.shift += (viewTarget.shift - view.shift) * k;
+      view.cx += (viewTarget.cx - view.cx) * k;
+      view.cy += (viewTarget.cy - view.cy) * k;
       if (viewAtTarget()) {
         view.zoom = viewTarget.zoom;
-        view.shift = viewTarget.shift;
+        view.cx = viewTarget.cx;
+        view.cy = viewTarget.cy;
       }
     }
     updateSettled();
@@ -524,11 +533,12 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
 
     step,
 
-    setViewTargets(zoom: number, shift: number) {
-      viewTarget = { zoom, shift };
+    setViewTargets(zoom: number, cx: number, cy: number) {
+      viewTarget = { zoom, cx, cy };
       if (!viewSeeded || reduced()) {
         view.zoom = zoom;
-        view.shift = shift;
+        view.cx = cx;
+        view.cy = cy;
         viewSeeded = true;
       }
       updateSettled();

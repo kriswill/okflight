@@ -1,7 +1,7 @@
 // The card view's TDD core: cardGraph picks and classifies neighbors
 // (directional flow — in-links above, out-links below, ring 2 continues the
 // same direction outward), layoutCards turns that into deterministic world
-// placements + elbow arrows, fitZoom fits the ortho camera. The e2e script
+// placements + elbow arrows, fitView fits/centers the ortho camera. The e2e
 // asserts against exactly these outputs via window.__okf.cards.
 import { describe, expect, test } from "bun:test";
 import type { ConceptNode } from "../data";
@@ -16,7 +16,7 @@ import {
   FOCUS_H,
   FOCUS_W,
   FOCUS_Z,
-  fitZoom,
+  fitView,
   GAP_X,
   GAP_Y,
   ZOOM_MIN,
@@ -512,38 +512,51 @@ describe("bundleCardGraph", () => {
   });
 });
 
-// Zoom is driven by the CROSS axis alone (ring count): the band axis is
-// scrollable, so its length must never shrink the cards — the focus keeps
-// its scale no matter how many cards ride the scroll.
-describe("fitZoom", () => {
+// The view fits the CROSS axis alone (ring count): the band axis is
+// scrollable, so its length must never shrink the cards. And it centers on
+// the OCCUPIED cross extent, not the focus — a node with links on only one
+// side balances the visualization instead of leaving half the stage empty.
+describe("fitView", () => {
   const bounds = { minX: -3000, maxX: 3000, minY: -100, maxY: 100 };
 
   test("vertical flow fits the vertical (cross) extent; band length is ignored", () => {
-    // Cross envelope 200 in a 400-high viewport: 400/200 -> clamped to 1,
-    // despite a 6000-wide band.
-    expect(fitZoom(bounds, 450, 400, "v", 1)).toBe(1);
+    // Cross extent 200 in a 400-high viewport -> clamped to 1, despite a
+    // 6000-wide band.
+    expect(fitView(bounds, 450, 400, "v", 1).zoom).toBe(1);
     // Cross 800 in a 400-high viewport: 0.5 -> clamped to ZOOM_MIN.
-    expect(fitZoom({ ...bounds, minY: -400, maxY: 400 }, 450, 400, "v", 1)).toBe(ZOOM_MIN);
+    expect(fitView({ ...bounds, minY: -400, maxY: 400 }, 450, 400, "v", 1).zoom).toBe(ZOOM_MIN);
     // Cross 500 in a 400-high viewport: 0.8.
-    expect(fitZoom({ ...bounds, minY: -250, maxY: 250 }, 450, 400, "v", 1)).toBeCloseTo(0.8);
+    expect(fitView({ ...bounds, minY: -250, maxY: 250 }, 450, 400, "v", 1).zoom).toBeCloseTo(0.8);
   });
 
   test("horizontal flow fits the horizontal (cross) extent instead", () => {
     const b = { minX: -250, maxX: 250, minY: -3000, maxY: 3000 };
-    expect(fitZoom(b, 400, 300, "h", 1)).toBeCloseTo(0.8);
-    expect(fitZoom(b, 800, 300, "h", 1)).toBe(1);
+    expect(fitView(b, 400, 300, "h", 1).zoom).toBeCloseTo(0.8);
+    expect(fitView(b, 800, 300, "h", 1).zoom).toBe(1);
   });
 
-  test("fits the symmetric envelope so the origin stays centered", () => {
-    // Asymmetric cross: envelope doubles the far side (|maxY|=250 -> 500).
-    const asym = { minX: 0, maxX: 0, minY: -50, maxY: 250 };
-    expect(fitZoom(asym, 450, 400, "v", 1)).toBeCloseTo(0.8);
+  test("one-sided layouts rebalance: cross centers on the occupied midpoint", () => {
+    // No out-links (v-flow): everything sits above the focus.
+    const oneSided = { minX: -3000, maxX: 3000, minY: -48, maxY: 382 };
+    expect(fitView(oneSided, 800, 852, "v", 1).cross).toBeCloseTo(167);
+    // Symmetric layouts keep the focus dead center.
+    expect(fitView({ minX: 0, maxX: 0, minY: -212, maxY: 212 }, 800, 852, "v", 1).cross).toBe(0);
+    // h-flow: the cross is x.
+    expect(fitView({ minX: -710, maxX: 115, minY: 0, maxY: 0 }, 800, 852, "h", 1).cross).toBeCloseTo(-297.5);
   });
 
-  test("pad shrinks proportionally; never below ZOOM_MIN; degenerate bounds -> 1", () => {
-    expect(fitZoom({ ...bounds, minY: -250, maxY: 250 }, 450, 400, "v", 0.9)).toBeCloseTo(0.72);
+  test("asymmetric extents fit as-is — no symmetric doubling", () => {
+    const asym = { minX: 0, maxX: 0, minY: -50, maxY: 250 }; // extent 300
+    expect(fitView(asym, 450, 400, "v", 1).zoom).toBe(1);
+    expect(fitView({ minX: 0, maxX: 0, minY: -50, maxY: 550 }, 450, 400, "v", 1).zoom).toBeCloseTo(400 / 600);
+  });
+
+  test("pad shrinks proportionally; never below ZOOM_MIN; degenerate bounds -> centered 1", () => {
+    expect(fitView({ ...bounds, minY: -250, maxY: 250 }, 450, 400, "v", 0.9).zoom).toBeCloseTo(0.72);
     expect(ZOOM_MIN).toBeGreaterThanOrEqual(0.5);
-    expect(fitZoom({ ...bounds, minY: -2000, maxY: 2000 }, 800, 600, "v", 0.85)).toBe(ZOOM_MIN);
-    expect(fitZoom({ minX: 0, maxX: 0, minY: 0, maxY: 0 }, 800, 600, "v", 0.85)).toBe(1);
+    expect(fitView({ ...bounds, minY: -2000, maxY: 2000 }, 800, 600, "v", 0.85).zoom).toBe(ZOOM_MIN);
+    const degenerate = fitView({ minX: 0, maxX: 0, minY: 0, maxY: 0 }, 800, 600, "v", 0.85);
+    expect(degenerate.zoom).toBe(1);
+    expect(degenerate.cross).toBe(0);
   });
 });

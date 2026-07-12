@@ -410,24 +410,32 @@ describe("view tween", () => {
   test("first targets seed instantly; later ones ease exponentially and snap", () => {
     const m = createCardMotion({ reducedMotion: () => false });
     m.setLayout(layoutF());
-    m.setViewTargets(0.5, -100);
+    m.setViewTargets(0.5, -100, 40);
     close(m.view.zoom, 0.5);
+    close(m.view.cx, -100);
+    close(m.view.cy, 40);
     expect(m.settled).toBe(true);
-    m.setViewTargets(1, 0);
+    m.setViewTargets(1, 0, 0);
     expect(m.settled).toBe(false);
     m.step(90);
     close(m.view.zoom, 0.5 + 0.5 * (1 - Math.exp(-1)), 1e-6);
+    close(m.view.cx, -100 * Math.exp(-1), 1e-6);
+    close(m.view.cy, 40 * Math.exp(-1), 1e-6);
     for (let i = 0; i < 200; i++) m.step(90);
     close(m.view.zoom, 1);
+    close(m.view.cx, 0);
+    close(m.view.cy, 0);
     expect(m.settled).toBe(true);
   });
 
   test("reduced motion snaps view targets", () => {
     const m = createCardMotion({ reducedMotion: () => true });
     m.setLayout(layoutF());
-    m.setViewTargets(0.5, -100);
-    m.setViewTargets(0.8, -50);
+    m.setViewTargets(0.5, -100, 0);
+    m.setViewTargets(0.8, -50, 20);
     close(m.view.zoom, 0.8);
+    close(m.view.cx, -50);
+    close(m.view.cy, 20);
     expect(m.settled).toBe(true);
   });
 });

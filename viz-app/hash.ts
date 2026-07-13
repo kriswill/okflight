@@ -69,7 +69,12 @@ export function encodeViewHash(view: ViewState): string {
   // Type names contain no ','; the registry (okf-profile.md) keeps it that way.
   if (view.filters.hidden.length) p.set("hide", [...view.filters.hidden].sort().join(","));
   if (view.filters.q) p.set("q", view.filters.q);
-  if ((view.sel.kind === "concept" || view.sel.kind === "bundle") && view.filters.isolate)
+  // Depth is meaningful for concept/bundle anchors, and for ANY cards-view
+  // state (the layout's ring count) — but not for an unanchored graph.
+  if (
+    (view.sel.kind === "concept" || view.sel.kind === "bundle" || view.filters.view === "cards") &&
+    view.filters.isolate
+  )
     p.set("isolate", String(view.filters.isolate));
   if (view.filters.view === "cards") p.set("view", "cards");
   if (view.filters.flow === "h") p.set("flow", "h");
@@ -88,7 +93,10 @@ export function decodeHash(raw: string, model: HashModel): Selection {
   if (h.startsWith("c/") && model.byId[h.slice(2)]) return { kind: "concept", id: h.slice(2) };
   if (h.startsWith("f/") && model.files[h.slice(2)]) return { kind: "file", path: h.slice(2) };
   if (h.startsWith("d/") && model.dirs[h.slice(2)]) return { kind: "dir", path: h.slice(2) };
-  if (h.startsWith("b/") && model.bundles?.[h.slice(2)]) return { kind: "bundle", path: h.slice(2) };
+  // hasOwn, not truthiness: inherited keys ("constructor", "__proto__")
+  // must never validate as bundles.
+  if (h.startsWith("b/") && model.bundles && Object.hasOwn(model.bundles, h.slice(2)))
+    return { kind: "bundle", path: h.slice(2) };
   return { kind: "none" };
 }
 
@@ -100,9 +108,16 @@ export function decodeViewHash(raw: string, model: HashModel): ViewState {
   const hide = p.get("hide");
   const hidden = hide ? hide.split(",").filter((t) => t && (!model.typeCounts || t in model.typeCounts)) : [];
   const q = p.get("q") ?? "";
+  const view: "graph" | "cards" = p.get("view") === "cards" ? "cards" : "graph";
   const iv = p.get("isolate");
   const isolate: 0 | 1 | 2 =
-    sel.kind !== "concept" && sel.kind !== "bundle" ? 0 : iv === "1" ? 1 : iv === "2" ? 2 : 0;
+    sel.kind !== "concept" && sel.kind !== "bundle" && view !== "cards"
+      ? 0
+      : iv === "1"
+        ? 1
+        : iv === "2"
+          ? 2
+          : 0;
   const facets: Record<string, string> = {};
   for (const f of model.facets ?? []) {
     // Legacy alias: pre-facets links used `os=`. Read it only for a facet
@@ -111,7 +126,6 @@ export function decodeViewHash(raw: string, model: HashModel): ViewState {
     const v = p.get(f.name) ?? (f.name === "platform" && !p.has("platform") ? p.get("os") : null);
     facets[f.name] = v && f.values.includes(v) ? v : "all";
   }
-  const view: "graph" | "cards" = p.get("view") === "cards" ? "cards" : "graph";
   const flow: "v" | "h" = p.get("flow") === "h" ? "h" : "v";
   return { sel, filters: { hidden, q, isolate, facets, view, flow } };
 }

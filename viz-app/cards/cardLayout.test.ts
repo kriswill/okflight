@@ -19,7 +19,6 @@ import {
   fitView,
   GAP_X,
   GAP_Y,
-  ZOOM_MIN,
   bundleCardGraph,
   layoutCards,
   rootCardGraph,
@@ -459,8 +458,10 @@ describe("bundleCardGraph", () => {
       cfg: cfg(),
     });
 
-  test("unknown bundle -> null", () => {
+  test("unknown bundle -> null; inherited prototype keys too", () => {
     expect(bundleCardGraph(bModel(), "ghost", 1, all)).toBeNull();
+    expect(bundleCardGraph(bModel(), "constructor", 1, all)).toBeNull();
+    expect(bundleCardGraph(bModel(), "toString", 1, all)).toBeNull();
   });
 
   test("bundle focus: root card above, authored links below with kinds", () => {
@@ -523,8 +524,10 @@ describe("fitView", () => {
     // Cross extent 200 in a 400-high viewport -> clamped to 1, despite a
     // 6000-wide band.
     expect(fitView(bounds, 450, 400, "v", 1).zoom).toBe(1);
-    // Cross 800 in a 400-high viewport: 0.5 -> clamped to ZOOM_MIN.
-    expect(fitView({ ...bounds, minY: -400, maxY: 400 }, 450, 400, "v", 1).zoom).toBe(ZOOM_MIN);
+    // Cross 800 in a 400-high viewport: 0.5 — BELOW the old readability
+    // floor, because the ring axis has no scroll/overflow affordance: a
+    // clipped, unreachable row is worse than smaller cards.
+    expect(fitView({ ...bounds, minY: -400, maxY: 400 }, 450, 400, "v", 1).zoom).toBeCloseTo(0.5);
     // Cross 500 in a 400-high viewport: 0.8.
     expect(fitView({ ...bounds, minY: -250, maxY: 250 }, 450, 400, "v", 1).zoom).toBeCloseTo(0.8);
   });
@@ -551,10 +554,11 @@ describe("fitView", () => {
     expect(fitView({ minX: 0, maxX: 0, minY: -50, maxY: 550 }, 450, 400, "v", 1).zoom).toBeCloseTo(400 / 600);
   });
 
-  test("pad shrinks proportionally; never below ZOOM_MIN; degenerate bounds -> centered 1", () => {
+  test("pad shrinks proportionally; the whole cross always fits; degenerate bounds -> centered 1", () => {
     expect(fitView({ ...bounds, minY: -250, maxY: 250 }, 450, 400, "v", 0.9).zoom).toBeCloseTo(0.72);
-    expect(ZOOM_MIN).toBeGreaterThanOrEqual(0.5);
-    expect(fitView({ ...bounds, minY: -2000, maxY: 2000 }, 800, 600, "v", 0.85).zoom).toBe(ZOOM_MIN);
+    // The cross extent is bounded by the ring design (never more than two
+    // rings), so the fit shrinks as far as it must — nothing is clipped.
+    expect(fitView({ ...bounds, minY: -2000, maxY: 2000 }, 800, 600, "v", 0.85).zoom).toBeCloseTo(0.1275);
     const degenerate = fitView({ minX: 0, maxX: 0, minY: 0, maxY: 0 }, 800, 600, "v", 0.85);
     expect(degenerate.zoom).toBe(1);
     expect(degenerate.cross).toBe(0);

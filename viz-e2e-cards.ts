@@ -167,6 +167,29 @@ try {
   l = (await layout(page))!;
   check("clicking the root in-card returns to the root focus", l.rootFocus === true);
 
+  console.log("2c. the root FOCUS card is inert — clicking it must not reset the hops");
+  await page.evaluate(() => {
+    const two = [...document.querySelectorAll("#isolate .seg")].find((b) => b.textContent!.trim() === "2-hop");
+    (two as HTMLElement).click();
+  });
+  await settleMotion(page);
+  l = (await layout(page))!;
+  const ring2Count = l.cards.filter((c) => c.ring === 2).length;
+  check("root focus honors 2-hop", ring2Count > 0);
+  const rootPx = await okf<{ x: number; y: number }>(page, 'window.__okf.cards.project("")');
+  await page.mouse.click(rootPx.x, rootPx.y);
+  await settleMotion(page);
+  l = (await layout(page))!;
+  check(
+    "focus-card click is a no-op (the falsy \"\" id must not route to clearSelection)",
+    l.rootFocus === true && l.cards.filter((c) => c.ring === 2).length === ring2Count,
+  );
+  await page.evaluate(() => {
+    const off = [...document.querySelectorAll("#isolate .seg")].find((b) => b.textContent!.trim() === "off");
+    (off as HTMLElement).click();
+  });
+  await settleMotion(page);
+
   console.log("3. focused layout: directional ring 1 (animated refocus)");
   const animatedDuringRefocus = await page.evaluate(
     () =>
@@ -276,6 +299,42 @@ try {
   l = (await layout(page))!;
   check("mega-hub keeps every in-link on one scrollable band (no grid)", l.cards.filter((c) => c.lane === "in" && c.ring === 1).length === 29);
   check("focus keeps full scale on the mega-hub (zoom pinned at 1)", (await okf(page, "window.__okf.cards.zoom")) === 1);
+  const faces0 = await okf<number>(page, "window.__okf.cards.faceCount");
+  check("face textures are lazy: only window cards are textured on a hub", faces0 > 0 && faces0 <= 12, `faces=${faces0} of ${l.cards.length}`);
+  await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window as any).__okf.cards.scrollBy("in", 1e9); // slam to the far end
+  });
+  const facesEnd = await okf<number>(page, "window.__okf.cards.faceCount");
+  check(
+    "textures release behind the scroll (hysteresis keeps the count bounded)",
+    facesEnd > 0 && facesEnd <= 16,
+    `faces=${facesEnd}`,
+  );
+  await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cards = (window as any).__okf.cards;
+    cards.scrollBy("in", -cards.scroll.in); // back to dead center
+  });
+  const chipPx = await okf<{ lane: string; dir: number; x: number; y: number }[]>(
+    page,
+    "window.__okf.cards.chips()",
+  );
+  const posChip = chipPx.find((c) => c.lane === "in" && c.dir === 1)!;
+  await page.mouse.click(posChip.x, posChip.y);
+  await settle(page);
+  const scrollAfterChip = await okf<{ in: number }>(page, "window.__okf.cards.scroll");
+  l = (await layout(page))!;
+  check(
+    "clicking an overflow chip pages the band and never resets the navigation",
+    scrollAfterChip.in > 0 && l.focusId === "services/core-platform",
+    JSON.stringify(scrollAfterChip),
+  );
+  await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cards = (window as any).__okf.cards;
+    cards.scrollBy("in", -cards.scroll.in);
+  });
   check(
     "one-sided layout rebalances: focus rides below stage center (all links above, none below)",
     await page.evaluate(() => {

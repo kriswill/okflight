@@ -51,8 +51,13 @@
   $effect(() => {
     const h = encodeViewHash({
       // Bundle focus is a navigation without a details panel: viz.sel stays
-      // "none", so compose the encoded selection from cardsBundle here.
-      sel: viz.cardsBundle ? { kind: "bundle", path: viz.cardsBundle } : viz.sel,
+      // "none", so compose the encoded selection from cardsBundle — but a
+      // live selection (a file/dir panel opened over the bundle) is what
+      // the user is looking at and must win the URL.
+      sel:
+        viz.sel.kind === "none" && viz.cardsBundle
+          ? { kind: "bundle", path: viz.cardsBundle }
+          : viz.sel,
       filters: {
         hidden: [...viz.hidden],
         q: viz.query,

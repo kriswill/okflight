@@ -93,7 +93,8 @@ describe("App hash handling", () => {
     mountApp(viz);
     viz.focusBundle("notes");
     flushSync();
-    expect(location.hash).toBe("#b/notes");
+    // focusBundle enters the cards view, and the hash carries both.
+    expect(location.hash).toBe("#b/notes?view=cards");
     // A bundle navigation replaces a concept one on Back.
     location.hash = "#c/wiki/architecture";
     window.dispatchEvent(new Event("hashchange"));
@@ -104,6 +105,19 @@ describe("App hash handling", () => {
     flushSync();
     expect(viz.cardsBundle).toBe("notes");
     expect(viz.sel).toEqual({ kind: "none" });
+  });
+
+  test("a selection made over a bundle focus wins the URL", () => {
+    const viz = createVizState(model());
+    mountApp(viz);
+    viz.focusBundle("notes");
+    flushSync();
+    viz.selectFile("docs/50%.md");
+    flushSync();
+    // The file panel is what the user is looking at — share/back must
+    // reproduce it, not the bundle layout still underneath.
+    expect(location.hash).toBe("#f/docs/50%25.md?view=cards");
+    expect(viz.cardsBundle).toBe("notes");
   });
 });
 

@@ -149,12 +149,13 @@ function childLinks(
       .sort(byTitle(model))
       .map((id) => ({ id, kind: "card" as const }));
   if (e.kind === "dir")
-    return (model.bundles[e.id]?.links ?? []).flatMap((l): { id: string; kind: "card" | "dir" }[] =>
-      l.kind === "concept"
-        ? ok(l.id)
-          ? [{ id: l.id, kind: "card" }]
-          : []
-        : [{ id: l.path, kind: "dir" }],
+    return ((Object.hasOwn(model.bundles, e.id) && model.bundles[e.id]?.links) || []).flatMap(
+      (l): { id: string; kind: "card" | "dir" }[] =>
+        l.kind === "concept"
+          ? ok(l.id)
+            ? [{ id: l.id, kind: "card" }]
+            : []
+          : [{ id: l.path, kind: "dir" }],
     );
   return [];
 }
@@ -198,7 +199,8 @@ export function bundleCardGraph(
   depth: 1 | 2,
   visible: (n: ConceptNode) => boolean,
 ): CardGraph | null {
-  const doc = model.bundles[path];
+  // hasOwn: inherited keys ("constructor") must not resolve as bundles.
+  const doc = Object.hasOwn(model.bundles, path) ? model.bundles[path] : undefined;
   if (!doc) return null;
   const ok = (id: string) => !!model.byId[id] && visible(model.byId[id]!);
   // Nearest ancestor with an embedded index: an enclosing bundle, else the
@@ -207,7 +209,7 @@ export function bundleCardGraph(
     let up = p;
     while (up.includes("/")) {
       up = up.slice(0, up.lastIndexOf("/"));
-      if (model.bundles[up]) return { id: up, kind: "dir", twoWay: false };
+      if (Object.hasOwn(model.bundles, up)) return { id: up, kind: "dir", twoWay: false };
     }
     return model.root ? { id: "", kind: "root", twoWay: false } : null;
   };
@@ -479,10 +481,6 @@ export function layoutCards(g: CardGraph, opts?: { flow?: CardFlow }): CardLayou
   return { focusId: g.focusId, rootFocus: g.root, cards, arrows, byId, bounds };
 }
 
-/** Card scale never drops below this: readable cards beat fitting every
- *  last band card on screen (long bands are explored by scrolling). */
-export const ZOOM_MIN = 0.6;
-
 export interface FitView {
   zoom: number;
   /** World cross-axis center of the occupied extent — where the camera
@@ -493,9 +491,13 @@ export interface FitView {
 }
 
 /** Fit the layout's CROSS-axis extent (ring count) into the viewport;
- *  zoom clamped to [ZOOM_MIN, 1]. The band axis never participates — it is
+ *  zoom clamped to at most 1. The band axis never participates — it is
  *  scrollable, so a longer band must not shrink the cards: the focus keeps
- *  its scale and off-window cards fade behind the overflow indicators. */
+ *  its scale and off-window cards fade behind the overflow indicators.
+ *  There is deliberately NO lower zoom floor: the ring axis has no
+ *  scroll or overflow affordance, so the whole cross extent (bounded by
+ *  the two-ring design) must always fit — a clipped, unreachable row is
+ *  worse than smaller cards on a short viewport. */
 export function fitView(
   b: CardLayout["bounds"],
   vw: number,
@@ -508,7 +510,7 @@ export function fitView(
   const avail = flow === "v" ? vh : vw;
   if (!(extent > 0)) return { zoom: 1, cross: 0 };
   return {
-    zoom: Math.min(1, Math.max(ZOOM_MIN, (pad * avail) / extent)),
+    zoom: Math.min(1, (pad * avail) / extent),
     cross: (lo + hi) / 2,
   };
 }

@@ -47,11 +47,26 @@ describe("bundle selection", () => {
     expect(decodeHash("b/notes", { ...model, bundles: undefined })).toEqual({ kind: "none" });
   });
 
+  test("inherited Object.prototype keys never decode as bundles", () => {
+    for (const k of ["constructor", "toString", "hasOwnProperty", "__proto__"]) {
+      expect(decodeHash("b/" + k, model)).toEqual({ kind: "none" });
+    }
+  });
+
   test("isolate rides behind '?' for a bundle selection too", () => {
     expect(encodeViewHash({ sel: { kind: "bundle", path: "notes" }, filters: { ...f, isolate: 2 } })).toBe(
       "b/notes?isolate=2&view=cards",
     );
     expect(decodeViewHash("b/notes?isolate=2", model).filters.isolate).toBe(2);
+  });
+
+  test("isolate rides for the cards view without a selection (root-focus hops)", () => {
+    const none = { kind: "none" } as const;
+    expect(encodeViewHash({ sel: none, filters: { ...f, isolate: 2 } })).toBe("?isolate=2&view=cards");
+    expect(decodeViewHash("?isolate=2&view=cards", model).filters.isolate).toBe(2);
+    // The graph view still drops it: isolation needs an anchor concept.
+    expect(encodeViewHash({ sel: none, filters: { ...f, view: "graph" as const, isolate: 2 } })).toBe("");
+    expect(decodeViewHash("?isolate=2", model).filters.isolate).toBe(0);
   });
 });
 

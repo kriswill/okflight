@@ -94,6 +94,10 @@ describe("gitProvider", () => {
         encoding: "utf8",
         env: {
           ...process.env,
+          // Hermetic: the machine's git config must not leak in — a global
+          // commit.gpgsign, say, makes every commit hang on a signing agent.
+          GIT_CONFIG_GLOBAL: "/dev/null",
+          GIT_CONFIG_NOSYSTEM: "1",
           GIT_AUTHOR_NAME: "t",
           GIT_AUTHOR_EMAIL: "t@t",
           GIT_COMMITTER_NAME: "t",

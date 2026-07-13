@@ -621,10 +621,37 @@ describe("root card data", () => {
         { kind: "dir" as const, path: "notes" },
       ],
     };
-    expect(buildModel({ ...raw, root }).root!.links).toEqual([
+    const bundles = { notes: { title: "Notes", desc: "", links: [] } };
+    expect(buildModel({ ...raw, root, bundles }).root!.links).toEqual([
       { kind: "concept", id: "a" },
       { kind: "dir", path: "notes" },
     ]);
+  });
+
+  test("buildModel drops dir links whose index.md was never embedded", () => {
+    // A hand-written link to a not-yet-created sub-index must not render a
+    // dir card that can't be focused (there is nothing behind it).
+    const root = {
+      title: "kb",
+      desc: "",
+      links: [
+        { kind: "dir" as const, path: "notes" },
+        { kind: "dir" as const, path: "ghost" },
+      ],
+    };
+    const bundles = {
+      notes: {
+        title: "Notes",
+        desc: "",
+        links: [
+          { kind: "dir" as const, path: "ghost" },
+          { kind: "concept" as const, id: "a" },
+        ],
+      },
+    };
+    const m = buildModel({ ...raw, root, bundles });
+    expect(m.root!.links).toEqual([{ kind: "dir", path: "notes" }]);
+    expect(m.bundles["notes"]!.links).toEqual([{ kind: "concept", id: "a" }]);
   });
 });
 
@@ -652,6 +679,7 @@ describe("bundle index data", () => {
           { kind: "dir" as const, path: "notes/deep" },
         ],
       },
+      "notes/deep": { title: "Deep", desc: "", links: [] },
     };
     expect(buildModel({ ...raw, bundles }).bundles["notes"]!.links).toEqual([
       { kind: "concept", id: "b" },

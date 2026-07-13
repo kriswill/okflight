@@ -63,9 +63,11 @@
   function onClick(e: MouseEvent) {
     const t = e.target as Element;
     if (t.closest(".close")) {
-      // Closing an index panel is a dismissal, not a navigation — the cards
-      // focus must not change under the user.
+      // Closing a panel is a dismissal, not a navigation — the cards focus
+      // must not change under the user: the index panel hides in place, and
+      // a file/dir panel over a bundle focus falls back to that bundle.
       if (viz.sel.kind === "none") viz.hideIndexPanel();
+      else if (viz.cardsBundle) viz.dismissSelection();
       else viz.clearSelection();
       return;
     }
@@ -86,7 +88,11 @@
       e.preventDefault();
       const path = ab.dataset.bundle ?? "";
       if (path) viz.focusBundle(path);
-      else viz.clearSelection(); // the root index link -> root focus
+      else {
+        // The root index link: the root card lives in the cards view.
+        viz.setViewMode("cards");
+        viz.clearSelection();
+      }
       return;
     }
     const a = t.closest("a[data-node]") as HTMLElement | null;

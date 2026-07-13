@@ -110,14 +110,16 @@ export function createMd({
         const p = resolveRel(dir, href);
         const nid = conceptOf(p);
         if (nid) return `<a href="#" data-node="${esc(nid)}">${txt}</a>`;
-        if (p && files[p]) return `<a href="#" data-file="${esc(p)}">${txt}</a>`;
-        if (p && dirs[p]) return `<a href="#" data-dir="${esc(p)}">${txt}</a>`;
         // Index docs are reserved (never concepts): a bundle's index.md is a
-        // focus navigation; the root's is the root card ("" path).
+        // focus navigation; the root's is the root card ("" path). Checked
+        // BEFORE the file registry — an index that also got embedded as a
+        // repo file must still navigate, not open the raw source view.
         if (p && p.startsWith(bundlePrefix) && (p.endsWith("/index.md") || p === bundlePrefix + "index.md")) {
           const bid = p === bundlePrefix + "index.md" ? "" : p.slice(bundlePrefix.length, -"/index.md".length);
-          if (bid ? bundles[bid] : root) return `<a href="#" data-bundle="${esc(bid)}">${txt}</a>`;
+          if (bid ? Object.hasOwn(bundles, bid) : root) return `<a href="#" data-bundle="${esc(bid)}">${txt}</a>`;
         }
+        if (p && files[p]) return `<a href="#" data-file="${esc(p)}">${txt}</a>`;
+        if (p && dirs[p]) return `<a href="#" data-dir="${esc(p)}">${txt}</a>`;
         if (/^https?:/.test(href)) return `<a href="${esc(href)}" target="_blank" rel="noopener">${txt}</a>`;
         return `<a title="${esc(href)}">${txt}</a>`;
       });

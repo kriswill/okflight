@@ -77,6 +77,16 @@ describe("selection", () => {
     expect(s.focusedConcept).toBeNull();
     s.focusBundle("ghost");
     expect(s.cardsBundle).toBe("notes");
+    s.focusBundle("constructor"); // inherited prototype keys are not bundles
+    expect(s.cardsBundle).toBe("notes");
+  });
+
+  test("focusBundle enters the cards view — index links navigate from the graph too", () => {
+    const s = createVizState(model());
+    expect(s.viewMode).toBe("graph");
+    s.focusBundle("notes");
+    expect(s.viewMode).toBe("cards");
+    expect(s.cardsBundle).toBe("notes");
   });
 
   test("selecting a concept or clearing leaves bundle focus", () => {
@@ -94,6 +104,17 @@ describe("selection", () => {
     s.focusBundle("notes");
     s.selectFile("flakes/okf/viz.ts");
     expect(s.cardsBundle).toBe("notes");
+  });
+
+  test("dismissSelection closes a panel without navigating away from the bundle", () => {
+    const s = createVizState(model());
+    s.focusBundle("notes");
+    s.setIsolate(2);
+    s.selectFile("flakes/okf/viz.ts");
+    s.dismissSelection();
+    expect(s.sel).toEqual({ kind: "none" });
+    expect(s.cardsBundle).toBe("notes"); // clearSelection would wipe this
+    expect(s.isolateDepth).toBe(2); // …and reset this
   });
 
   test("cardsIndexDoc: the focused index doc, cards view only, no selection open", () => {

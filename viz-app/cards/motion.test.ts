@@ -353,6 +353,40 @@ describe("scroll", () => {
 // The focus card keeps its scale no matter the band length: the visible
 // window derives from the viewport (setWindow), and cards hidden past its
 // edges are surfaced by per-edge overflow chips with counts.
+describe("transition robustness", () => {
+  test("a no-op relayout mid-transition keeps the in-flight arrow tracks", () => {
+    const m = createCardMotion({ reducedMotion: () => false });
+    m.setLayout(layoutF());
+    m.setLayout(layoutA()); // transition starts: f→b becomes an exit arrow
+    const keysMid = m.arrowList.map((a) => a.key).sort();
+    expect(keysMid).toContain("f→b");
+    m.setLayout(layoutA()); // identical re-derive (filter churn, theme flip)
+    expect(m.settled).toBe(false);
+    // The adopt path must NOT rebuild tracks from the next layout alone —
+    // that dropped exit arrows mid-flight and reset shared ones to "enter".
+    expect(m.arrowList.map((a) => a.key).sort()).toEqual(keysMid);
+    for (let i = 0; i < 42; i++) m.step(10);
+    expect(m.arrowList.map((a) => a.key).sort()).toEqual(["a→f", "c→a"]);
+  });
+
+  test("transition start preserves the on-screen opacity of window-faded cards", () => {
+    const m = createCardMotion({ reducedMotion: () => false });
+    m.setLayout(wideLayout());
+    m.setWindow(500);
+    const flat = wideLayout();
+    const id = flat.cards.find((c) => c.ring === 1 && Math.abs(c.x - 464) < 1)!.id;
+    const before = m.sample(id)!.opacity;
+    expect(before).toBeGreaterThan(0);
+    expect(before).toBeLessThan(1); // genuinely mid-ramp
+    m.setLayout(layoutCards(cardGraph(wideModel, "n06", 1, all)!));
+    m.step(1);
+    // Baking the DISPLAY opacity (fade already applied) into the track and
+    // then fading again on reproject squared the fade — a visible dip on
+    // the first frame of every refocus.
+    close(m.sample(id)!.opacity, before, 0.02);
+  });
+});
+
 describe("viewport window & overflow", () => {
   const start = () => {
     const m = createCardMotion({ reducedMotion: () => false });
@@ -370,6 +404,14 @@ describe("viewport window & overflow", () => {
     const limitBefore = m.scrollLimit("in");
     m.setWindow(500);
     expect(m.window.fadeEnd).toBe(500);
+    // Narrow stages keep their fade too: the floor sits far below any real
+    // viewport so cards never hard-clip at a panel edge (chips stay pinned
+    // inside at fadeEnd - 40).
+    m.setWindow(200);
+    expect(m.window.fadeEnd).toBe(200);
+    m.setWindow(50);
+    expect(m.window.fadeEnd).toBe(160);
+    m.setWindow(500);
     expect(m.sample(id696)!.opacity).toBe(0);
     expect(m.sample(id696)!.scale).toBeCloseTo(SCALE_MIN, 6); // aperture follows
     expect(m.scrollLimit("in")).toBeGreaterThan(limitBefore);

@@ -205,7 +205,10 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
         id,
         x: flow === "v" ? s.flatX - sc : s.flatX,
         y: flow === "v" ? s.flatY : s.flatY - sc,
-        opacity: s.opacity,
+        // The track carries the PRE-fade opacity: reproject re-applies the
+        // window fade every sample, so baking the display opacity would
+        // square the fade on the transition's first frame.
+        opacity: s.baseOpacity,
         sx: s.sx,
         sy: s.sy,
         w: s.w,
@@ -484,9 +487,14 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
       if (prevFlat && flow === flowArg && sameLayout(prevFlat, next)) {
         // Same placements re-derived (theme flip, no-op filter churn):
         // adopt the new references without animating or resetting scroll.
+        // With a transition in flight, the in-flight tracks stay — a
+        // rebuild from `next` alone would drop exit arrows mid-fade and
+        // reset shared ones to the enter ramp.
         flat = next;
-        retargetArrows(null, next);
-        if (!spec) computeArrows(1);
+        if (!spec) {
+          retargetArrows(null, next);
+          computeArrows(1);
+        }
         return;
       }
       if (!prevFlat || reduced()) {
@@ -560,7 +568,7 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
      *  the live viewport: the fade ramp ends there, so cards vanish before
      *  the screen edge instead of being clipped by it. */
     setWindow(halfBand: number) {
-      const end = Math.min(FADE_END, Math.max(360, halfBand));
+      const end = Math.min(FADE_END, Math.max(160, halfBand));
       if (end === fadeEnd) return;
       fadeEnd = end;
       fadeStart = Math.max(end - (FADE_END - FADE_START), end / 2);

@@ -107,6 +107,18 @@ describe("inline rendering", () => {
   test("bundle index links resolve to data-bundle (root index -> empty path)", () => {
     const b = createMd({ ...ctx, bundles: { decisions: {}, "decisions/deep": {} }, root: {} });
     expect(b.mdToHtml("[here](index.md)", from)).toBe('<p><a href="#" data-bundle="decisions">here</a></p>');
+    // A bundle index that also got embedded as a repo file still navigates:
+    // the reserved-index route outranks the raw file view.
+    const shadowed = createMd({
+      ...ctx,
+      files: { ...ctx.files, "knowledge/decisions/index.md": {} },
+      bundles: { decisions: {} },
+      root: {},
+      bundleDir: "knowledge",
+    });
+    expect(shadowed.mdToHtml("[here](index.md)", "decisions/foo")).toBe(
+      '<p><a href="#" data-bundle="decisions">here</a></p>',
+    );
     expect(b.mdToHtml("[deep](deep/index.md)", from)).toBe(
       '<p><a href="#" data-bundle="decisions/deep">deep</a></p>',
     );

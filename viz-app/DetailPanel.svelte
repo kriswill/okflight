@@ -86,7 +86,11 @@
       e.preventDefault();
       const path = ab.dataset.bundle ?? "";
       if (path) viz.focusBundle(path);
-      else viz.clearSelection(); // the root index link -> root focus
+      else {
+        // The root index link: the root card lives in the cards view.
+        viz.setViewMode("cards");
+        viz.clearSelection();
+      }
       return;
     }
     const a = t.closest("a[data-node]") as HTMLElement | null;

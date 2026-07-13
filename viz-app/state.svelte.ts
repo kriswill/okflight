@@ -202,10 +202,13 @@ export function createVizState(model: VizModel) {
     get cardsBundle() {
       return cardsBundle;
     },
-    /** Center the cards view on a sub-bundle's index.md (dir card click). */
+    /** Center the cards view on a sub-bundle's index.md (dir card click or
+     *  an index link in any panel — it navigates, so it enters the view
+     *  that can show it). */
     focusBundle(path: string) {
       if (!Object.hasOwn(model.bundles, path)) return;
       cardsBundle = path;
+      viewMode = "cards";
       sel = { kind: "none" };
       lastConceptId = null;
       indexPanelHidden = false;

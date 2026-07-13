@@ -93,7 +93,8 @@ describe("App hash handling", () => {
     mountApp(viz);
     viz.focusBundle("notes");
     flushSync();
-    expect(location.hash).toBe("#b/notes");
+    // focusBundle enters the cards view, and the hash carries both.
+    expect(location.hash).toBe("#b/notes?view=cards");
     // A bundle navigation replaces a concept one on Back.
     location.hash = "#c/wiki/architecture";
     window.dispatchEvent(new Event("hashchange"));

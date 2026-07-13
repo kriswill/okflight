@@ -81,6 +81,14 @@ describe("selection", () => {
     expect(s.cardsBundle).toBe("notes");
   });
 
+  test("focusBundle enters the cards view — index links navigate from the graph too", () => {
+    const s = createVizState(model());
+    expect(s.viewMode).toBe("graph");
+    s.focusBundle("notes");
+    expect(s.viewMode).toBe("cards");
+    expect(s.cardsBundle).toBe("notes");
+  });
+
   test("selecting a concept or clearing leaves bundle focus", () => {
     const s = createVizState(model());
     s.focusBundle("notes");

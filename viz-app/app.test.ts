@@ -106,6 +106,19 @@ describe("App hash handling", () => {
     expect(viz.cardsBundle).toBe("notes");
     expect(viz.sel).toEqual({ kind: "none" });
   });
+
+  test("a selection made over a bundle focus wins the URL", () => {
+    const viz = createVizState(model());
+    mountApp(viz);
+    viz.focusBundle("notes");
+    flushSync();
+    viz.selectFile("docs/50%.md");
+    flushSync();
+    // The file panel is what the user is looking at — share/back must
+    // reproduce it, not the bundle layout still underneath.
+    expect(location.hash).toBe("#f/docs/50%25.md?view=cards");
+    expect(viz.cardsBundle).toBe("notes");
+  });
 });
 
 describe("App filter persistence", () => {

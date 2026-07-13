@@ -59,6 +59,15 @@ describe("bundle selection", () => {
     );
     expect(decodeViewHash("b/notes?isolate=2", model).filters.isolate).toBe(2);
   });
+
+  test("isolate rides for the cards view without a selection (root-focus hops)", () => {
+    const none = { kind: "none" } as const;
+    expect(encodeViewHash({ sel: none, filters: { ...f, isolate: 2 } })).toBe("?isolate=2&view=cards");
+    expect(decodeViewHash("?isolate=2&view=cards", model).filters.isolate).toBe(2);
+    // The graph view still drops it: isolation needs an anchor concept.
+    expect(encodeViewHash({ sel: none, filters: { ...f, view: "graph" as const, isolate: 2 } })).toBe("");
+    expect(decodeViewHash("?isolate=2", model).filters.isolate).toBe(0);
+  });
 });
 
 describe("encodeViewHash", () => {

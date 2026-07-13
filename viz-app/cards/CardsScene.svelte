@@ -10,6 +10,9 @@
     boxMat: THREE_NS.MeshBasicMaterial;
     faceMat: THREE_NS.MeshBasicMaterial;
     entry: RenderEntry;
+    /** Request/release the lazy face texture (see Card.svelte). */
+    wantFace: (want: boolean) => void;
+    hasFace: () => boolean;
   }
 
   /** Refs an ElbowArrow registers. */
@@ -76,6 +79,9 @@
   let hovered: string | null = null;
 
   const DEPTH = 8;
+  /** Hysteresis for releasing lazy face textures: keep them a bit past the
+   *  fade edge so scrolling back and forth doesn't thrash canvas creation. */
+  const FACE_RELEASE = 1.5;
   const applyCard = (id: string, refs: CardRefs) => {
     const s = motion.sample(id);
     if (!s) return;
@@ -89,10 +95,26 @@
     refs.boxMat.opacity = s.opacity;
     refs.faceMat.opacity = s.opacity;
     // Fully faded cards should not catch the eye as z-fighting ghosts.
-    refs.group.visible = s.opacity > 0.004;
+    const visible = s.opacity > 0.004;
+    refs.group.visible = visible;
+    // Lazy faces: texture visible cards, release ones far outside the
+    // window (in between: keep whatever exists — hysteresis).
+    if (visible) refs.wantFace(true);
+    else if (Math.abs(s.effBand) > motion.window.fadeEnd * FACE_RELEASE) refs.wantFace(false);
   };
 
   const applyArrow = (a: ArrowState, refs: ArrowRefs, rebuildTube: boolean) => {
+    // Invisible arrows (both ends outside the window, or fully faded) get
+    // no geometry work at all: a hub's hundreds of hidden connectors would
+    // otherwise rebuild a TubeGeometry each per frame. Every path that can
+    // change visibility re-applies with rebuildTube, so a connector
+    // scrolling into view rebuilds on that same frame.
+    const visible = a.opacity > 0.004;
+    refs.tubeMesh.visible = visible;
+    refs.headMesh.visible = visible;
+    if (refs.tailMesh) refs.tailMesh.visible = visible;
+    if (refs.haloMesh) refs.haloMesh.visible = visible;
+    if (!visible) return;
     if (rebuildTube) {
       const curve = new THREE.CatmullRomCurve3(a.path);
       // Same CPU gradient array for tube and halo (separate GL buffers).
@@ -433,6 +455,10 @@
       },
       get zoom() {
         return motion.view.zoom;
+      },
+      /** Live face-texture count — the lazy-texture bound under test. */
+      get faceCount() {
+        return [...cardRefs.values()].filter((r) => r.hasFace()).length;
       },
       pose: (id: string) => {
         const p = motion.pose(id);

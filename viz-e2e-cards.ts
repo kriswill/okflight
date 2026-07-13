@@ -276,6 +276,23 @@ try {
   l = (await layout(page))!;
   check("mega-hub keeps every in-link on one scrollable band (no grid)", l.cards.filter((c) => c.lane === "in" && c.ring === 1).length === 29);
   check("focus keeps full scale on the mega-hub (zoom pinned at 1)", (await okf(page, "window.__okf.cards.zoom")) === 1);
+  const faces0 = await okf<number>(page, "window.__okf.cards.faceCount");
+  check("face textures are lazy: only window cards are textured on a hub", faces0 > 0 && faces0 <= 12, `faces=${faces0} of ${l.cards.length}`);
+  await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window as any).__okf.cards.scrollBy("in", 1e9); // slam to the far end
+  });
+  const facesEnd = await okf<number>(page, "window.__okf.cards.faceCount");
+  check(
+    "textures release behind the scroll (hysteresis keeps the count bounded)",
+    facesEnd > 0 && facesEnd <= 16,
+    `faces=${facesEnd}`,
+  );
+  await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cards = (window as any).__okf.cards;
+    cards.scrollBy("in", -cards.scroll.in); // back to dead center
+  });
   check(
     "one-sided layout rebalances: focus rides below stage center (all links above, none below)",
     await page.evaluate(() => {

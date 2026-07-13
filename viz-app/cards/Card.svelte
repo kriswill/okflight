@@ -4,7 +4,12 @@
   // materials created once and always transparent (no mid-flight shader
   // recompiles). This component only owns structure + texture; every
   // transform/opacity write comes from the registered frame applier.
-  import { T } from "@threlte/core";
+  //
+  // Face textures are LAZY: a supersampled canvas costs real GPU memory, so
+  // the applier requests one only while the card is inside the visible
+  // window (and releases it again far outside) — a hub with hundreds of
+  // links mounts hundreds of cards but only ever textures the visible few.
+  import { T, useThrelte } from "@threlte/core";
   import * as THREE from "three";
   import { makeCardFace } from "./cardFace";
   import type { CardRefs } from "./CardsScene.svelte";
@@ -24,11 +29,14 @@
   }
   const { entry, bg, title, desc, outline = false, ink, registerCard }: Props = $props();
 
+  const { invalidate } = useThrelte();
+
   const DEPTH = 8;
 
   let group = $state<THREE.Group | undefined>();
   let boxMesh = $state<THREE.Mesh | undefined>();
   let faceMesh = $state<THREE.Mesh | undefined>();
+  let faceWanted = $state(false);
 
   // Created once; opacity/color mutated imperatively. Always transparent so
   // fades never trigger a program recompile mid-flight.
@@ -37,31 +45,45 @@
 
   $effect(() => {
     boxMat.color.set(bg);
+    invalidate();
   });
 
-  // Texture regenerates only when the render entry changes (retarget time =
-  // transition start, already at final detail) or the theme flips.
+  // Texture regenerates when the render entry changes (retarget time =
+  // transition start, already at final detail), the theme flips, or the
+  // applier first wants a face for this card; null while unwanted.
   const texture = $derived(
-    makeCardFace({
-      title,
-      desc,
-      bg,
-      outline,
-      ink,
-      w: entry.w,
-      h: entry.h,
-      dpr: Math.min(Math.max(devicePixelRatio || 1, 1), 2),
-    }),
+    faceWanted
+      ? makeCardFace({
+          title,
+          desc,
+          bg,
+          outline,
+          ink,
+          w: entry.w,
+          h: entry.h,
+          dpr: Math.min(Math.max(devicePixelRatio || 1, 1), 2),
+        })
+      : null,
   );
   $effect(() => {
     faceMat.map = texture;
     faceMat.needsUpdate = true;
-    return () => texture.dispose();
+    invalidate();
+    return () => texture?.dispose();
   });
 
   $effect(() => {
     if (!group || !boxMesh || !faceMesh) return;
-    return registerCard(entry.id, { group, boxMesh, faceMesh, boxMat, faceMat, entry });
+    return registerCard(entry.id, {
+      group,
+      boxMesh,
+      faceMesh,
+      boxMat,
+      faceMat,
+      entry,
+      wantFace: (want: boolean) => (faceWanted = want),
+      hasFace: () => faceWanted,
+    });
   });
 </script>
 

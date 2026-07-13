@@ -116,7 +116,8 @@ let
 in
 stdenvNoCC.mkDerivation {
   pname = "okf";
-  version = "0.1.1";
+  # Single version source: package.json (bumped by the release flow).
+  version = (lib.importJSON ./package.json).version;
   inherit src;
 
   nativeBuildInputs = [ makeBinaryWrapper ];

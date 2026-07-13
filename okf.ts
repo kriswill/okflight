@@ -66,6 +66,14 @@ const commands: Record<string, Cmd> = {
       ["--perf", "after building, measure viewer startup in headless Chrome and print a timing table"],
     ],
   },
+  version: {
+    file: "", // built-in: dispatched below without a module import
+    args: "",
+    brief: "print the okflight (and bun) version",
+    summary:
+      "Print the installed okflight version — read from the package's own package.json, so it reflects the build actually running (npm, nix, or source checkout) — plus the bun runtime version.",
+    flags: [],
+  },
 };
 
 const prog = process.env.OKF_PROG ?? "bun okf.ts";
@@ -125,7 +133,8 @@ async function commandHelp(name: string) {
   for (const [flag, desc] of t.flags) console.log(`\n  ${c.yellow(flag)}  ${desc}`);
 }
 
-const [cmd, ...rest] = process.argv.slice(2);
+const [cmdArg, ...rest] = process.argv.slice(2);
+const cmd = cmdArg === "--version" || cmdArg === "-v" ? "version" : cmdArg;
 
 if (!cmd || cmd === "help" || cmd === "--help" || cmd === "-h") {
   const topic = cmd === "help" ? rest[0] : undefined;
@@ -152,6 +161,12 @@ const unknownFlag = rest.find((a) => !commands[cmd].flags.some(([f]) => matches(
 if (unknownFlag) {
   console.error(`${c.red("error:")} unknown flag ${c.bold(unknownFlag)} for ${c.cyan(cmd)} — try ${prog} help ${cmd}`);
   process.exit(1);
+}
+
+if (cmd === "version") {
+  const { version } = await Bun.file(new URL("package.json", import.meta.url)).json();
+  console.log(`okflight ${version} (bun ${Bun.version})`);
+  process.exit(0);
 }
 
 await import(commands[cmd].file);

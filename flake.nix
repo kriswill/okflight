@@ -28,7 +28,19 @@
           checks.test = config.packages.okf.passthru.tests.unit;
 
           devShells.default = pkgs.mkShell {
-            packages = builtins.attrValues { inherit (pkgs) bun git; };
+            packages = builtins.attrValues { inherit (pkgs) bun git; } ++ [
+              # Live-source `okf`: runs the enclosing checkout's okf.ts (a
+              # flake only sees a store copy of itself, so the working tree
+              # must be resolved at call time) — edits apply with no rebuild.
+              (pkgs.writeShellScriptBin "okf" ''
+                root=$(git rev-parse --show-toplevel 2>/dev/null)
+                if [ ! -f "$root/okf.ts" ]; then
+                  echo "okf(dev shim): no okf.ts at the git toplevel ('$root') — run inside the okflight checkout" >&2
+                  exit 1
+                fi
+                OKF_PROG=okf exec bun "$root/okf.ts" "$@"
+              '')
+            ];
           };
         };
     };

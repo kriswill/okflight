@@ -63,9 +63,11 @@
   function onClick(e: MouseEvent) {
     const t = e.target as Element;
     if (t.closest(".close")) {
-      // Closing an index panel is a dismissal, not a navigation — the cards
-      // focus must not change under the user.
+      // Closing a panel is a dismissal, not a navigation — the cards focus
+      // must not change under the user: the index panel hides in place, and
+      // a file/dir panel over a bundle focus falls back to that bundle.
       if (viz.sel.kind === "none") viz.hideIndexPanel();
+      else if (viz.cardsBundle) viz.dismissSelection();
       else viz.clearSelection();
       return;
     }

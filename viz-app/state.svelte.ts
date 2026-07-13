@@ -215,6 +215,14 @@ export function createVizState(model: VizModel) {
       fly = false;
       selSeq++;
     },
+    /** Close a file/dir panel without navigating: the cards focus (bundle)
+     *  and hop depth underneath stay put — a dismissal, not a clear. */
+    dismissSelection() {
+      sel = { kind: "none" };
+      lastConceptId = null;
+      fly = false;
+      selSeq++;
+    },
     get cardsIndexDoc() {
       return cardsIndexDoc;
     },

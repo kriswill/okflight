@@ -1,8 +1,15 @@
+<script lang="ts" module>
+  /** Chip plane size in world units — the scene hit-tests against these. */
+  export const CHIP_W = 64;
+  export const CHIP_H = 26;
+</script>
+
 <script lang="ts">
   // Band-edge overflow indicator: a small pill pinned at the window edge
-  // showing how many cards live past it. Static between recomputes — plain
-  // Threlte prop reactivity (no frame-applier registry) keeps it in place;
-  // motion.overflow re-emits whenever scroll/window/layout changes.
+  // showing how many cards live past it. Clicking one pages the band
+  // toward that edge (hit-tested by the scene). Static between recomputes —
+  // plain Threlte prop reactivity (no frame-applier registry) keeps it in
+  // place; motion.overflow re-emits whenever scroll/window/layout changes.
   import { T } from "@threlte/core";
   import * as THREE from "three";
   import { makeChipFace } from "./cardFace";
@@ -17,9 +24,6 @@
     ink: string;
   }
   const { count, angle, pos, quat, bg, ink }: Props = $props();
-
-  const CHIP_W = 64;
-  const CHIP_H = 26;
 
   const mat = new THREE.MeshBasicMaterial({ toneMapped: false, transparent: true });
   const texture = $derived(

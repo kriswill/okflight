@@ -106,6 +106,17 @@ describe("selection", () => {
     expect(s.cardsBundle).toBe("notes");
   });
 
+  test("dismissSelection closes a panel without navigating away from the bundle", () => {
+    const s = createVizState(model());
+    s.focusBundle("notes");
+    s.setIsolate(2);
+    s.selectFile("flakes/okf/viz.ts");
+    s.dismissSelection();
+    expect(s.sel).toEqual({ kind: "none" });
+    expect(s.cardsBundle).toBe("notes"); // clearSelection would wipe this
+    expect(s.isolateDepth).toBe(2); // …and reset this
+  });
+
   test("cardsIndexDoc: the focused index doc, cards view only, no selection open", () => {
     const s = createVizState(model());
     expect(s.cardsIndexDoc).toBeNull(); // graph view

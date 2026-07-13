@@ -49,8 +49,8 @@
   import { BAND_X, BAND_Y, fitView, type CardLayout } from "./cardLayout";
   import { cylPose } from "./cylinder";
   import ElbowArrow from "./ElbowArrow.svelte";
-  import { createCardMotion, type ArrowState } from "./motion.svelte";
-  import OverflowChip from "./OverflowChip.svelte";
+  import { createCardMotion, type ArrowState, type OverflowChip as Chip } from "./motion.svelte";
+  import OverflowChip, { CHIP_H, CHIP_W } from "./OverflowChip.svelte";
   import { pickCard3 } from "./picking";
 
   const { viz, layout }: { viz: VizState; layout: CardLayout } = $props();
@@ -287,6 +287,15 @@
     return viz.model.byId[r.id]?.desc ?? "";
   };
 
+  /* --- overflow chips ------------------------------------------------------ */
+  /** Chip pose: pinned just inside the fade edge on its band's ring-1 line
+   *  (shared by the template render and the pointer hit test). */
+  const chipPose = (o: Chip) => {
+    const cross =
+      motion.flow === "v" ? (o.lane === "in" ? 1 : -1) * BAND_Y[1] : (o.lane === "in" ? -1 : 1) * BAND_X[1];
+    return cylPose(o.dir * (motion.window.fadeEnd - 40), cross, 6, motion.flow);
+  };
+
   /* --- pointer machine: hover / click / drag ------------------------------ */
   const clickableKinds = new Set(["card", "dir", "root"]);
   const setHovered = (id: string | null) => {
@@ -310,6 +319,18 @@
     const pick = (e: PointerEvent) => {
       if (!cam) return null;
       return pickCard3(ndc(e.clientX, e.clientY), cam, motion.pickItems());
+    };
+    // Overflow chips are hit-tested separately (they are not cards): a
+    // click pages the band toward that edge instead of falling through to
+    // the background handler and resetting the navigation.
+    const pickChip = (e: PointerEvent): Chip | null => {
+      if (!cam || !motion.overflow.length) return null;
+      const items = motion.overflow.map((o) => {
+        const p = chipPose(o);
+        return { id: o.key, kind: "card" as const, pos: p.pos, quat: p.quat, w: CHIP_W, h: CHIP_H, opacity: 1 };
+      });
+      const hit = pickCard3(ndc(e.clientX, e.clientY), cam, items);
+      return hit == null ? null : (motion.overflow.find((o) => o.key === hit) ?? null);
     };
     // Which scrollable band the pointer is over: intersect the pointer ray
     // with the z=0 stage plane (exact for any camera pose, unlike a plain
@@ -365,9 +386,15 @@
       }
       if (!motion.settled) return; // hover disabled mid-animation
       const id = pick(e);
-      const c = id ? motion.renderList.find((r) => r.id === id) : null;
+      // id may be the root card's "" — null-check, never truthiness.
+      const c = id != null ? motion.renderList.find((r) => r.id === id) : null;
       setHovered(c && clickableKinds.has(c.kind) ? id : null);
-      el.style.cursor = hovered ? "pointer" : sideAt(e.clientX, e.clientY) ? "grab" : "default";
+      el.style.cursor =
+        hovered != null || pickChip(e)
+          ? "pointer"
+          : sideAt(e.clientX, e.clientY)
+            ? "grab"
+            : "default";
     };
     const up = (e: PointerEvent) => {
       const wasDragging = dragging;
@@ -385,8 +412,17 @@
       }
       if (!press || e.button !== 0) return;
       press = null;
+      const chip = pickChip(e);
+      if (chip) {
+        motion.scrollBy(chip.lane, chip.dir * motion.window.fadeEnd);
+        applyFrame(true);
+        invalidate();
+        return;
+      }
       const id = pick(e);
-      if (!id) {
+      // The root card's id is "" (falsy): null-check, or its clicks — and
+      // clicks on the root FOCUS card — misroute into the background branch.
+      if (id == null) {
         viz.clearSelection();
         return;
       }
@@ -472,6 +508,15 @@
         const r = renderer.domElement.getBoundingClientRect();
         return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height };
       },
+      /** Overflow chips with their client-px centers, for automation clicks. */
+      chips: () => {
+        if (!cam) return [];
+        const r = renderer.domElement.getBoundingClientRect();
+        return motion.overflow.map((o) => {
+          const v = chipPose(o).pos.clone().project(cam!);
+          return { ...o, x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height };
+        });
+      },
     };
     return () => {
       delete okf.cards;
@@ -521,9 +566,7 @@
   />
 {/each}
 {#each motion.overflow as o (o.key)}
-  {@const cross =
-    motion.flow === "v" ? (o.lane === "in" ? 1 : -1) * BAND_Y[1] : (o.lane === "in" ? -1 : 1) * BAND_X[1]}
-  {@const p = cylPose(o.dir * (motion.window.fadeEnd - 40), cross, 6, motion.flow)}
+  {@const p = chipPose(o)}
   {@const angle = motion.flow === "v" ? (o.dir === 1 ? 0 : Math.PI) : o.dir === 1 ? -Math.PI / 2 : Math.PI / 2}
   <OverflowChip count={o.count} {angle} pos={p.pos} quat={p.quat} bg={NEUTRAL} ink={INK} />
 {/each}

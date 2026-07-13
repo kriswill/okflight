@@ -41,6 +41,8 @@
   // about the dome center — no per-card work at all.
   import { T, useTask, useThrelte } from "@threlte/core";
   import * as THREE from "three";
+  import { ndc as toNdc } from "../gl/pointer";
+  import { SIDEBAR_W } from "../gl/viewShift";
   import { mark } from "../perf";
   import type { VizState } from "../state.svelte";
   import { tubeGradient } from "./arrowFrame";
@@ -60,7 +62,6 @@
   // Dead-on orthographic view: visual depth comes from the cylinder tilt
   // and card slabs alone, so bands and arrows line up with the screen axes.
   const EYE = new THREE.Vector3(0, 0, 900);
-  const SIDEBAR_W = 260; // keep in sync with Stage.svelte / Sidebar #side
   const TUBE_R = 1.4;
   /** Tube tessellation — tubeGradient's ring math must match. */
   const TUBULAR = 40;
@@ -312,10 +313,7 @@
 
   $effect(() => {
     const el = renderer.domElement;
-    const ndc = (cx: number, cy: number) => {
-      const r = el.getBoundingClientRect();
-      return { x: ((cx - r.left) / r.width) * 2 - 1, y: -(((cy - r.top) / r.height) * 2 - 1) };
-    };
+    const ndc = (cx: number, cy: number) => toNdc(cx, cy, el.getBoundingClientRect());
     const pick = (e: PointerEvent) => {
       if (!cam) return null;
       return pickCard3(ndc(e.clientX, e.clientY), cam, motion.pickItems());

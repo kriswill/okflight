@@ -32,8 +32,8 @@
     position: absolute;
     bottom: 16px;
     /* Hugs the graph's left edge: the sidebar overlay's width (Sidebar.svelte
-       / Stage's SIDEBAR_WIDTH, kept in sync by hand) + the theme toggle's
-       16px corner inset. */
+       / gl/viewShift.ts' SIDEBAR_W, kept in sync by hand — CSS can't import
+       the literal) + the theme toggle's 16px corner inset. */
     left: calc(260px + 16px);
     z-index: 1;
     display: flex;

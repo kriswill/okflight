@@ -83,6 +83,10 @@ try {
     (window as any).__okf.setView("cards");
   });
   await settleMotion(page);
+  check(
+    "graph render path idle in cards mode (no bloom pass over the cards)",
+    (await okf(page, "window.__okf.graph.renderPath")) === "idle",
+  );
   let l = (await layout(page))!;
   check("root focus layout", l.rootFocus === true && l.byId[l.focusId]?.kind === "focus");
   check(
@@ -487,9 +491,9 @@ try {
     (window as any).__okf.setView("graph");
   });
   await settle(page);
-  check("graph host visible again", await page.evaluate(() => !document.getElementById("graph-host")!.classList.contains("hidden")));
+  check("graph active again", (await okf(page, "window.__okf.graph.active")) === true);
   check("cards handle removed", (await okf(page, "window.__okf.cards ?? null")) === null);
-  check("graph scene alive", await page.evaluate(() => !!(window as any).__okf.scene)); // eslint-disable-line @typescript-eslint/no-explicit-any
+  check("graph renders through its composer", (await okf(page, "window.__okf.graph.renderPath")) === "composer");
 
   check("no page errors", pageErrors.length === 0, pageErrors.join("; "));
 } finally {

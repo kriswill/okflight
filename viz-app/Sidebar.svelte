@@ -39,8 +39,9 @@
 
 <style>
   #side {
-    /* Overlays the full-bleed canvas (Stage.svelte's SIDEBAR_WIDTH constant
-       must match this). */
+    /* Overlays the full-bleed canvas (gl/viewShift.ts' SIDEBAR_W constant —
+       the single JS source every consumer imports — must match this; CSS
+       can't share the literal). */
     position: absolute;
     top: 0;
     left: 0;

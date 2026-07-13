@@ -1,20 +1,15 @@
 // Canvas-texture card faces: the whole face (rounded rect, border, title,
 // description) drawn in 2D and mapped onto the card's front plane — the same
-// approach as scene.ts' sprite labels, so no SDF/troika dependency and crisp
-// text under the orthographic camera. e2e-verified only: happy-dom has no
-// real 2D text metrics.
+// approach as the graph's sprite labels (graph/labels.ts), so no SDF/troika
+// dependency and crisp text under the orthographic camera. e2e-verified
+// only: happy-dom has no real 2D text metrics.
 import * as THREE from "three";
+import { relLuminance } from "../color";
 import { wrapLines } from "./cardText";
 
 /** Readable ink for a #rrggbb background by WCAG relative luminance. */
 export function inkFor(hex: string): string {
-  const n = parseInt(hex.replace("#", "").slice(0, 6), 16);
-  const lin = (c: number) => {
-    const s = c / 255;
-    return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
-  };
-  const L = 0.2126 * lin((n >> 16) & 255) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
-  return L > 0.45 ? "#16181d" : "#f6f7f9";
+  return relLuminance(hex) > 0.45 ? "#16181d" : "#f6f7f9";
 }
 
 export interface CardFaceOpts {

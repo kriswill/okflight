@@ -355,6 +355,12 @@ export function buildModel(raw: RawData): VizModel {
 
   const radii = nodes.map((n) => (3.5 + Math.min(6.5, (deg[n.id] || 0) * 0.8)) * 0.2058);
 
+  // An index link is only renderable when something exists behind it: a
+  // known concept, or a dir whose index.md actually got embedded — a link
+  // to a not-yet-written sub-index must not become an unfocusable card.
+  const validIndexLink = (l: RootLink) =>
+    l.kind === "concept" ? !!byId[l.id] : Object.hasOwn(raw.bundles ?? {}, l.path);
+
   return {
     nodes,
     files,
@@ -383,9 +389,7 @@ export function buildModel(raw: RawData): VizModel {
     stats: raw.stats ?? null,
     licenses: raw.licenses ?? [],
     generator: raw.generator ?? null,
-    root: raw.root
-      ? { ...raw.root, links: raw.root.links.filter((l) => l.kind !== "concept" || byId[l.id]) }
-      : null,
+    root: raw.root ? { ...raw.root, links: raw.root.links.filter(validIndexLink) } : null,
     // Null prototype: paths are user-controlled keys, and a dir literally
     // named "constructor" must work while inherited keys must never resolve.
     bundles: Object.assign(
@@ -393,7 +397,7 @@ export function buildModel(raw: RawData): VizModel {
       Object.fromEntries(
         Object.entries(raw.bundles ?? {}).map(([path, doc]) => [
           path,
-          { ...doc, links: doc.links.filter((l) => l.kind !== "concept" || byId[l.id]) },
+          { ...doc, links: doc.links.filter(validIndexLink) },
         ]),
       ),
     ),

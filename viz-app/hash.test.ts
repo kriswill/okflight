@@ -47,6 +47,12 @@ describe("bundle selection", () => {
     expect(decodeHash("b/notes", { ...model, bundles: undefined })).toEqual({ kind: "none" });
   });
 
+  test("inherited Object.prototype keys never decode as bundles", () => {
+    for (const k of ["constructor", "toString", "hasOwnProperty", "__proto__"]) {
+      expect(decodeHash("b/" + k, model)).toEqual({ kind: "none" });
+    }
+  });
+
   test("isolate rides behind '?' for a bundle selection too", () => {
     expect(encodeViewHash({ sel: { kind: "bundle", path: "notes" }, filters: { ...f, isolate: 2 } })).toBe(
       "b/notes?isolate=2&view=cards",

@@ -77,6 +77,8 @@ describe("selection", () => {
     expect(s.focusedConcept).toBeNull();
     s.focusBundle("ghost");
     expect(s.cardsBundle).toBe("notes");
+    s.focusBundle("constructor"); // inherited prototype keys are not bundles
+    expect(s.cardsBundle).toBe("notes");
   });
 
   test("selecting a concept or clearing leaves bundle focus", () => {

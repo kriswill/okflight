@@ -88,7 +88,10 @@ export function decodeHash(raw: string, model: HashModel): Selection {
   if (h.startsWith("c/") && model.byId[h.slice(2)]) return { kind: "concept", id: h.slice(2) };
   if (h.startsWith("f/") && model.files[h.slice(2)]) return { kind: "file", path: h.slice(2) };
   if (h.startsWith("d/") && model.dirs[h.slice(2)]) return { kind: "dir", path: h.slice(2) };
-  if (h.startsWith("b/") && model.bundles?.[h.slice(2)]) return { kind: "bundle", path: h.slice(2) };
+  // hasOwn, not truthiness: inherited keys ("constructor", "__proto__")
+  // must never validate as bundles.
+  if (h.startsWith("b/") && model.bundles && Object.hasOwn(model.bundles, h.slice(2)))
+    return { kind: "bundle", path: h.slice(2) };
   return { kind: "none" };
 }
 

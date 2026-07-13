@@ -149,12 +149,13 @@ function childLinks(
       .sort(byTitle(model))
       .map((id) => ({ id, kind: "card" as const }));
   if (e.kind === "dir")
-    return (model.bundles[e.id]?.links ?? []).flatMap((l): { id: string; kind: "card" | "dir" }[] =>
-      l.kind === "concept"
-        ? ok(l.id)
-          ? [{ id: l.id, kind: "card" }]
-          : []
-        : [{ id: l.path, kind: "dir" }],
+    return ((Object.hasOwn(model.bundles, e.id) && model.bundles[e.id]?.links) || []).flatMap(
+      (l): { id: string; kind: "card" | "dir" }[] =>
+        l.kind === "concept"
+          ? ok(l.id)
+            ? [{ id: l.id, kind: "card" }]
+            : []
+          : [{ id: l.path, kind: "dir" }],
     );
   return [];
 }
@@ -198,7 +199,8 @@ export function bundleCardGraph(
   depth: 1 | 2,
   visible: (n: ConceptNode) => boolean,
 ): CardGraph | null {
-  const doc = model.bundles[path];
+  // hasOwn: inherited keys ("constructor") must not resolve as bundles.
+  const doc = Object.hasOwn(model.bundles, path) ? model.bundles[path] : undefined;
   if (!doc) return null;
   const ok = (id: string) => !!model.byId[id] && visible(model.byId[id]!);
   // Nearest ancestor with an embedded index: an enclosing bundle, else the
@@ -207,7 +209,7 @@ export function bundleCardGraph(
     let up = p;
     while (up.includes("/")) {
       up = up.slice(0, up.lastIndexOf("/"));
-      if (model.bundles[up]) return { id: up, kind: "dir", twoWay: false };
+      if (Object.hasOwn(model.bundles, up)) return { id: up, kind: "dir", twoWay: false };
     }
     return model.root ? { id: "", kind: "root", twoWay: false } : null;
   };

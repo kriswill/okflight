@@ -116,7 +116,7 @@ export function createMd({
         // focus navigation; the root's is the root card ("" path).
         if (p && p.startsWith(bundlePrefix) && (p.endsWith("/index.md") || p === bundlePrefix + "index.md")) {
           const bid = p === bundlePrefix + "index.md" ? "" : p.slice(bundlePrefix.length, -"/index.md".length);
-          if (bid ? bundles[bid] : root) return `<a href="#" data-bundle="${esc(bid)}">${txt}</a>`;
+          if (bid ? Object.hasOwn(bundles, bid) : root) return `<a href="#" data-bundle="${esc(bid)}">${txt}</a>`;
         }
         if (/^https?:/.test(href)) return `<a href="${esc(href)}" target="_blank" rel="noopener">${txt}</a>`;
         return `<a title="${esc(href)}">${txt}</a>`;

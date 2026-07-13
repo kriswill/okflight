@@ -459,8 +459,10 @@ describe("bundleCardGraph", () => {
       cfg: cfg(),
     });
 
-  test("unknown bundle -> null", () => {
+  test("unknown bundle -> null; inherited prototype keys too", () => {
     expect(bundleCardGraph(bModel(), "ghost", 1, all)).toBeNull();
+    expect(bundleCardGraph(bModel(), "constructor", 1, all)).toBeNull();
+    expect(bundleCardGraph(bModel(), "toString", 1, all)).toBeNull();
   });
 
   test("bundle focus: root card above, authored links below with kinds", () => {

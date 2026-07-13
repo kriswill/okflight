@@ -386,11 +386,16 @@ export function buildModel(raw: RawData): VizModel {
     root: raw.root
       ? { ...raw.root, links: raw.root.links.filter((l) => l.kind !== "concept" || byId[l.id]) }
       : null,
-    bundles: Object.fromEntries(
-      Object.entries(raw.bundles ?? {}).map(([path, doc]) => [
-        path,
-        { ...doc, links: doc.links.filter((l) => l.kind !== "concept" || byId[l.id]) },
-      ]),
+    // Null prototype: paths are user-controlled keys, and a dir literally
+    // named "constructor" must work while inherited keys must never resolve.
+    bundles: Object.assign(
+      Object.create(null) as Record<string, RootDoc>,
+      Object.fromEntries(
+        Object.entries(raw.bundles ?? {}).map(([path, doc]) => [
+          path,
+          { ...doc, links: doc.links.filter((l) => l.kind !== "concept" || byId[l.id]) },
+        ]),
+      ),
     ),
   };
 }

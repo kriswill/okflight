@@ -204,7 +204,7 @@ export function createVizState(model: VizModel) {
     },
     /** Center the cards view on a sub-bundle's index.md (dir card click). */
     focusBundle(path: string) {
-      if (!model.bundles[path]) return;
+      if (!Object.hasOwn(model.bundles, path)) return;
       cardsBundle = path;
       sel = { kind: "none" };
       lastConceptId = null;

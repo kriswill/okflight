@@ -1,4 +1,5 @@
 node_modules/
+.direnv/
 result
 result-*
 test/fixtures/cards-bundle/knowledge/viz.html

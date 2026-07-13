@@ -34,13 +34,16 @@
   <!-- Explicit NoToneMapping/no-shadows: Threlte defaults to AgX + PCFSoft,
        which would clamp the >1.0 bloom colors and cost shadow-map state.
        antialias is ~free for the graph (its draw is a composer blit) and
-       keeps cards edges clean; the dpr clamp is looser in cards mode where
-       face textures supersample. -->
+       keeps cards edges clean. One FIXED dpr clamp for both modes: a
+       per-mode value made Threlte setPixelRatio() and reallocate the
+       backbuffer on every view toggle (a visible hitch on retina). 1.5 is
+       the graph's tuned bloom fill budget; card text stays crisp because
+       the face textures supersample at their own min(dpr, 2). -->
   <Canvas
     renderMode="on-demand"
     toneMapping={THREE.NoToneMapping}
     shadows={false}
-    dpr={viz.viewMode === "graph" ? [1, 1.5] : [1, 2]}
+    dpr={[1, 1.5]}
     createRenderer={(canvas) =>
       new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: "high-performance" })}
   >

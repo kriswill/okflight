@@ -15,6 +15,17 @@ describe("graph motion", () => {
     expect(pos).toEqual(v(1, 2, 3));
   });
 
+  test("flyFrom exposes the tween's start pose while in flight, null when settled", () => {
+    const m = createGraphMotion();
+    expect(m.flyFrom).toBeNull();
+    m.flyTo(v(5, 6, 7), v(0, 0, 0), v(100, 0, 0), v(0, 0, 0));
+    expect(m.flyFrom).toEqual(v(5, 6, 7));
+    m.step(200, v(0, 0, 0), v(0, 0, 0));
+    expect(m.flyFrom).toEqual(v(5, 6, 7)); // frozen at fly start, not live
+    m.step(10_000, v(0, 0, 0), v(0, 0, 0));
+    expect(m.flyFrom).toBeNull();
+  });
+
   test("flyTo unsettles; the tween eases out and lands exactly", () => {
     const m = createGraphMotion();
     m.flyTo(v(0, 0, 0), v(0, 0, 0), v(100, 0, 0), v(10, 0, 0));

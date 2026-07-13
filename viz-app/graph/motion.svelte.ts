@@ -12,6 +12,10 @@ const FLY_MS = 833;
 export interface GraphMotion {
   /** True when no fly is in flight — the frame task can sleep. */
   readonly settled: boolean;
+  /** Start pose of the in-flight tween (null when settled). Probe surface:
+   *  the initial deep-link fly must start from the fitted view, never the
+   *  camera's constructor default. */
+  readonly flyFrom: THREE.Vector3 | null;
   flyTo(fromPos: THREE.Vector3, fromTarget: THREE.Vector3, toPos: THREE.Vector3, toTarget: THREE.Vector3): void;
   /** Grabbing the view cancels an in-flight fly-to instead of fighting it. */
   cancelFly(): void;
@@ -33,6 +37,9 @@ export function createGraphMotion(): GraphMotion {
   return {
     get settled() {
       return settled;
+    },
+    get flyFrom() {
+      return fly ? fly.fromPos : null;
     },
     flyTo(fromPos, fromTarget, toPos, toTarget) {
       fly = {

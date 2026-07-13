@@ -161,6 +161,15 @@ try {
     p.visibleLabelCount >= 28 && p.visibleLabelCount <= 34,
     `got ${p.visibleLabelCount}`,
   );
+  // Reselecting the SAME node must re-fly (the selSeq bump is the trigger —
+  // the deleted stage.test.ts bridge test's behavior, now checked live).
+  await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window as any).__okf.select("hub");
+  });
+  p = await probe(page);
+  check("reselecting the selected node re-flies (selSeq bump)", p.flying === true);
+  await settleFly(page);
 
   console.log("3. pointer: click selects, a drag never does");
   const inAPx = await project(page, "in-a");
@@ -205,6 +214,21 @@ try {
   await settle(page);
   p = await probe(page);
   check("clearing the filter undims", p.dimmedCount === 0, `was ${dimmedWithFilter}, now ${p.dimmedCount}`);
+  // The same dim effect must also re-fire on a search query (the other
+  // branch the deleted stage.test.ts dim-bridge test covered; facets stay
+  // unit-tested in state.test.ts — this fixture configures none).
+  await page.evaluate(() => {
+    location.hash = "#c/in-a?q=hub";
+  });
+  await settle(page);
+  p = await probe(page);
+  check("search query dims non-matches", p.dimmedCount > 0, `dimmed ${p.dimmedCount}`);
+  await page.evaluate(() => {
+    location.hash = "#c/in-a";
+  });
+  await settle(page);
+  p = await probe(page);
+  check("clearing the query undims", p.dimmedCount === 0);
 
   console.log("6. panel close drops the view shift back to sidebar-only");
   await page.evaluate(() => {
@@ -259,6 +283,32 @@ try {
   await settle(page);
   p = await probe(page);
   check("graph mode resumes", p.paused === false);
+
+  console.log("8. deep-linked selection flies from the fitted pose, not the constructor default");
+  // Full navigation (not a hash tweak) so the app boots with the selection
+  // already applied — the case where the fly effect runs before the fit.
+  await page.goto("about:blank");
+  await page.goto("file://" + HTML + "#c/hub");
+  await waitInteractive(page);
+  p = await probe(page);
+  check("deep link starts a fly on load", p.flying === true);
+  const flyFrom = await page.evaluate(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    () => (window as any).__okf.graph.flyFrom as { x: number; y: number; z: number } | null,
+  );
+  check(
+    "the fly's start is the fitted view, not the camera's constructor pose",
+    !!flyFrom && Math.hypot(flyFrom.x - 0, flyFrom.y - 60, flyFrom.z - 620) > 20,
+    JSON.stringify(flyFrom),
+  );
+  await settleFly(page);
+  p = await probe(page);
+  const hubPx3 = await project(page, "hub");
+  check(
+    "deep-linked selection lands selected + centered",
+    p.selected === hubIdx && Math.abs(hubPx3.x - 600) < 2 && Math.abs(hubPx3.y - 450) < 2,
+    JSON.stringify({ selected: p.selected, px: hubPx3 }),
+  );
 
   check("no page errors", pageErrors.length === 0, pageErrors.join("; "));
 } finally {

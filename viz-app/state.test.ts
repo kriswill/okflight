@@ -49,6 +49,31 @@ describe("selection", () => {
     expect(s.sceneSelectedIndex).toBe(0);
   });
 
+  // The selSeq contract drives the graph's fly/emphasis effect (GraphView
+  // reads `void viz.selSeq` as its trigger): concept navigations must bump
+  // it — including reselecting the same concept, which re-flies the camera —
+  // while file/dir panels must NOT, or opening a file would fly the graph.
+  test("selSeq bumps on every concept selection, including a reselect (re-fly)", () => {
+    const s = createVizState(model());
+    const before = s.selSeq;
+    s.selectConcept("a");
+    expect(s.selSeq).toBe(before + 1);
+    s.selectConcept("a"); // same node again: still a new fly
+    expect(s.selSeq).toBe(before + 2);
+    expect(s.fly).toBe(true);
+  });
+
+  test("selectFile/selectDir never bump selSeq or move the scene selection (no scene churn)", () => {
+    const s = createVizState(model());
+    s.selectConcept("a");
+    const seq = s.selSeq;
+    const idx = s.sceneSelectedIndex;
+    s.selectFile("flakes/okf/viz.ts");
+    s.selectDir("flakes/ccglass");
+    expect(s.selSeq).toBe(seq);
+    expect(s.sceneSelectedIndex).toBe(idx);
+  });
+
   test("dir view keeps scene emphasis and back-link on last concept", () => {
     const s = createVizState(model());
     s.selectConcept("a");

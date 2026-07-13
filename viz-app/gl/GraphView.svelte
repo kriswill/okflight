@@ -159,7 +159,10 @@
   let theme = viz.theme();
   let baseColors: string[] = [];
   let shiftPx = 0;
-  let fitted = false;
+  // $state: the selection effect defers a deep-linked fly until the initial
+  // fit has run — a hash selection applies before mount, and a fly captured
+  // against the unfitted constructor pose would tween in from nowhere.
+  let fitted = $state(false);
 
   const updateLabelVisibility = () => {
     labels.forEach((sp, i) => {
@@ -269,11 +272,15 @@
     void viz.selSeq;
     const i = viz.sceneSelectedIndex;
     const fly = viz.fly;
+    // Deep-link mount order: this effect runs before the fit effect below.
+    // Reading `fitted` re-fires it once the fit lands, so the initial fly's
+    // fromPos is the fitted view, never the constructor default.
+    const ready = fitted;
     selected = i;
     untrack(() => {
       applyEmphasis();
       repaint();
-      if (i !== null && fly) {
+      if (i !== null && fly && ready) {
         const { toPos, toTarget } = flyTarget(fnodes, adj, i, cam.position, controls.target, cam.fov, cam.aspect);
         gmotion.flyTo(cam.position, controls.target, toPos, toTarget);
         wake();
@@ -381,7 +388,9 @@
         return;
       }
       const rect = el.getBoundingClientRect();
-      viz.hover = { i, x: Math.min(e.clientX - rect.left + 14, rect.width - 330), y: e.clientY - rect.top + 14 };
+      // Clamp both ends: the right bound goes negative on canvases narrower
+      // than the 330px tooltip, which used to fling it off the left edge.
+      viz.hover = { i, x: Math.max(0, Math.min(e.clientX - rect.left + 14, rect.width - 330)), y: e.clientY - rect.top + 14 };
     };
     // Grabbing the view cancels an in-flight fly-to instead of fighting it.
     const down = (e: PointerEvent) => {
@@ -444,6 +453,10 @@
       },
       get flying() {
         return !gmotion.settled;
+      },
+      get flyFrom() {
+        const f = gmotion.flyFrom;
+        return f ? { x: f.x, y: f.y, z: f.z } : null;
       },
       get paused() {
         return viz.viewMode === "cards";

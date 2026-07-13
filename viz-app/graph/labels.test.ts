@@ -11,7 +11,7 @@ const edges: [number, number][] = [
 describe("adjacency / rankByDegree", () => {
   test("adjacency is symmetric", () => {
     const adj = adjacency(4, edges);
-    expect([...adj[0]!].sort()).toEqual([1, 2, 3]);
+    expect([...adj[0]!].sort((a, b) => a - b)).toEqual([1, 2, 3]);
     expect(adj[3]!.has(0)).toBe(true);
     expect(adj[3]!.has(1)).toBe(false);
   });

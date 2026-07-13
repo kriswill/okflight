@@ -2,7 +2,6 @@
 // `bun test` only picks up *.test.ts — and never bundled (only test files
 // import it).
 import type { ConceptNode } from "./data";
-import type { SceneApi } from "./scene";
 
 export const node = (id: string, type: string, title = id, extra: Partial<ConceptNode> = {}): ConceptNode => ({
   id,
@@ -68,33 +67,3 @@ export const cfg = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-/** Recording stand-in for the WebGL GraphScene. */
-export interface StubScene extends SceneApi {
-  calls: [string, ...unknown[]][];
-  dimFn: ((i: number) => boolean) | null;
-}
-
-export const makeStub = (): StubScene => {
-  const s: StubScene = {
-    calls: [],
-    dimFn: null,
-    setDim(fn) {
-      s.dimFn = fn;
-      s.calls.push(["setDim"]);
-    },
-    setSelected(i, fly) {
-      s.calls.push(["setSelected", i, fly]);
-    },
-    applyTheme() {
-      s.calls.push(["applyTheme"]);
-    },
-    setViewShift(leftInset, rightInset) {
-      s.calls.push(["setViewShift", leftInset, rightInset]);
-    },
-    setPaused(paused) {
-      s.calls.push(["setPaused", paused]);
-    },
-    resize() {},
-  };
-  return s;
-};

@@ -1,13 +1,16 @@
-// Stage bridge tests: reactive state changes must reach the imperative
-// GraphScene API. A recording stub replaces the WebGL scene; a DOM-only
-// stub component stands in for the Threlte cards view.
+// Stage chrome tests: panel geometry, theme-toggle placement, and the GL
+// injection seam. The GL stage itself is a DOM-only stub here (bun test
+// must never resolve @threlte/core); the scene wiring that used to be
+// asserted through a recording SceneApi stub now lives in the pure-module
+// unit tests (graph/*.test.ts, gl/*.test.ts) and the e2e parity contract
+// (viz-e2e-graph.ts).
 import { afterEach, describe, expect, test } from "bun:test";
 import { flushSync, mount, unmount } from "svelte";
-import CardsStub from "./CardsStub.svelte";
 import { buildModel } from "./data";
+import GLStub from "./GLStub.svelte";
 import Stage from "./Stage.svelte";
 import { createVizState } from "./state.svelte";
-import { makeStub, node } from "./test-helpers";
+import { node } from "./test-helpers";
 
 const model = () =>
   buildModel({
@@ -23,98 +26,36 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-function mountStage(state = createVizState(model())) {
-  const stub = makeStub();
+function mountStage(state = createVizState(model()), gl: typeof GLStub | null = GLStub) {
   const app = mount(Stage, {
     target: document.body,
-    props: { viz: state, createScene: () => stub },
+    props: gl ? { viz: state, gl } : { viz: state },
   });
   cleanup = () => unmount(app);
   flushSync();
-  return { stub, state };
+  return { state };
 }
 
-describe("Stage bridges", () => {
-  test("dim bridge re-pushes on query and hidden-type changes", () => {
-    const { stub, state } = mountStage();
-    const before = stub.calls.filter(([m]) => m === "setDim").length;
-    state.query = "alpha";
-    flushSync();
-    expect(stub.calls.filter(([m]) => m === "setDim").length).toBe(before + 1);
-    expect(stub.dimFn!(0)).toBe(false); // Alpha matches
-    expect(stub.dimFn!(1)).toBe(true); // Beta dimmed
-    state.query = "";
-    state.toggleType("Pattern");
-    flushSync();
-    expect(stub.dimFn!(1)).toBe(true);
-    expect(stub.dimFn!(0)).toBe(false);
-  });
-
-  test("dim bridge re-pushes when a facet selection changes (immutable facetSel replacement)", () => {
-    const withFacet = createVizState(
-      buildModel({
-        nodes: [node("a", "Decision", "Alpha"), node("b", "Pattern", "Beta")],
-        edges: [{ s: "a", t: "b" }],
-        cfg: { facet: { kind: { types: { Decision: "x", Pattern: "y" } } } },
-      }),
-    );
-    const { stub, state } = mountStage(withFacet);
-    const before = stub.calls.filter(([m]) => m === "setDim").length;
-    state.setFacet("kind", "x");
-    flushSync();
-    expect(stub.calls.filter(([m]) => m === "setDim").length).toBe(before + 1);
-    expect(stub.dimFn!(0)).toBe(false); // Alpha (Decision -> "x") stays
-    expect(stub.dimFn!(1)).toBe(true); // Beta (Pattern -> "y") dimmed
-  });
-
-  test("selection bridge flies to concepts, keeps emphasis in file view, re-fires on reselect", () => {
-    const { stub, state } = mountStage();
-    state.selectConcept("a");
-    flushSync();
-    expect(stub.calls.filter(([m]) => m === "setSelected").at(-1)).toEqual(["setSelected", 0, true]);
-    stub.calls = [];
-    state.selectFile("f.ts");
-    flushSync();
-    // file view: selection index unchanged → no scene churn
-    expect(stub.calls.filter(([m]) => m === "setSelected")).toHaveLength(0);
-    state.selectConcept("a"); // reselect same node re-flies (selSeq bump)
-    flushSync();
-    expect(stub.calls.filter(([m]) => m === "setSelected")).toHaveLength(1);
-    state.clearSelection();
-    flushSync();
-    expect(stub.calls.filter(([m]) => m === "setSelected").at(-1)).toEqual(["setSelected", null, false]);
-  });
-
-  test("view shift follows panel open/close and width", () => {
-    const { stub, state } = mountStage();
-    // happy-dom reports clientWidth 0 — pin a real stage width for the clamp.
-    Object.defineProperty(document.getElementById("stage")!, "clientWidth", { value: 1000 });
-    const shifts = () => stub.calls.filter(([m]) => m === "setViewShift");
-    state.selectConcept("a");
-    flushSync();
-    expect(shifts().at(-1)).toEqual(["setViewShift", 260, 460]); // sidebar px, default: min(460, 85% of stage)
-    state.setPanelW(555);
-    flushSync();
-    expect(shifts().at(-1)![2]).toBe(555);
-    state.clearSelection();
-    flushSync();
-    expect(shifts().at(-1)![2]).toBe(0);
-  });
-
-  test("view shift and panel width re-clamp on window resize", () => {
-    const { stub, state } = mountStage();
+describe("Stage chrome", () => {
+  test("panel width follows open/close, setPanelW, and window-resize re-clamp", () => {
+    const { state } = mountStage();
     const stage = document.getElementById("stage")!;
     Object.defineProperty(stage, "clientWidth", { value: 1000, configurable: true });
-    const shifts = () => stub.calls.filter(([m]) => m === "setViewShift");
+    expect(document.getElementById("panel")).toBeNull();
     state.selectConcept("a");
     flushSync();
-    expect(shifts().at(-1)![2]).toBe(460);
+    // default: min(460, 85% of stage)
     expect((document.getElementById("panel") as HTMLElement).style.width).toBe("460px");
+    state.setPanelW(555);
+    flushSync();
+    expect((document.getElementById("panel") as HTMLElement).style.width).toBe("555px");
     Object.defineProperty(stage, "clientWidth", { value: 400, configurable: true });
     window.dispatchEvent(new Event("resize"));
     flushSync();
-    expect(shifts().at(-1)![2]).toBe(340); // re-clamped: min(460, 85% of 400)
-    expect((document.getElementById("panel") as HTMLElement).style.width).toBe("340px");
+    expect((document.getElementById("panel") as HTMLElement).style.width).toBe("368px"); // min(555, 92% of 400)
+    state.clearSelection();
+    flushSync();
+    expect(document.getElementById("panel")).toBeNull();
   });
 
   test("theme toggle button hugs the panel's left edge when open", () => {
@@ -130,51 +71,29 @@ describe("Stage bridges", () => {
     flushSync();
     expect(btn.style.right).toBe("16px");
   });
-
-  test("theme bridge reapplies on dark flip and repaint", () => {
-    const { stub, state } = mountStage();
-    const before = stub.calls.filter(([m]) => m === "applyTheme").length;
-    state.dark = !state.dark;
-    flushSync();
-    expect(stub.calls.filter(([m]) => m === "applyTheme").length).toBe(before + 1);
-    state.repaint();
-    flushSync();
-    expect(stub.calls.filter(([m]) => m === "applyTheme").length).toBe(before + 2);
-  });
 });
 
-describe("cards view integration", () => {
-  test("cards mode mounts the injected component and hides + pauses the graph; graph mode reverses it", () => {
-    const state = createVizState(model());
-    const stub = makeStub();
-    const app = mount(Stage, {
-      target: document.body,
-      props: { viz: state, createScene: () => stub, cards: CardsStub },
-    });
-    cleanup = () => unmount(app);
-    flushSync();
-    expect(document.querySelector("[data-testid=cards-stub]")).toBeNull();
-
+describe("GL injection seam", () => {
+  test("the injected GL stage mounts once and stays mounted across view flips", () => {
+    const { state } = mountStage();
+    const stub = () => document.querySelector("[data-testid=gl-stub]");
+    expect(stub()).not.toBeNull();
+    expect(stub()!.textContent).toBe("graph");
     state.setViewMode("cards");
     flushSync();
-    expect(document.querySelector("[data-testid=cards-stub]")).not.toBeNull();
-    // Graph host stays mounted (GraphScene has no dispose and a live RAF
-    // loop) but goes invisible and stops compositing.
-    expect(document.getElementById("graph-host")!.classList.contains("hidden")).toBe(true);
-    expect(stub.calls.at(-1)).toEqual(["setPaused", true]);
-
+    // The GL stage owns mode switching internally — Stage never remounts it.
+    expect(stub()!.textContent).toBe("cards");
     state.setViewMode("graph");
     flushSync();
-    expect(document.querySelector("[data-testid=cards-stub]")).toBeNull();
-    expect(document.getElementById("graph-host")!.classList.contains("hidden")).toBe(false);
-    expect(stub.calls.at(-1)).toEqual(["setPaused", false]);
+    expect(stub()!.textContent).toBe("graph");
   });
 
-  test("without a cards component, cards mode renders nothing and never throws", () => {
-    const { state } = mountStage();
+  test("without a gl component, Stage renders chrome only and never throws", () => {
+    const { state } = mountStage(createVizState(model()), null);
+    expect(document.querySelector("[data-testid=gl-stub]")).toBeNull();
+    expect(document.getElementById("gl-host")).toBeNull();
     state.setViewMode("cards");
     flushSync();
-    expect(document.querySelector("[data-testid=cards-stub]")).toBeNull();
-    expect(document.getElementById("graph-host")!.classList.contains("hidden")).toBe(true);
+    expect(document.getElementById("stage")).not.toBeNull();
   });
 });

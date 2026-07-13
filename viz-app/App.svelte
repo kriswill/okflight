@@ -2,19 +2,16 @@
   import type { Component } from "svelte";
   import { decodeViewHash, encodeViewHash } from "./hash";
   import { installPerf, mark, summary } from "./perf";
-  import type { CreateScene, SceneApi } from "./scene";
   import Sidebar from "./Sidebar.svelte";
   import Stage from "./Stage.svelte";
   import type { VizState } from "./state.svelte";
 
   interface Props {
     viz: VizState;
-    /** Test seam, forwarded to Stage. */
-    createScene?: CreateScene;
-    /** Cards view component, injected by main.ts and forwarded to Stage. */
-    cards?: Component<{ viz: VizState }>;
+    /** GL stage component, injected by main.ts and forwarded to Stage. */
+    gl?: Component<{ viz: VizState; onSceneReady?: () => void; onFirstFrame?: () => void }>;
   }
-  const { viz, createScene, cards }: Props = $props();
+  const { viz, gl }: Props = $props();
 
   /* --- URL state (hash) — selection + filters survive reload/back/forward - */
   let currentState: string | null = null;
@@ -101,15 +98,13 @@
   });
 
   /* --- debug/scripting hook (also used by automated visual checks) --------- */
-  let sceneRef: SceneApi | null = null;
+  // The GL scenes add their own live handles: __okf.graph (GraphView, always)
+  // and __okf.cards (CardsScene, while mounted).
   const okf: Record<string, unknown> = {
     select: (id: string, fly = true) => (viz.model.byId[id] ? viz.selectConcept(id, fly) : viz.clearSelection()),
     selectFile: (path: string) => viz.selectFile(path),
     selectDir: (path: string) => viz.selectDir(path),
     focusBundle: (path: string) => viz.focusBundle(path),
-    get scene() {
-      return sceneRef;
-    },
     get view() {
       return viz.viewMode;
     },
@@ -124,8 +119,7 @@
   installPerf(okf);
   (window as unknown as { __okf: unknown }).__okf = okf;
 
-  const onSceneReady = (s: SceneApi) => {
-    sceneRef = s;
+  const onSceneReady = () => {
     mark("viz:scene-init");
   };
   const onFirstFrame = () => {
@@ -145,4 +139,4 @@
 <svelte:window onhashchange={applyHash} onpopstate={applyHash} />
 
 <Sidebar {viz} />
-<Stage {viz} {createScene} {cards} {onSceneReady} {onFirstFrame} />
+<Stage {viz} {gl} {onSceneReady} {onFirstFrame} />

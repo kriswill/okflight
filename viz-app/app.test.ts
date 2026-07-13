@@ -7,7 +7,7 @@ import { flushSync, mount, unmount } from "svelte";
 import App from "./App.svelte";
 import { buildModel } from "./data";
 import { createVizState } from "./state.svelte";
-import { cfg, makeStub, node } from "./test-helpers";
+import { cfg, node } from "./test-helpers";
 
 const model = () =>
   buildModel({
@@ -22,7 +22,7 @@ const model = () =>
 
 let cleanup: (() => void) | null = null;
 const mountApp = (viz: ReturnType<typeof createVizState>) => {
-  const app = mount(App, { target: document.body, props: { viz, createScene: () => makeStub() } });
+  const app = mount(App, { target: document.body, props: { viz } });
   cleanup = () => unmount(app);
   flushSync();
 };

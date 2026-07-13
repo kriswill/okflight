@@ -12,6 +12,20 @@ export interface GenParams {
 
 const GOLDEN_ANGLE = 137.508;
 
+/** WCAG relative luminance of a #rrggbb color (sRGB channels linearized).
+ *  Shared rule, different thresholds: card faces flip ink at 0.45
+ *  (cards/cardFace.ts inkFor), the graph flips to the glow look below 0.15
+ *  (graph/palette.ts isDarkBg, which applies the same weights to an
+ *  already-linear THREE.Color). */
+export function relLuminance(hex: string): number {
+  const n = parseInt(hex.replace("#", "").slice(0, 6), 16);
+  const lin = (c: number) => {
+    const s = c / 255;
+    return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * lin((n >> 16) & 255) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
+}
+
 function fnv1a(s: string): number {
   let h = 0x811c9dc5;
   for (let i = 0; i < s.length; i++) {

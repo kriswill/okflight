@@ -2,118 +2,33 @@
   import type { Component } from "svelte";
   import AboutBadge from "./AboutBadge.svelte";
   import DetailPanel from "./DetailPanel.svelte";
-  import { GraphScene, type CreateScene, type SceneApi, type SceneNode } from "./scene";
   import type { VizState } from "./state.svelte";
   import ThemeToggle from "./ThemeToggle.svelte";
   import Tooltip from "./Tooltip.svelte";
 
   interface Props {
     viz: VizState;
-    createScene?: CreateScene;
-    /** The cards view, injected from main.ts (like createScene, a seam: the
-     *  Threlte subtree must never enter the bun-test module graph). */
-    cards?: Component<{ viz: VizState }>;
-    onSceneReady?: (scene: SceneApi) => void;
+    /** The GL stage (graph + cards), injected from main.ts — a seam: the
+     *  Threlte subtree must never enter the bun-test module graph. */
+    gl?: Component<{ viz: VizState; onSceneReady?: () => void; onFirstFrame?: () => void }>;
+    onSceneReady?: () => void;
     onFirstFrame?: () => void;
   }
 
-  const {
-    viz,
-    createScene = (el, nodes, edges, theme, cb) => new GraphScene(el, nodes, edges, theme, cb),
-    cards: Cards,
-    onSceneReady,
-    onFirstFrame,
-  }: Props = $props();
-
-  // Sidebar.svelte's #side is an absolute overlay of the same width — kept
-  // in sync by hand since CSS and JS can't share a literal here.
-  const SIDEBAR_WIDTH = 260;
+  const { viz, gl: GL, onSceneReady, onFirstFrame }: Props = $props();
 
   let el = $state<HTMLElement | null>(null);
-  let scene = $state<SceneApi | null>(null);
   // clientWidth is not a signal — the window resize listener below bumps this
-  // so width-derived state (view shift here, panel width in DetailPanel)
-  // re-reads it.
+  // so width-derived state (panel width in DetailPanel, the theme toggle's
+  // offset) re-reads it. The GL stage sizes itself off the canvas instead.
   let resizeSeq = $state(0);
-
-  // The scene keeps this array by reference; the theme bridge mutates entry
-  // colors in place before applyTheme() re-reads them (legacy contract).
-  // svelte-ignore state_referenced_locally -- viz's identity never changes
-  const sceneNodes: SceneNode[] = viz.model.nodes.map((n, i) => ({
-    x: n.x,
-    y: n.y,
-    z: n.z,
-    r: viz.model.radii[i]!,
-    color: viz.colorOf(n.type),
-    title: n.title,
-  }));
-
-  const attach = (node: HTMLElement) => {
-    const s = createScene(node, sceneNodes, viz.model.edgeIdx, viz.theme(), {
-      onHover(i, cx, cy) {
-        if (i === null) {
-          viz.hover = null;
-          return;
-        }
-        const rect = node.getBoundingClientRect();
-        viz.hover = { i, x: Math.min(cx - rect.left + 14, rect.width - 330), y: cy - rect.top + 14 };
-      },
-      onSelect(i) {
-        if (i === null) viz.clearSelection();
-        else viz.selectConcept(viz.model.nodes[i]!.id, true);
-      },
-      onFirstFrame,
-    });
-    scene = s;
-    onSceneReady?.(s);
-  };
-
-  // Reactive state → imperative scene. Dependencies must be read inside the
-  // effect body — the closures handed to the scene run outside tracking.
-  $effect(() => {
-    void viz.query;
-    void viz.hidden.size;
-    void viz.isolateDepth;
-    void viz.sel;
-    void viz.facetSel;
-    scene?.setDim((i) => !viz.visible(viz.model.nodes[i]!));
-  });
-
-  $effect(() => {
-    void viz.selSeq;
-    scene?.setSelected(viz.sceneSelectedIndex, viz.fly);
-  });
-
-  $effect(() => {
-    void resizeSeq;
-    const open = viz.sel.kind !== "none";
-    const px = viz.panelPx(el?.clientWidth ?? 0);
-    scene?.setViewShift(SIDEBAR_WIDTH, open ? px : 0);
-  });
-
-  $effect(() => {
-    void viz.dark;
-    void viz.paletteVersion;
-    const colors = viz.model.nodes.map((n) => viz.colorOf(n.type));
-    const theme = viz.theme();
-    if (!scene) return;
-    sceneNodes.forEach((sn, i) => (sn.color = colors[i]!));
-    scene.applyTheme(theme);
-  });
-
-  // The graph never unmounts (GraphScene has no dispose and a free-running
-  // RAF loop) — cards mode hides it and stops its compositing instead.
-  $effect(() => {
-    scene?.setPaused(viz.viewMode === "cards");
-  });
 </script>
 
 <svelte:window onresize={() => resizeSeq++} />
 
 <main id="stage" bind:this={el}>
-  <div id="graph-host" class:hidden={viz.viewMode === "cards"} {@attach attach}></div>
-  {#if viz.viewMode === "cards" && Cards}
-    <div id="cards-host"><Cards {viz} /></div>
+  {#if GL}
+    <div id="gl-host"><GL {viz} {onSceneReady} {onFirstFrame} /></div>
   {/if}
   <Tooltip {viz} />
   <DetailPanel {viz} stageEl={el} {resizeSeq} />
@@ -124,23 +39,14 @@
 <style>
   #stage {
     /* Full-bleed: the sidebar and detail panel overlay this rather than
-       sharing a grid track, so the three.js scene always has the whole
-       viewport to frame. */
+       sharing a grid track, so the GL scene always has the whole viewport
+       to frame. */
     position: absolute;
     inset: 0;
     overflow: hidden;
   }
-  #graph-host,
-  #cards-host {
+  #gl-host {
     position: absolute;
     inset: 0;
-  }
-  #cards-host {
-    z-index: 1; /* above the (hidden) canvas, below the overlay chrome */
-  }
-  #graph-host.hidden {
-    /* visibility (not display): keeps the canvas size stable so no resize
-       churn fires while hidden, and pointer events stop reaching it. */
-    visibility: hidden;
   }
 </style>

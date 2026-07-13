@@ -10,7 +10,7 @@
   // toward that edge (hit-tested by the scene). Static between recomputes —
   // plain Threlte prop reactivity (no frame-applier registry) keeps it in
   // place; motion.overflow re-emits whenever scroll/window/layout changes.
-  import { T } from "@threlte/core";
+  import { T, useThrelte } from "@threlte/core";
   import * as THREE from "three";
   import { makeChipFace } from "./cardFace";
 
@@ -25,9 +25,13 @@
   }
   const { count, angle, pos, quat, bg, ink }: Props = $props();
 
+  const { invalidate } = useThrelte();
+
   const mat = new THREE.MeshBasicMaterial({ toneMapped: false, transparent: true });
-  const texture = $derived(
-    makeChipFace({
+  // Eager effect over the props (same rationale as Card.svelte's face
+  // effect): regenerate on any change, invalidate the on-demand canvas.
+  $effect(() => {
+    const tex = makeChipFace({
       count,
       angle,
       bg,
@@ -35,12 +39,11 @@
       w: CHIP_W,
       h: CHIP_H,
       dpr: Math.min(Math.max(devicePixelRatio || 1, 1), 2),
-    }),
-  );
-  $effect(() => {
-    mat.map = texture;
+    });
+    mat.map = tex;
     mat.needsUpdate = true;
-    return () => texture.dispose();
+    invalidate();
+    return () => tex.dispose();
   });
 </script>
 

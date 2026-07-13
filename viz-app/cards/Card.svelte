@@ -48,28 +48,28 @@
     invalidate();
   });
 
-  // Texture regenerates when the render entry changes (retarget time =
-  // transition start, already at final detail), the theme flips, or the
-  // applier first wants a face for this card; null while unwanted.
-  const texture = $derived(
-    faceWanted
-      ? makeCardFace({
-          title,
-          desc,
-          bg,
-          outline,
-          ink,
-          w: entry.w,
-          h: entry.h,
-          dpr: Math.min(Math.max(devicePixelRatio || 1, 1), 2),
-        })
-      : null,
-  );
+  // One EAGER effect owns the face texture: every input is read
+  // unconditionally BEFORE the gate (the dependency set must never depend
+  // on the gate state), and any change — theme flips included — disposes
+  // and regenerates. Deliberately NOT an intermediate $derived: a derived
+  // whose gate short-circuits past the prop reads has been seen to miss
+  // later prop invalidations in the bundled runtime.
   $effect(() => {
-    faceMat.map = texture;
+    const spec = {
+      title,
+      desc,
+      bg,
+      outline,
+      ink,
+      w: entry.w,
+      h: entry.h,
+      dpr: Math.min(Math.max(devicePixelRatio || 1, 1), 2),
+    };
+    const tex = faceWanted ? makeCardFace(spec) : null;
+    faceMat.map = tex;
     faceMat.needsUpdate = true;
     invalidate();
-    return () => texture?.dispose();
+    return () => tex?.dispose();
   });
 
   $effect(() => {

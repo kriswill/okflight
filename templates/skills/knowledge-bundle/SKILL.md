@@ -37,7 +37,7 @@ okf viz       # regenerate {bundle}/viz.html interactive graph (gitignored)
 | Made a non-obvious decision (anything that would deserve a long commit body) | Add `{bundle}/decisions/<slug>.md` (template below); cite commit hashes; link affected concepts both ways |
 | Changed how a core mechanism works | Update the matching `{bundle}/patterns/*.md` |
 | New recurring procedure | Add `{bundle}/playbooks/<slug>.md` |
-| Any of the above | Append a `log.md` entry under today's `## YYYY-MM-DD` (newest first, `**Update**`/`**Creation**`/`**Deprecation**` lead), then run `index` + `validate` |
+| Any of the above | Append a log entry to the **owning bundle directory's** `log.md` (`{bundle}/decisions/log.md`, `{bundle}/patterns/log.md`, … — create it on the first entry) under today's `## YYYY-MM-DD` (newest first, `**Update**`/`**Creation**`/`**Deprecation**` lead), links relative to that file; then run `index` + `validate` |
 
 ## Entry quality checklist
 
@@ -98,3 +98,11 @@ timestamp: '<ISO-8601 now>'
   concept bodies (frontmatter `title` is the H1).
 - Never hand-edit generated `index.md` listing sections — only the blurb
   above the first heading; `viz.html` is generated and gitignored.
+- ⚠️ **Logs are bundle-scoped; the root `{bundle}/log.md` is NOT the
+  default.** Per OKF SPEC §7 a `log.md` may appear at any level, recording
+  changes to that scope — so entries go in the `log.md` of the directory
+  owning the change's primary subject. The root log records bundle-level
+  events only: new bundle types or directories, root-level concept docs,
+  bundle-wide sweeps, tooling conventions. Before appending to the root
+  log, justify why no single sub-bundle owns the change — if one does, the
+  entry belongs there.

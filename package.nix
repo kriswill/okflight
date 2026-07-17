@@ -63,10 +63,13 @@ let
 
   # The lock is pure JS — no os/cpu-conditional packages, no install scripts —
   # so one hash serves every platform; --cpu/--os="*" keeps that true if a
-  # future dep adds conditionals. --omit=optional: the only optional dep is
-  # the `bun` npm package (the npx/bunx fallback runtime — see bin/okf.mjs);
+  # future dep adds conditionals. --omit=optional: the only optional deps are
+  # the `bun` npm package (the npx/bunx fallback runtime — see bin/okf.mjs)
+  # and @typescript/native-preview's per-platform tsgo binaries (~26M each);
   # the nix wrapper provides the real bun, and vendoring every platform's
-  # ~90MB binary into the store would be pure bloat. NOT --production:
+  # binaries into the store would be pure bloat. Consequence: the vendored
+  # tree cannot run the tsgo typecheck — `okf viz --check` needs a dev-tree
+  # `bun install` (which does fetch optionals). NOT --production:
   # `okf viz` needs svelte + bun-plugin-svelte at CLI runtime, the tests
   # happy-dom.
   # Refresh the hash (bun.lock or nixpkgs bun changes): set lib.fakeHash, then
@@ -109,7 +112,7 @@ let
     # Fixup would patch shebangs into store paths — forbidden in a fixed-output
     # derivation.
     dontFixup = true;
-    outputHash = "sha256-m3/rcohIVs0TNn2xVs4BjKniOhHcscu0mLyNhrOMZ74=";
+    outputHash = "sha256-4Q0LD6wmy1unwsKzOY4vp6ySSHFv67lKTv8uPZXSyd0=";
     outputHashAlgo = "sha256";
     outputHashMode = "recursive";
   };

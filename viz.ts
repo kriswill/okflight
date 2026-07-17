@@ -30,12 +30,33 @@ import { THEMES } from "./viz-app/themes";
 const argv = process.argv.slice(2);
 
 // --check: typecheck the viewer app (svelte-check) instead of building.
+// TS diagnostics come from tsgo (@typescript/native-preview) via svelte-check's
+// experimental API — in-process, no `node` spawn, no disk artifacts, ~2x faster
+// than the tsc path. Drop the flag to fall back to tsc (typescript stays a
+// devDependency: svelte-check requires it regardless).
 if (argv.includes("--check")) {
-  const r = Bun.spawnSync(["bunx", "svelte-check", "--tsconfig", "./tsconfig.json"], {
-    cwd: import.meta.dir,
-    stdout: "inherit",
-    stderr: "inherit",
-  });
+  // tsgo's per-platform binary is an optionalDependency, omitted from the nix
+  // package's vendored node_modules (--omit=optional); without it svelte-check
+  // dies with an unhelpful "Cannot run with tsconfig path without LS/TSdoc
+  // resolver". Fail with a real explanation instead.
+  const tsgoBin = `@typescript/native-preview-${process.platform}-${process.arch}`;
+  try {
+    Bun.resolveSync(`${tsgoBin}/package.json`, import.meta.dir);
+  } catch {
+    console.error(
+      `okf viz --check: ${tsgoBin} is not installed — the nix-built package ` +
+        `omits optional deps; run from a dev checkout after \`bun install\`.`,
+    );
+    process.exit(1);
+  }
+  const r = Bun.spawnSync(
+    ["bunx", "svelte-check", "--tsconfig", "./tsconfig.json", "--tsgo-experimental-api"],
+    {
+      cwd: import.meta.dir,
+      stdout: "inherit",
+      stderr: "inherit",
+    },
+  );
   process.exit(r.exitCode ?? 1);
 }
 

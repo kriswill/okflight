@@ -54,7 +54,7 @@
     "bun-plugin-svelte": "^0.0.6",
     "postprocessing": "^6.38.3",
     "svelte": "^5.56.4",
-    "three": "~0.183.0"
+    "three": "~0.185.1"
   },
   "optionalDependencies": {
     "bun": "^1.2.0"

@@ -28,7 +28,7 @@ const commands: Record<string, Cmd> = {
     flags: [
       ["--dir=<dir>", "bundle directory (default: knowledge)"],
       ["--title=<t>", 'viz display title (default: "OKF knowledge graph")'],
-      ["--skills-dir=<d>", "agent-skill install dir (default: .agent/skills)"],
+      ["--skills-dir=<d>", "agent-skill install dir (default: .agents/skills)"],
       ["--no-skill", "skip installing the knowledge-bundle agent skill"],
       ["--no-scripts", "skip the scaffold-scripts starter"],
       ["--no-gitignore", "leave .gitignore untouched"],

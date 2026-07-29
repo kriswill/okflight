@@ -93,7 +93,7 @@ and CI (`--yes` plus `--dir=`/`--title=`/`--skills-dir=`/`--no-skill`/
 - `okflight.toml` — the commented starter config (as `init` does), with
   `[scaffold] script` pre-wired when the scripts starter is chosen;
 - the bundle skeleton — `<dir>/index.md`, `<dir>/log.md`;
-- `.agent/skills/knowledge-bundle/SKILL.md` — an agent skill teaching the
+- `.agents/skills/knowledge-bundle/SKILL.md` — an agent skill teaching the
   bundle-maintenance loop (when to scaffold/index/validate, entry quality
   bar, decision-record template), with the bundle dir substituted in; point
   `--skills-dir=` at `.claude/skills` (or symlink) for Claude Code;

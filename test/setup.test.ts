@@ -59,7 +59,7 @@ describe("okf setup", () => {
     expect(existsSync(join(root, "docs/kb/index.md"))).toBe(true);
     expect(existsSync(join(root, "docs/kb/log.md"))).toBe(true);
 
-    const skill = readFileSync(join(root, ".agent/skills/knowledge-bundle/SKILL.md"), "utf8");
+    const skill = readFileSync(join(root, ".agents/skills/knowledge-bundle/SKILL.md"), "utf8");
     expect(skill).toContain("docs/kb/"); // {bundle} substituted
     expect(skill).toContain("docs/kb/_okflight/scripts"); // scripts variant of {scaffold-note}
     expect(skill).not.toContain("{bundle}");
@@ -81,7 +81,7 @@ describe("okf setup", () => {
     run("setup.ts", root, "--yes", "--no-skill", "--no-scripts", "--no-gitignore");
     const toml = readFileSync(join(root, "okflight.toml"), "utf8");
     expect(toml).toContain('# script = "knowledge/_okflight/scripts/main.ts"'); // [scaffold] left commented
-    expect(existsSync(join(root, ".agent"))).toBe(false);
+    expect(existsSync(join(root, ".agents"))).toBe(false);
     expect(existsSync(join(root, "knowledge/_okflight"))).toBe(false);
     expect(existsSync(join(root, ".gitignore"))).toBe(false);
 

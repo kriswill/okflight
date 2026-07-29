@@ -1,6 +1,6 @@
 // Guided integration wizard — everything `okf init` writes plus the pieces
 // that make a repo actually receive okflight: the knowledge-bundle agent
-// skill (.agent/skills/), the repo-owned scaffold-scripts starter
+// skill (.agents/skills/), the repo-owned scaffold-scripts starter
 // (<bundle>/_okflight/scripts/, wired into [scaffold] script), and a
 // .gitignore entry for the generated viz. Interactive on a TTY (Enter
 // accepts the default); every question also has a flag, so agents and CI
@@ -46,7 +46,7 @@ if (!validRelDir(dir)) {
   process.exit(1);
 }
 const title = ask(flagVal("--title"), "Graph display title", "OKF knowledge graph");
-const skillsDir = ask(flagVal("--skills-dir"), "Agent-skills directory", ".agent/skills").replace(/\/+$/, "");
+const skillsDir = ask(flagVal("--skills-dir"), "Agent-skills directory", ".agents/skills").replace(/\/+$/, "");
 if (!validRelDir(skillsDir)) {
   console.error('setup: skills directory must be a non-empty relative path without ".."');
   process.exit(1);

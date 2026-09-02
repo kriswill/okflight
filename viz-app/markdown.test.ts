@@ -222,3 +222,70 @@ describe("blocks", () => {
     expect(md.mdToHtml("line one\nline two\n\nnext para", from)).toBe("<p>line one line two</p><p>next para</p>");
   });
 });
+
+describe("math (KaTeX)", () => {
+  const html = (src: string) => md.mdToHtml(src, from);
+
+  test("inline $…$ renders KaTeX markup inside the paragraph", () => {
+    const out = html("energy is $E = mc^2$ exactly");
+    expect(out).toStartWith("<p>energy is <span class=\"katex\">");
+    expect(out).toEndWith(" exactly</p>");
+    expect(out).toContain("<annotation encoding=\"application/x-tex\">E = mc^2</annotation>");
+  });
+
+  test("inline \\(…\\) is an equivalent delimiter", () => {
+    expect(html("\\(x^2\\)")).toContain('<span class="katex">');
+  });
+
+  test("display $$…$$ on one line renders in display mode", () => {
+    const out = html("$$\\int_0^1 x\\,dx$$");
+    expect(out).toContain("katex-display");
+    expect(out).not.toContain("<p>");
+  });
+
+  test("display block spanning several lines", () => {
+    const out = html("intro\n\n$$\na = b\n+ c\n$$\n\nafter");
+    expect(out).toStartWith("<p>intro</p>");
+    expect(out).toContain("katex-display");
+    expect(out).toEndWith("<p>after</p>");
+  });
+
+  test("\\[…\\] display delimiter", () => {
+    expect(html("\\[a+b\\]")).toContain("katex-display");
+  });
+
+  test("dollars in prose are not math", () => {
+    expect(html("costs $5 to $10 per seat")).toBe("<p>costs $5 to $10 per seat</p>");
+  });
+
+  test("escaped \\$ stays a literal dollar", () => {
+    expect(html("\\$x\\$")).toBe("<p>$x$</p>");
+  });
+
+  test("dollars inside a code span stay literal", () => {
+    expect(html("run `echo $HOME and $PWD` now")).toBe("<p>run <code>echo $HOME and $PWD</code> now</p>");
+  });
+
+  test("math inside a fenced block is not rendered", () => {
+    expect(html("```\n$$x^2$$\n```")).toBe("<pre><code>$$x^2$$</code></pre>");
+  });
+
+  test("markdown inside math is left to KaTeX", () => {
+    // *…* and _…_ are TeX syntax here, not emphasis.
+    expect(html("$a_1 * b_2$")).not.toContain("<em>");
+  });
+
+  test("a bad formula renders inline as an error, not a throw", () => {
+    const out = html("$\\frac{1}$");
+    expect(out).toContain("katex-error");
+  });
+
+  test("math survives in list items and table cells", () => {
+    expect(html("- $x^2$")).toContain('<li><span class="katex"');
+    expect(html("| a |\n| --- |\n| $x^2$ |")).toContain('<td><span class="katex"');
+  });
+
+  test("unterminated display block still renders", () => {
+    expect(html("$$\na+b")).toContain("katex-display");
+  });
+});

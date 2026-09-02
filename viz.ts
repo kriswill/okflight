@@ -13,7 +13,7 @@ import { extname, join } from "node:path";
 import { loadContext } from "./config-cli";
 import { extractLinks, firstHeading, indexBlurb, isExternal, nowISO, parseDoc, resolveLink, titleFromSlug, walkMd } from "./lib";
 import { layout3d } from "./layout3d";
-import { collectLicenses, generatorInfo } from "./licenses";
+import { collectLicenses, generatorInfo, packageDir } from "./licenses";
 import { displayName } from "./viz-app/config";
 import {
   classifyRootLink,
@@ -451,6 +451,27 @@ const appJs = (await jsOut.text()).replace(/<\/script/gi, "<\\/script");
 let appCss = "";
 for (const o of build.outputs) if (o.path.endsWith(".css")) appCss += await o.text();
 appCss = appCss.replace(/<\/style/gi, "<\\/style");
+// KaTeX's stylesheet ships alongside a fonts/ directory it loads by relative
+// URL — useless in a single-file page, so the woff2 faces ride inline as
+// data URIs and the woff/ttf fallbacks (same glyphs, ~4x the bytes) are
+// dropped. Every browser that can run the viewer's WebGL supports woff2.
+const katexDir = packageDir("katex", import.meta.dir);
+const katexCss = readFileSync(join(katexDir, "dist", "katex.min.css"), "utf8")
+  .replace(/src:([^;}]+)/g, (_m, src: string) =>
+    "src:" +
+    src
+      .split(/,(?=\s*url\()/)
+      .filter((part) => /\.woff2\)/.test(part))
+      .map((part) =>
+        part.replace(/url\((fonts\/[^)]+)\)/, (_u, rel: string) => {
+          const bytes = readFileSync(join(katexDir, "dist", rel));
+          return `url(data:font/woff2;base64,${bytes.toString("base64")})`;
+        }),
+      )
+      .join(","),
+  )
+  .replace(/<\/style/gi, "<\\/style");
+appCss = katexCss + appCss;
 // Minification just stripped the bundled deps' copyright headers, and MIT/
 // zlib both require the notice to accompany every redistributed copy — ride
 // each runtime dependency's LICENSE text along in the data blob (About

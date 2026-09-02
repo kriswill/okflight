@@ -2,10 +2,78 @@
 // hard-wrap continuations, fences, pipe tables, inline code/bold/em/links,
 // and autolinking of bare repo paths that resolve to embedded files.
 
+import katex from "katex";
+
 import { DEFAULT_BUNDLE_DIR } from "./config";
 
 export const esc = (s: unknown) =>
   String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
+
+/** Render one math span to KaTeX HTML. Parse errors render in place as
+ *  KaTeX's red error markup rather than throwing — one bad formula must not
+ *  take down the whole document. */
+function tex(src: string, display: boolean): string {
+  // Default output keeps the MathML layer alongside the visual HTML, so
+  // screen readers and copy-paste get the formula rather than glyph soup.
+  return katex.renderToString(src, { displayMode: display, throwOnError: false });
+}
+
+/** Placeholder for an already-rendered math span, parked through the inline
+ *  pipeline so escaping/bold/link passes never see KaTeX's markup. NUL can't
+ *  occur in the source (esc leaves it alone, no rule matches it). */
+const MATH_OPEN = "\u0000m";
+const MATH_CLOSE = "\u0000";
+
+/** Replace inline math ($…$, \(…\)) with placeholders, leaving the rest of
+ *  the line untouched. Code spans are skipped verbatim, so `$5 and $7` in
+ *  backticks stays literal; an unpaired delimiter also stays literal. */
+function extractMath(s: string, store: string[]): string {
+  let out = "";
+  let i = 0;
+  while (i < s.length) {
+    const c = s[i];
+    if (c === "`") {
+      const end = s.indexOf("`", i + 1);
+      if (end < 0) {
+        out += s.slice(i);
+        break;
+      }
+      out += s.slice(i, end + 1);
+      i = end + 1;
+      continue;
+    }
+    if (c === "\\" && (s[i + 1] === "(" || s[i + 1] === "$")) {
+      // \( opens math; \$ is an escaped literal dollar.
+      if (s[i + 1] === "$") {
+        out += "$";
+        i += 2;
+        continue;
+      }
+      const end = s.indexOf("\\)", i + 2);
+      if (end >= 0) {
+        out += MATH_OPEN + (store.push(tex(s.slice(i + 2, end), false)) - 1) + MATH_CLOSE;
+        i = end + 2;
+        continue;
+      }
+    }
+    if (c === "$") {
+      // A closing $ must not be preceded by whitespace, and the span must be
+      // non-empty — keeps prose like "$5 to $10" out of math mode.
+      const m = /^\$(?!\s)((?:[^$\\\n]|\\.)+?)(?<!\s)\$(?!\d)/.exec(s.slice(i));
+      if (m) {
+        out += MATH_OPEN + (store.push(tex(m[1], false)) - 1) + MATH_CLOSE;
+        i += m[0].length;
+        continue;
+      }
+    }
+    out += c;
+    i++;
+  }
+  return out;
+}
+
+const restoreMath = (html: string, store: string[]) =>
+  html.replace(/\u0000m(\d+)\u0000/g, (_m, n) => store[Number(n)] ?? "");
 
 export interface MdCtx {
   files: Record<string, unknown>;
@@ -125,11 +193,16 @@ export function createMd({
       });
 
   function render(md: string, dir: string[]): string {
-    const inline = (s: string) => autolinkPaths(inlineRaw(s, dir));
+    const inline = (s: string) => {
+      const math: string[] = [];
+      return restoreMath(autolinkPaths(inlineRaw(extractMath(s, math), dir)), math);
+    };
     const out: string[] = [];
     let inFence = false;
     let fence: string[] = [];
     let list: { type: string; items: string[] } | null = null;
+    /** Open display-math block: the delimiter that closes it + its lines. */
+    let mathBlock: { close: string; lines: string[] } | null = null;
     let para: string[] = [];
     let tbl: string[] = [];
     const flushList = () => {
@@ -177,6 +250,32 @@ export function createMd({
       out.push(`<div class="tbl-wrap"><table>${head}${body ? `<tbody>${body}</tbody>` : ""}</table></div>`);
     };
     for (const line of md.split("\n")) {
+      if (mathBlock) {
+        const end = line.indexOf(mathBlock.close);
+        if (end < 0) {
+          mathBlock.lines.push(line);
+          continue;
+        }
+        mathBlock.lines.push(line.slice(0, end));
+        out.push(tex(mathBlock.lines.join("\n").trim(), true));
+        mathBlock = null;
+        continue;
+      }
+      // Display math on its own block: $$…$$ or \[…\], opened and closed on
+      // one line or spanning several. Checked before fences/lists so a body
+      // that starts a line with $$ never falls through to paragraph text.
+      const mOpen = !inFence && line.match(/^\s*(\$\$|\\\[)(.*)$/);
+      if (mOpen) {
+        flushTable();
+        flushList();
+        flushPara();
+        const close = mOpen[1] === "$$" ? "$$" : "\\]";
+        const rest = mOpen[2];
+        const end = rest.indexOf(close);
+        if (end >= 0) out.push(tex(rest.slice(0, end).trim(), true));
+        else mathBlock = { close, lines: [rest] };
+        continue;
+      }
       if (/^(```|~~~)/.test(line)) {
         flushTable();
         flushList();
@@ -228,6 +327,8 @@ export function createMd({
       flushList();
       para.push(inline(line));
     }
+    // An unterminated display block still renders what it collected.
+    if (mathBlock) out.push(tex(mathBlock.lines.join("\n").trim(), true));
     flushTable();
     flushList();
     flushPara();

@@ -4,6 +4,13 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # svelte-check consumes TypeScript's JS API, which the TS 7 package
+      # (tsgo, Go binary only) no longer ships; tsgo diagnostics come from
+      # @typescript/native-preview. Stay on the 6.x line until svelte-check
+      # runs on TS 7 alone.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule:

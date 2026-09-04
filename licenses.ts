@@ -13,10 +13,11 @@ import type { DepLicense, GeneratorInfo } from "./viz-app/data";
 
 /** `dependencies` entries whose code is NOT compiled into the generated
  *  page. npm/bunx installs only `dependencies`, so tooling okf needs at CLI
- *  runtime (the Svelte build plugin) must live there even though nothing of
- *  it is redistributed in the page — embedding its notice would misstate
- *  what the page contains. Test-/dev-only tooling stays in devDependencies. */
-export const BUILD_ONLY = new Set(["bun-plugin-svelte"]);
+ *  runtime must live there even though nothing of it is redistributed in the
+ *  page — embedding its notice would misstate what the page contains.
+ *  Currently empty (the Svelte compiler plugin is in-repo and svelte itself
+ *  IS bundled); test-/dev-only tooling stays in devDependencies. */
+export const BUILD_ONLY = new Set<string>([]);
 
 /** `dependencies` compiled into the page only when the named option is on
  *  (viz.ts aliases them to stubs otherwise) — their notices ship only with

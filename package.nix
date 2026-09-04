@@ -6,7 +6,7 @@
   makeBinaryWrapper,
 }:
 # okf runs from source under bun — `okf viz` bundles the Svelte viewer with
-# Bun.build + bun-plugin-svelte at CLI runtime, so `bun build --compile` is out;
+# Bun.build + an in-repo Svelte plugin at CLI runtime, so `bun build --compile` is out;
 # the package ships the TypeScript tree plus vendored node_modules and a bun
 # wrapper. Deps are a fixed-output `bun install` (no bun packaging helper exists
 # in nixpkgs; this mirrors its opencode/helix-gpt packages). The repo okf
@@ -70,7 +70,7 @@ let
   # binaries into the store would be pure bloat. Consequence: the vendored
   # tree cannot run the tsgo typecheck — `okf viz --check` needs a dev-tree
   # `bun install` (which does fetch optionals). NOT --production:
-  # `okf viz` needs svelte + bun-plugin-svelte at CLI runtime, the tests
+  # `okf viz` needs svelte (compiler + runtime) at CLI runtime, the tests
   # happy-dom.
   # Refresh the hash (bun.lock or nixpkgs bun changes): set lib.fakeHash, then
   # `nix build ./flakes/okf#okf.node_modules` and copy the "got:" value.
@@ -112,7 +112,7 @@ let
     # Fixup would patch shebangs into store paths — forbidden in a fixed-output
     # derivation.
     dontFixup = true;
-    outputHash = "sha256-CzNnslDjWK2KDYSoByz988uBMmLd+s9t4PaKL0yWOhA=";
+    outputHash = "sha256-/8hMmJl6HnCxSd6EFzJJyAkdVKXUBd0J9ncCtf+PnKE=";
     outputHashAlgo = "sha256";
     outputHashMode = "recursive";
   };

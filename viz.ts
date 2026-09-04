@@ -411,13 +411,13 @@ const positions = layout3d(nodes.map((n) => n.id), dedupedEdges);
 for (const n of nodes) Object.assign(n, positions.get(n.id));
 lap("layout");
 
-// --- Bundle the viewer app (Svelte 5 via bun-plugin-svelte) ---------------------
+// --- Bundle the viewer app (Svelte 5 via viz-app/svelte-plugin.ts) ---------------
 // Missing-deps check via actual resolution, not a node_modules path probe:
 // an npm/bunx install lays the deps flat in the CONSUMER'S node_modules (a
 // parent of this file), where they resolve fine — a beside-viz.ts existence
 // check would trigger a spurious nested `bun install` of the full dev tree.
 // Only a genuinely fresh checkout (nothing resolvable) self-heals here.
-const unresolvable = ["svelte", "bun-plugin-svelte"].some((dep) => {
+const unresolvable = ["svelte"].some((dep) => {
   try {
     Bun.resolveSync(dep, import.meta.dir);
     return false;
@@ -430,15 +430,20 @@ if (unresolvable) {
   const r = Bun.spawnSync(["bun", "install"], { cwd: import.meta.dir, stdout: "inherit", stderr: "inherit" });
   if (r.exitCode !== 0) process.exit(r.exitCode ?? 1);
 }
-// Imported lazily so a fresh clone reaches the install step above first.
-const { SveltePlugin } = await import("bun-plugin-svelte");
+// Imported lazily so a fresh clone reaches the install step above first
+// (the plugin pulls in svelte/compiler).
+const { sveltePlugin } = await import("./viz-app/svelte-plugin");
 const build = await Bun.build({
   entrypoints: [join(import.meta.dir, "viz-app", "main.ts")],
   target: "browser",
   format: "esm",
   minify: true,
+  // "svelte" export condition: @threlte/core (and any Svelte library) points
+  // it at uncompiled .svelte sources for our compiler; without it Bun picks
+  // the package's default entry and the resolve fails.
+  conditions: ["svelte"],
   plugins: [
-    SveltePlugin({ development: false, compilerOptions: { runes: true } }),
+    sveltePlugin(),
     // display.math off: markdown.ts never calls into katex, but its static
     // import would still pull the whole renderer into the page — alias it to
     // an empty stub so the bundle carries no KaTeX code at all.

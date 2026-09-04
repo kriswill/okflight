@@ -15,6 +15,7 @@ const rawCfg = () => ({
     "fallback-name": "knowledge/",
     "about-html": "<b>about</b>",
     "date-format": "us",
+    math: true,
   },
   embed: { "max-bytes": 100 },
   taxonomy: {
@@ -49,6 +50,7 @@ describe("normalizeVizConfig", () => {
       expect(c.display.name).toBeNull();
       expect(c.display.aboutHtml).toContain("Open Knowledge Format");
       expect(c.display.dateFormat).toBe("iso");
+      expect(c.display.math).toBe(false);
       expect(c.embed.maxBytes).toBe(200_000);
       expect(c.taxonomy).toEqual({ types: [], dirGroups: {}, groupOrder: [], other: "Other" });
       expect(c.facets).toEqual([]);
@@ -112,6 +114,9 @@ describe("normalizeVizConfig", () => {
 
   test("strict: type mismatches error; lenient keeps defaults", () => {
     expect(() => normalizeVizConfig({ embed: { "max-bytes": "big" } }, { strict: true })).toThrow(VizConfigError);
+    expect(() => normalizeVizConfig({ display: { math: "yes" } }, { strict: true })).toThrow(VizConfigError);
+    expect(normalizeVizConfig({ display: { math: "yes" } }).display.math).toBe(false);
+    expect(normalizeVizConfig({ display: { math: true } }).display.math).toBe(true);
     expect(normalizeVizConfig({ embed: { "max-bytes": "big" } }).embed.maxBytes).toBe(200_000);
   });
 

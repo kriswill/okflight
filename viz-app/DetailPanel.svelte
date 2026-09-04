@@ -22,6 +22,7 @@
     bundleDir: viz.model.cfg.bundle.dir,
     bundles: viz.model.bundles,
     root: viz.model.root,
+    math: viz.model.cfg.display.math,
   });
 
   const file = $derived(viz.sel.kind === "file" ? viz.model.files[viz.sel.path] : null);

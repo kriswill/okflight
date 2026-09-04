@@ -57,6 +57,7 @@ title = "${tomlStr(title)}"    # <title> = "<name> — <title>"
 # badge = "OKFlight"             # brand label (stage About button + modal title)
 # name = ""                      # header name override ("" = derive owner/repo)
 # date-format = "iso"            # "iso" | "us" | "international"
+# math = false                   # render LaTeX with KaTeX (adds ~1.3 MB to viz.html)
 # about-html = """Help-bubble text (trusted HTML)."""
 
 ${scaffoldSection}

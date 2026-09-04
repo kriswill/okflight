@@ -10,7 +10,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { BUILD_ONLY, collectLicenses, generatorInfo } from "../licenses";
+import { BUILD_ONLY, collectLicenses, generatorInfo, OPTIONAL_DEPS } from "../licenses";
 
 const okflight = join(import.meta.dir, "..");
 
@@ -23,6 +23,7 @@ describe("collectLicenses", () => {
     // would throw here. Every exclusion must still BE a dependency, so a
     // removed dep can't leave a stale entry silently masking a future one.
     for (const name of BUILD_ONLY) expect(Object.keys(pkg.dependencies)).toContain(name);
+    for (const name of Object.keys(OPTIONAL_DEPS)) expect(Object.keys(pkg.dependencies)).toContain(name);
     const embedded = Object.keys(pkg.dependencies).filter((d: string) => !BUILD_ONLY.has(d));
     expect(got.map((l) => l.name)).toEqual(embedded.sort());
     for (const l of got) {
@@ -31,6 +32,12 @@ describe("collectLicenses", () => {
       expect(l.text.length).toBeGreaterThan(200); // a real notice, not a stub
       expect(l.text).toContain("Copyright");
     }
+  });
+
+  test("omit drops the named optional deps (display.math off leaves katex out)", () => {
+    const names = collectLicenses(okflight, Object.keys(OPTIONAL_DEPS)).map((l) => l.name);
+    expect(names).not.toContain("katex");
+    expect(names).toContain("three");
   });
 
   test("the known bundled deps carry their MIT/zlib notice texts", () => {
@@ -97,9 +104,8 @@ describe("generatorInfo", () => {
 });
 
 describe("okf viz output", () => {
-  test(
-    "the generated page embeds every runtime dep's license notice",
-    () => {
+  /** Build a tiny bundle with `okf viz <flags>`; returns the page + its #data blob. */
+  const build = (...flags: string[]) => {
       const root = mkdtempSync(join(tmpdir(), "okf-viz-"));
       writeFileSync(join(root, "okflight.toml"), '[vcs]\nprovider = "none"\n');
       mkdirSync(join(root, "knowledge"));
@@ -108,19 +114,26 @@ describe("okf viz output", () => {
         join(root, "knowledge", "alpha.md"),
         "---\ntype: Decision\ntitle: Alpha\ndescription: a\n---\n\nSee [beta](beta.md).\n",
       );
-      writeFileSync(join(root, "knowledge", "beta.md"), "---\ntype: Pattern\ntitle: Beta\ndescription: b\n---\n\nBody.\n");
+      writeFileSync(join(root, "knowledge", "beta.md"), "---\ntype: Pattern\ntitle: Beta\ndescription: b\n---\n\nBody $E = mc^2$.\n");
 
-      const r = Bun.spawnSync([process.execPath, join(okflight, "viz.ts")], { cwd: root, stdout: "pipe", stderr: "pipe" });
+      const r = Bun.spawnSync([process.execPath, join(okflight, "viz.ts"), ...flags], { cwd: root, stdout: "pipe", stderr: "pipe" });
       if (r.exitCode !== 0) throw new Error(`viz.ts failed (${r.exitCode}):\n${r.stdout}\n${r.stderr}`);
       const html = readFileSync(join(root, "knowledge", "viz.html"), "utf8");
-
       // Structure: the notices ride the #data blob the viewer boots from
       // (`<\/` is the valid JSON escape of `/`, so the blob parses verbatim).
       const blob = html.match(/<script id="data" type="application\/json">(.*?)<\/script>/s)![1]!;
-      const pkg = JSON.parse(readFileSync(join(okflight, "package.json"), "utf8"));
-      const licenses: { name: string; text: string }[] = JSON.parse(blob).licenses;
-      const embedded = Object.keys(pkg.dependencies).filter((d: string) => !BUILD_ONLY.has(d));
+      return { html, data: JSON.parse(blob) };
+  };
+  const pkg = JSON.parse(readFileSync(join(okflight, "package.json"), "utf8"));
+  const embedded = Object.keys(pkg.dependencies).filter((d: string) => !BUILD_ONLY.has(d));
+
+  test(
+    "the generated page embeds every runtime dep's license notice (--math: katex included)",
+    () => {
+      const { html, data } = build("--math");
+      const licenses: { name: string; text: string }[] = data.licenses;
       expect(licenses.map((l) => l.name)).toEqual(embedded.sort());
+      expect(html).toContain("KaTeX_Main"); // the stylesheet + inlined fonts shipped too
       for (const l of licenses) expect(l.text).toContain("Copyright");
 
       // Compliance: the notice texts are physically present in the shipped file.
@@ -130,12 +143,27 @@ describe("okf viz output", () => {
 
       // The page identifies its generator: project link + license + copyright
       // (the embedded viewer app is okflight code).
-      const gen = JSON.parse(blob).generator;
+      const gen = data.generator;
       expect(gen.url).toBe("https://github.com/kriswill/okflight");
       expect(gen.license).toBe("MIT");
       expect(gen.copyright).toBe("© 2026 Kris Williams");
       expect(html).toContain("Copyright (c) 2026 Kris Williams"); // full own-LICENSE text embedded
     },
     30_000, // spawns a full Bun.build of the viewer
+  );
+
+  test(
+    "display.math off (the default) leaves KaTeX out: no code, CSS, fonts, or notice",
+    () => {
+      const { html, data } = build();
+      const licenses: { name: string }[] = data.licenses;
+      expect(licenses.map((l) => l.name)).toEqual(embedded.filter((d) => !(d in OPTIONAL_DEPS)).sort());
+      expect(data.cfg.display.math).toBe(false);
+      expect(html).not.toContain("KaTeX_Main");
+      expect(html).not.toContain("katex-display");
+      // A body with math is left literal rather than typeset.
+      expect(html).toContain("$E = mc^2$");
+    },
+    30_000,
   );
 });

@@ -18,6 +18,11 @@ import type { DepLicense, GeneratorInfo } from "./viz-app/data";
  *  what the page contains. Test-/dev-only tooling stays in devDependencies. */
 export const BUILD_ONLY = new Set(["bun-plugin-svelte"]);
 
+/** `dependencies` compiled into the page only when the named option is on
+ *  (viz.ts aliases them to stubs otherwise) — their notices ship only with
+ *  the copies that actually got embedded. */
+export const OPTIONAL_DEPS: Record<string, string> = { katex: "display.math" };
+
 /** okflight's own identity for the generated page: the About modal's
  *  Built-with link plus its MIT notice — the viewer app minified into every
  *  page is okflight code, the same rationale as the dep notices below.
@@ -65,13 +70,15 @@ export function packageDir(name: string, from: string): string {
 /** Collect every runtime dependency's license notice from `dir`'s
  *  package.json + the resolvable node_modules (dir = the okf checkout,
  *  where viz.ts lives). Throws when a dependency ships no recognizable
- *  license file. */
-export function collectLicenses(dir: string): DepLicense[] {
+ *  license file. `omit`: optional deps left out of this build (OPTIONAL_DEPS
+ *  whose option is off). */
+export function collectLicenses(dir: string, omit: Iterable<string> = []): DepLicense[] {
   const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
     dependencies?: Record<string, string>;
   };
+  const omitted = new Set(omit);
   return Object.keys(pkg.dependencies ?? {})
-    .filter((name) => !BUILD_ONLY.has(name))
+    .filter((name) => !BUILD_ONLY.has(name) && !omitted.has(name))
     .sort()
     .map((name) => {
       const pkgDir = packageDir(name, dir);

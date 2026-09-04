@@ -17,6 +17,30 @@ time) in the page — see the "Licenses" tab in the viewer's About modal, which
 also carries okflight's own MIT notice (the embedded viewer app is okflight
 code) and links back to this project.
 
+### LaTeX math (opt-in)
+
+Concept bodies may carry LaTeX — inline `$…$` or `\(…\)`, display
+`$$…$$` or `\[…\]` (single line or a multi-line block). `viz` typesets it
+with [KaTeX](https://katex.org/), MathML layer included so copy-paste and
+screen readers get the formula. Because the renderer plus its inlined woff2
+fonts add about 1.3 MB to every `viz.html`, math is **off by default**;
+turn it on either way:
+
+```toml
+[display]
+math = true          # okflight.toml — every build of this workspace
+```
+
+```sh
+okf viz --math       # one run, whatever the TOML says
+```
+
+With math off the page carries no KaTeX code, stylesheet, fonts or license
+notice, and the delimiters stay literal text — nothing is stripped, so a
+bundle that later enables math renders the same source. Dollar amounts in
+prose (`$5 to $10`) and anything inside code spans or fences are never
+treated as math either way.
+
 okf operates on a **workspace**: the nearest directory at or above cwd holding
 an `okflight.toml` (the pre-rebrand name `okf.toml` is still discovered, with a
 rename nudge), else the git toplevel (zero-config mode). `okf init [--dir=<d>]`

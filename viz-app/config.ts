@@ -30,6 +30,10 @@ export interface VizConfig {
     /** Detail-panel date rendering: "iso" (as written), "us" ("Jul 3, 2026"),
      *  or "international" ("3 Jul 2026"). */
     dateFormat: DateFormat;
+    /** Render LaTeX math (inline $…$ / \(…\), display $…$ / \[…\]) with
+     *  KaTeX. Opt-in: the renderer, stylesheet and fonts add ~1.3 MB to the
+     *  page, so it stays out unless a bundle actually writes math. */
+    math: boolean;
   };
   embed: {
     /** Per-file embed cap in bytes. */
@@ -130,6 +134,7 @@ const defaults = (): VizConfig => ({
     name: null,
     aboutHtml: GENERIC_ABOUT,
     dateFormat: "iso",
+    math: false,
   },
   embed: { maxBytes: 200_000 },
   taxonomy: { types: [], dirGroups: {}, groupOrder: [], other: "Other" },
@@ -182,6 +187,8 @@ export function normalizeVizConfig(raw: unknown, opts?: { strict?: boolean; warn
   ) => fieldIn(section, sectionName)(camel, set);
   const asStr = (assign: (s: string) => void) => (v: unknown, path: string) =>
     typeof v === "string" ? assign(v) : bad(path, "expected a string");
+  const asBool = (assign: (b: boolean) => void) => (v: unknown, path: string) =>
+    typeof v === "boolean" ? assign(v) : bad(path, "expected a boolean");
   const asNum = (assign: (n: number) => void) => (v: unknown, path: string) =>
     typeof v === "number" && Number.isFinite(v) && v > 0 ? assign(v) : bad(path, "expected a positive number");
   const asStrArr = (assign: (a: string[]) => void) => (v: unknown, path: string) =>
@@ -227,6 +234,7 @@ export function normalizeVizConfig(raw: unknown, opts?: { strict?: boolean; warn
             ? (cfg.display.dateFormat = v as DateFormat)
             : bad(path, `expected one of: ${DATE_FORMATS.join(", ")}`),
         );
+        field(s, "display", "math", asBool((v) => (cfg.display.math = v)));
       });
       section("embed", (s) => {
         field(s, "embed", "maxBytes", asNum((v) => (cfg.embed.maxBytes = v)));

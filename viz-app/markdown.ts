@@ -92,6 +92,9 @@ export interface MdCtx {
   /** Embedded root index doc — gates the root `index.md` link target
    *  (data-bundle=""). */
   root?: unknown;
+  /** Render LaTeX math via KaTeX (cfg.display.math). Off: delimiters stay
+   *  literal text and the page carries no KaTeX code, CSS or fonts. */
+  math?: boolean;
 }
 
 export function createMd({
@@ -103,6 +106,7 @@ export function createMd({
   bundleDir = DEFAULT_BUNDLE_DIR,
   bundles = {},
   root = null,
+  math = false,
 }: MdCtx) {
   /** Resolve a relative link target against a repo-root-relative directory. */
   function resolveRel(dir: string[], target: string): string | null {
@@ -194,8 +198,9 @@ export function createMd({
 
   function render(md: string, dir: string[]): string {
     const inline = (s: string) => {
-      const math: string[] = [];
-      return restoreMath(autolinkPaths(inlineRaw(extractMath(s, math), dir)), math);
+      if (!math) return autolinkPaths(inlineRaw(s, dir));
+      const spans: string[] = [];
+      return restoreMath(autolinkPaths(inlineRaw(extractMath(s, spans), dir)), spans);
     };
     const out: string[] = [];
     let inFence = false;
@@ -264,7 +269,7 @@ export function createMd({
       // Display math on its own block: $$…$$ or \[…\], opened and closed on
       // one line or spanning several. Checked before fences/lists so a body
       // that starts a line with $$ never falls through to paragraph text.
-      const mOpen = !inFence && line.match(/^\s*(\$\$|\\\[)(.*)$/);
+      const mOpen = math && !inFence && line.match(/^\s*(\$\$|\\\[)(.*)$/);
       if (mOpen) {
         flushTable();
         flushList();

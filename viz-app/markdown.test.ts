@@ -224,7 +224,14 @@ describe("blocks", () => {
 });
 
 describe("math (KaTeX)", () => {
-  const html = (src: string) => md.mdToHtml(src, from);
+  const mathMd = createMd({ ...ctx, math: true });
+  const html = (src: string) => mathMd.mdToHtml(src, from);
+
+  test("off by default: delimiters stay literal text, no KaTeX markup", () => {
+    expect(md.mdToHtml("energy is $E = mc^2$ exactly", from)).toBe("<p>energy is $E = mc^2$ exactly</p>");
+    expect(md.mdToHtml("$\na+b\n$", from)).not.toContain("katex");
+    expect(md.mdToHtml("\\(x^2\\)", from)).not.toContain("katex");
+  });
 
   test("inline $…$ renders KaTeX markup inside the paragraph", () => {
     const out = html("energy is $E = mc^2$ exactly");

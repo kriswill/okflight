@@ -50,7 +50,7 @@ export function generatorInfo(dir: string): GeneratorInfo {
  *  okf sources in a checkout or the nix package, flat in the consumer's
  *  node_modules for npm/bunx installs (symlinked stores resolve through
  *  existsSync). */
-function packageDir(name: string, from: string): string {
+export function packageDir(name: string, from: string): string {
   let dir = from;
   for (;;) {
     const cand = join(dir, "node_modules", name);

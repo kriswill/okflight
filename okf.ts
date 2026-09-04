@@ -58,10 +58,11 @@ const commands: Record<string, Cmd> = {
   },
   viz: {
     file: "./viz.ts",
-    args: "[--check] [--perf]",
+    args: "[--math] [--check] [--perf]",
     brief: "render the 3D graph at {viz-out}",
-    summary: "Render the bundle as a self-contained interactive 3D graph at {viz-out} (gitignored) — a Svelte 5 viewer around Three.js glow spheres with bloom, orbit camera with fly-to, frozen generation-time layout. Referenced source files are embedded with syntax highlighting; resource paths and file links open an in-panel preview, referenced directories open a browsable listing of their tracked files, and revision citations verified against the workspace link out to the forge (vcs.commit-url-template). LaTeX math in concept bodies renders with KaTeX (inline $…$ or \\(…\\), display $$…$$ or \\[…\\]), fonts and all inlined for offline use. Workspace strings and settings (header/title, facet filters, type taxonomy and legend groups, embed cap, bundle dir) come from the optional okflight.toml; without it the viewer builds with generic fallbacks. Build-phase timings print on every run; the page records startup marks on window.__okf.perf.",
+    summary: "Render the bundle as a self-contained interactive 3D graph at {viz-out} (gitignored) — a Svelte 5 viewer around Three.js glow spheres with bloom, orbit camera with fly-to, frozen generation-time layout. Referenced source files are embedded with syntax highlighting; resource paths and file links open an in-panel preview, referenced directories open a browsable listing of their tracked files, and revision citations verified against the workspace link out to the forge (vcs.commit-url-template). LaTeX math in concept bodies (inline $…$ or \\(…\\), display $…$ or \\[…\\]) renders with KaTeX when display.math is on in okflight.toml or --math is passed — opt-in, since the renderer plus inlined fonts add ~1.3 MB to the page. Workspace strings and settings (header/title, facet filters, type taxonomy and legend groups, embed cap, bundle dir) come from the optional okflight.toml; without it the viewer builds with generic fallbacks. Build-phase timings print on every run; the page records startup marks on window.__okf.perf.",
     flags: [
+      ["--math", "render LaTeX math with KaTeX (overrides display.math; adds ~1.3 MB)"],
       ["--check", "typecheck the viewer app (svelte-check) instead of building"],
       ["--perf", "after building, measure viewer startup in headless Chrome and print a timing table"],
     ],

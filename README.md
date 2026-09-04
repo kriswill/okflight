@@ -16,6 +16,28 @@ each runtime dependency's LICENSE text (collected from `node_modules` at build
 time) in the page — see the "Licenses" tab in the viewer's About modal, which
 also carries okflight's own MIT notice (the embedded viewer app is okflight
 code) and links back to this project.
+LaTeX math in concept bodies (`$…# okflight
+
+[![Version](https://badgen.net/npm/v/@kriswill/okflight?color=green)](https://www.npmjs.com/package/@kriswill/okflight) [![FlakeHub](https://img.shields.io/endpoint?url=https://flakehub.com/f/kriswill/okflight/badge)](https://flakehub.com/flake/kriswill/okflight) [![License](https://badgen.net/npm/license/@kriswill/okflight)](LICENSE)
+[![ci](https://github.com/kriswill/okflight/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/kriswill/okflight/actions/workflows/ci.yml)
+[![release](https://github.com/kriswill/okflight/actions/workflows/release.yml/badge.svg)](https://github.com/kriswill/okflight/actions/workflows/release.yml)
+
+`okf` — a CLI for maintaining an [OKF v0.1](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md)
+knowledge bundle: `scaffold` stubs catalog docs from the repo sources, `index`
+regenerates progressive-disclosure `index.md` listings, `validate` checks
+spec/profile conformance and links, and `viz` renders the bundle as a
+self-contained interactive 3D graph (single offline HTML file — Svelte 5 viewer
+around Three.js glow spheres, bundled at generation time by `Bun.build`).
+Since minification strips the bundled libraries' copyright headers and their
+MIT/zlib terms require notices to accompany redistributed copies, `viz` embeds
+each runtime dependency's LICENSE text (collected from `node_modules` at build
+time) in the page — see the "Licenses" tab in the viewer's About modal, which
+also carries okflight's own MIT notice (the embedded viewer app is okflight
+, `$…$`, `\(…\)`, `\[…\]`) is
+opt-in: set `[display] math = true` in `okflight.toml`, or pass `okf viz
+--math` for one run. Off (the default) the page carries no KaTeX code, CSS,
+fonts or license notice and the delimiters stay literal text; on, KaTeX plus
+its inlined woff2 fonts add roughly 1.3 MB to `viz.html`.
 
 okf operates on a **workspace**: the nearest directory at or above cwd holding
 an `okflight.toml` (the pre-rebrand name `okf.toml` is still discovered, with a

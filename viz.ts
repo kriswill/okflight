@@ -13,7 +13,7 @@ import { extname, join } from "node:path";
 import { loadContext } from "./config-cli";
 import { extractLinks, firstHeading, indexBlurb, isExternal, nowISO, parseDoc, resolveLink, titleFromSlug, walkMd } from "./lib";
 import { layout3d } from "./layout3d";
-import { collectLicenses, generatorInfo, packageDir } from "./licenses";
+import { collectLicenses, generatorInfo, OPTIONAL_DEPS, packageDir } from "./licenses";
 import { displayName } from "./viz-app/config";
 import {
   classifyRootLink,
@@ -74,6 +74,9 @@ const lap = (name: string) => {
 // defaults (no facet filters, alphabetical types, flat legend).
 const { root: repo, bundle, cfg: okfCfg, vcs } = loadContext();
 const cfg = okfCfg.viz;
+// --math: one-off override of display.math — KaTeX in, whatever the TOML says.
+if (argv.includes("--math")) cfg.display.math = true;
+const math = cfg.display.math;
 const reserved = new Set(okfCfg.profile.reservedFiles);
 /** Last-modified date (YYYY-MM-DD) for embedded file/dir panels. */
 const isoDate = (rel: string) => (vcs.lastModified(rel) ?? nowISO()).slice(0, 10);
@@ -434,7 +437,22 @@ const build = await Bun.build({
   target: "browser",
   format: "esm",
   minify: true,
-  plugins: [SveltePlugin({ development: false, compilerOptions: { runes: true } })],
+  plugins: [
+    SveltePlugin({ development: false, compilerOptions: { runes: true } }),
+    // display.math off: markdown.ts never calls into katex, but its static
+    // import would still pull the whole renderer into the page — alias it to
+    // an empty stub so the bundle carries no KaTeX code at all.
+    ...(math
+      ? []
+      : [
+          {
+            name: "okf-katex-stub",
+            setup(b: Bun.PluginBuilder) {
+              b.onResolve({ filter: /^katex$/ }, () => ({ path: join(import.meta.dir, "viz-app", "katex-stub.ts") }));
+            },
+          },
+        ]),
+  ],
 });
 if (!build.success) {
   for (const log of build.logs) console.error(String(log));
@@ -455,23 +473,25 @@ appCss = appCss.replace(/<\/style/gi, "<\\/style");
 // URL — useless in a single-file page, so the woff2 faces ride inline as
 // data URIs and the woff/ttf fallbacks (same glyphs, ~4x the bytes) are
 // dropped. Every browser that can run the viewer's WebGL supports woff2.
-const katexDir = packageDir("katex", import.meta.dir);
-const katexCss = readFileSync(join(katexDir, "dist", "katex.min.css"), "utf8")
-  .replace(/src:([^;}]+)/g, (_m, src: string) =>
-    "src:" +
-    src
-      .split(/,(?=\s*url\()/)
-      .filter((part) => /\.woff2\)/.test(part))
-      .map((part) =>
-        part.replace(/url\((fonts\/[^)]+)\)/, (_u, rel: string) => {
-          const bytes = readFileSync(join(katexDir, "dist", rel));
-          return `url(data:font/woff2;base64,${bytes.toString("base64")})`;
-        }),
-      )
-      .join(","),
-  )
-  .replace(/<\/style/gi, "<\\/style");
-appCss = katexCss + appCss;
+const katexCss = () => {
+  const katexDir = packageDir("katex", import.meta.dir);
+  return readFileSync(join(katexDir, "dist", "katex.min.css"), "utf8")
+    .replace(/src:([^;}]+)/g, (_m, src: string) =>
+      "src:" +
+      src
+        .split(/,(?=\s*url\()/)
+        .filter((part) => /\.woff2\)/.test(part))
+        .map((part) =>
+          part.replace(/url\((fonts\/[^)]+)\)/, (_u, rel: string) => {
+            const bytes = readFileSync(join(katexDir, "dist", rel));
+            return `url(data:font/woff2;base64,${bytes.toString("base64")})`;
+          }),
+        )
+        .join(","),
+    )
+    .replace(/<\/style/gi, "<\\/style");
+};
+if (math) appCss = katexCss() + appCss;
 // Minification just stripped the bundled deps' copyright headers, and MIT/
 // zlib both require the notice to accompany every redistributed copy — ride
 // each runtime dependency's LICENSE text along in the data blob (About
@@ -479,7 +499,7 @@ appCss = katexCss + appCss;
 // fails the build rather than shipping notice-less.
 let licenses: DepLicense[] = [];
 try {
-  licenses = collectLicenses(import.meta.dir);
+  licenses = collectLicenses(import.meta.dir, math ? [] : Object.keys(OPTIONAL_DEPS));
 } catch (e) {
   console.error(`viz: ${e instanceof Error ? e.message : e}`);
   process.exit(1);

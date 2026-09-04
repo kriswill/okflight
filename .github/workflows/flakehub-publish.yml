@@ -33,7 +33,7 @@ jobs:
 
       - run: nix build .#okf -L
 
-      - uses: DeterminateSystems/flakehub-push@2ca953b09ca13532271987be2887bbd33b99980f # main 2026-07
+      - uses: DeterminateSystems/flakehub-push@4752651a220bf6431efb035bd50c002ead02507e # main 2026-07
         with:
           visibility: public
           include-output-paths: true

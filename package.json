@@ -68,6 +68,6 @@
     "happy-dom": "^20.10.6",
     "puppeteer-core": "^25.5.0",
     "svelte-check": "^4.7.1",
-    "typescript": "^7.0.2"
+    "typescript": "~6.0.3"
   }
 }

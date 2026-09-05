@@ -1,5 +1,5 @@
 ---
-okf_version: '0.1'
+okf_version: '0.2'
 ---
 
 # knowledge
@@ -21,6 +21,7 @@ synthetic root card: concepts directly, sub-bundles as dir cards.
 
 ## Subdirectories
 
+* [computations](computations/index.md)
 * [decisions](decisions/index.md)
 * [experiments](experiments/index.md)
 * [glossary](glossary/index.md)

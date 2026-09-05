@@ -1,0 +1,8 @@
+# Fixture: the OKF v0.2 SPEC.md examples (§4.3, §4.4, §10, Appendix A) as one
+# bundle. The spec links /-rooted, so the profile allows it.
+[bundle]
+dir = "bundle"
+[profile]
+rooted-links = "allow"
+[vcs]
+provider = "none"

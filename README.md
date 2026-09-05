@@ -4,10 +4,11 @@
 [![ci](https://github.com/kriswill/okflight/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/kriswill/okflight/actions/workflows/ci.yml)
 [![release](https://github.com/kriswill/okflight/actions/workflows/release.yml/badge.svg)](https://github.com/kriswill/okflight/actions/workflows/release.yml)
 
-`okf` — a CLI for maintaining an [OKF v0.1](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md)
+`okf` — a CLI for maintaining an [OKF v0.2](https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md)
 knowledge bundle: `scaffold` stubs catalog docs from the repo sources, `index`
 regenerates progressive-disclosure `index.md` listings, `validate` checks
-spec/profile conformance and links, and `viz` renders the bundle as a
+spec/profile conformance and links, `migrate` rewrites v0.1 docs into the v0.2
+shape, and `viz` renders the bundle as a
 self-contained interactive 3D graph (single offline HTML file — Svelte 5 viewer
 around Three.js glow spheres, bundled at generation time by `Bun.build`).
 Since minification strips the bundled libraries' copyright headers and their
@@ -52,10 +53,48 @@ is the guided superset — see "Integrating into a repo" below. **Git is optiona
 filesystem (minus `[vcs] ignore` globs), stamps mtime dates, and skips commit
 links, so any directory tree — no VCS at all — can host a bundle.
 
+### OKF v0.2: provenance, trust, lifecycle, attestation
+
+The v0.2 spec makes an agent-maintained corpus self-describing through a few
+optional frontmatter families, and okflight reads all of them:
+
+- **`generated: { by, at }`** — who wrote the content and when (supersedes
+  the v0.1 `timestamp`; `validate` still reads a legacy `timestamp` and
+  nudges you to `okf migrate`). `by` is an **actor** — `human:<id>`,
+  `process:<id>`, or `<producer>/<version>`.
+- **`verified`** — one `{ by, at }` or a list of them. `validate` accepts
+  both; the viewer derives the **trust tier** (unverified /
+  machine-confirmed / human-reviewed — a `human:` verifier is what lifts it).
+- **`status`** (`draft` | `stable` | `deprecated`, default stable) and
+  **`stale_after`** (an absolute instant): `index` marks deprecated concepts
+  in listings, `validate` warns once content is past due, and the viewer
+  shows a stale badge.
+- **`sources`** — the materials a concept derives from (`resource` required;
+  `id`, `title`, and the credibility signals `author`, `usage_count`,
+  `last_modified`, framed by a sibling `usage_window`). Per-claim
+  attribution is a markdown footnote whose label is a `sources[].id`
+  (`…as documented.[^ga4-schema]`); `validate` checks every footnote keys
+  into `sources`, and the viewer renders footnotes linked to their source.
+- **`type: Attested Computation`** — a sanctioned computation as its own
+  concept: `runtime` (required), typed `parameters`, the computation inline
+  under a `# Computation` fence or in a file named by `computation`, plus
+  `executor { resource, receipt }` and `attester { resource }`. `validate`
+  checks the contract; `viz` embeds the referenced files and links them from
+  the panel.
+
+`viz` adds two built-in lenses when a bundle uses them — **status** and
+**trust** — beside any `[facet.*]` you define (a workspace facet of the same
+name wins). `okf migrate` (dry run; `--write` to apply) converts a v0.1
+bundle in place: `timestamp` → `generated`, a body `## Citations` list →
+`sources` (link items only — revision hashes stay put), and bumps the root
+`index.md` `okf_version`; it stamps `generated.by` from `[scaffold] actor`
+(else `okflight/<version>`), as `scaffold` does for the docs it emits.
+
 All commands read that one optional config file (strict-validated; malformed
 config fails the command): `[bundle] dir` sets the bundle root (default
 `knowledge/`), `[profile]` tunes validation policy (`required-fields`,
-`recommended-fields`, `reserved-files`, `rooted-links = "error"|"allow"`,
+`recommended-fields` — default `title`, `description`, `generated` —
+`reserved-files`, `rooted-links = "error"|"allow"` for body links,
 `repo-links = "check"|"ignore"|"forbid"` — defaults reproduce the stock
 OKF-plus-reference-tooling behavior), `[vcs]` adds `url` and
 `commit-url-template = "{url}/commit/{hash}"` for forge-agnostic revision
@@ -147,7 +186,7 @@ bunx @kriswill/okflight setup   # guided integration (or `init` for the bare ske
 npx @kriswill/okflight setup    # identical — no bun preinstalled required, see below
 ```
 
-okf runs on Bun (`Bun.TOML`, `Bun.Glob`, and `okf viz` invokes `Bun.build` +
+okf runs on Bun ≥ 1.3.13 (`Bun.TOML`, `Bun.YAML` for frontmatter, `Bun.Glob`, and `okf viz` invokes `Bun.build` +
 the Svelte plugin at generation time), so the launcher re-execs through a
 bun: first the one on `PATH`, else the [`bun` npm
 package](https://www.npmjs.com/package/bun) that installs alongside as an

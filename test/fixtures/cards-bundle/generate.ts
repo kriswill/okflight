@@ -12,6 +12,7 @@
 // glossary terms, and an unregistered type for the generated-color fallback.
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
+import { fmToYaml } from "../../../lib";
 
 const ROOT = join(import.meta.dir, "knowledge");
 const GENERATED_DIRS = [
@@ -23,6 +24,7 @@ const GENERATED_DIRS = [
   "references",
   "glossary",
   "experiments",
+  "computations",
 ];
 
 interface Doc {
@@ -31,6 +33,12 @@ interface Doc {
   title: string;
   desc: string;
   links: string[]; // target ids
+  /** OKF v0.2 families (generated/verified/status/stale_after/sources, the
+   *  computation contract) — emitted after the base keys via fmToYaml. */
+  fm?: Record<string, unknown>;
+  /** Extra body markdown after the description (a Computation fence,
+   *  footnoted prose + definitions). */
+  tail?: string;
 }
 const docs: Doc[] = [];
 const byId = new Map<string, Doc>();
@@ -41,6 +49,11 @@ const add = (id: string, type: string, title: string, desc: string, links: strin
   return d;
 };
 const linkFrom = (fromId: string, ...targets: string[]) => byId.get(fromId)!.links.push(...targets);
+const decorate = (id: string, fm: Record<string, unknown>, tail = "") => {
+  const d = byId.get(id)!;
+  d.fm = { ...(d.fm ?? {}), ...fm };
+  if (tail) d.tail = (d.tail ?? "") + tail;
+};
 
 /* --- services: dependency graph with one mega in-hub --------------------- */
 const serviceNames = [
@@ -300,6 +313,86 @@ add("experiments/paused-island", "Experiment", "Paused: Offline Mode", "Parked u
 add("notes/note-2", "Reference", "Note Two", "Scratch thinking that references Note One.", ["notes/note-1"]);
 add("notes/note-3", "Reference", "Note Three", "", ["notes/note-2"]);
 
+/* --- OKF v0.2 families: trust, lifecycle, provenance, computation ---------- */
+// Deterministic spread so the built-in status/trust lenses and the panel's
+// family rows have something to show: superseded ADRs deprecate, every third
+// ADR is human-reviewed, one is past its stale_after, patterns cite sources
+// with footnotes, and a computations/ sub-bundle carries two Attested
+// Computations (inline fence + file form) linked from the glossary/runbooks.
+const AGENT = "reference_agent/gemini-2.5-pro";
+adrTopics.forEach((_t, i) => {
+  const n = String(i + 1).padStart(3, "0");
+  const id = `decisions/adr-${n}`;
+  const at = `2026-0${1 + (i % 6)}-${String(10 + i).padStart(2, "0")}T09:00:00Z`;
+  decorate(id, { generated: { by: i % 2 ? AGENT : "human:kris", at } });
+  if (i < 5) decorate(id, { status: "deprecated" }); // superseded by the chain
+  else if (i % 5 === 0) decorate(id, { status: "draft" });
+  if (i % 3 === 0) decorate(id, { verified: { by: "human:kris", at: `2026-07-0${1 + (i % 9)}T12:00:00Z` } });
+  else if (i % 4 === 0) decorate(id, { verified: [{ by: "process:adr-linter", at: "2026-07-15T02:00:00Z" }] });
+});
+decorate("decisions/adr-014", { stale_after: "2026-06-30T00:00:00Z" }); // retired importer: past due
+decorate("decisions/adr-016", { stale_after: "2099-01-01T00:00:00Z" });
+decorate(
+  "patterns/circuit-breaker",
+  {
+    generated: { by: AGENT, at: "2026-06-20T22:53:05Z" },
+    verified: { by: "human:kris", at: "2026-06-25T09:00:00Z" },
+    sources: [
+      { id: "fowler-cb", resource: "https://martinfowler.com/bliki/CircuitBreaker.html", title: "CircuitBreaker (Fowler)", author: "human:mfowler", last_modified: "2014-03-06T00:00:00Z" },
+      { id: "incident-history", resource: "all SEV1 incidents tagged circuit-breaker", title: "Incident history", usage_count: 42 },
+    ],
+    usage_window: { from: "2026-06-01T00:00:00Z", to: "2026-06-30T00:00:00Z" },
+  },
+  "The half-open probe interval follows Fowler's original sketch,[^fowler-cb] tuned against last quarter's incidents.[^incident-history]\n\n[^fowler-cb]: CircuitBreaker (Fowler)\n[^incident-history]: Incident history\n",
+);
+decorate("patterns/retry-backoff", {
+  generated: { by: "human:kris", at: "2026-05-02T10:00:00Z" },
+  verified: { by: "process:pattern-review", at: "2026-05-03T02:00:00Z" },
+  sources: [{ id: "aws-backoff", resource: "https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/", title: "Exponential Backoff And Jitter" }],
+}, "Full jitter, per the AWS write-up.[^aws-backoff]\n\n[^aws-backoff]: Exponential Backoff And Jitter\n");
+
+add("computations/error-budget-burn", "Attested Computation", "Error budget burn rate", "Burn rate of a service's error budget over a window, per the SLO catalog.", [
+  "references/slo-catalog",
+]);
+decorate(
+  "computations/error-budget-burn",
+  {
+    status: "stable",
+    runtime: "bigquery",
+    parameters: [
+      { name: "service", type: "string", required: true },
+      { name: "window_hours", type: "integer", required: false },
+    ],
+    executor: { resource: "../references/queue-semantics.md", receipt: ["job_id", "executed_sql", "result"] },
+    attester: { resource: "lib/sql-equality.py" },
+    generated: { by: AGENT, at: "2026-06-28T14:00:00Z" },
+    verified: [{ by: "process:slo-nightly", at: "2026-07-01T02:00:00Z" }, { by: "human:kris", at: "2026-07-02T09:00:00Z" }],
+    stale_after: "2099-12-31T00:00:00Z",
+    sources: [{ id: "slo-catalog", resource: "../references/slo-catalog.md", title: "SLO Catalog" }],
+  },
+  "## Computation\n\n```sql\nSELECT 1 - SUM(good) / SUM(total) AS burn\nFROM slo.events\nWHERE service = @service\n  AND ts > TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL @window_hours HOUR)\n```\n\nBudgets come from the catalog.[^slo-catalog]\n\n[^slo-catalog]: SLO Catalog\n",
+);
+add("computations/p99-latency", "Attested Computation", "p99 request latency", "Ninety-ninth percentile latency for a service over the last hour (file-form computation, dbt).", [
+  "glossary/p99",
+]);
+decorate("computations/p99-latency", {
+  status: "draft",
+  runtime: "dbt",
+  computation: "lib/p99.sql",
+  parameters: [{ name: "service", type: "string", required: true }],
+  attester: { resource: "lib/dbt-binding.py" },
+  generated: { by: "human:kris", at: "2026-07-10T08:00:00Z" },
+  stale_after: "2026-08-01T00:00:00Z", // past due: exercises the stale badge on a draft
+});
+linkFrom("glossary/error-budget", "computations/error-budget-burn");
+linkFrom("runbooks/incident-triage", "computations/error-budget-burn", "computations/p99-latency");
+/** Non-markdown files the computations point at (written beside the docs). */
+const COMPUTATION_FILES: Record<string, string> = {
+  "computations/lib/p99.sql": "select approx_percentile(latency_ms, 0.99) as p99 from {{ ref('request_log') }} where service = {{ var('service') }}\n",
+  "computations/lib/sql-equality.py": "# deterministic attester: receipt.executed_sql must equal the bound computation\n",
+  "computations/lib/dbt-binding.py": "# deterministic attester: receipt.compiled_sql must equal the compiled model with bound vars\n",
+};
+
 /* --- emit ------------------------------------------------------------------ */
 // The e2e-pinned neighborhood: nothing generated may link INTO these ids
 // (that would grow hub's asserted rows or rings). notes/note-1 is exempt —
@@ -321,7 +414,9 @@ const render = (d: Doc): string => {
     const rel = relative(dirname(join(ROOT, d.id + ".md")), join(ROOT, t + ".md"));
     return `- [${target?.title ?? t}](${rel})`;
   });
-  return `---\n${fm.join("\n")}\n---\n\n# ${d.title}\n\n${d.desc || "No summary yet."}\n${
+  // v0.2 families ride fmToYaml (nested mappings/lists) after the flat base keys.
+  const extra = d.fm ? fmToYaml(d.fm).split("\n").slice(1, -2).join("\n") : "";
+  return `---\n${fm.join("\n")}${extra ? "\n" + extra : ""}\n---\n\n# ${d.title}\n\n${d.desc || "No summary yet."}\n${d.tail ? "\n" + d.tail.trim() + "\n" : ""}${
     linkLines.length ? `\n## Related\n\n${linkLines.join("\n")}\n` : ""
   }`;
 };
@@ -332,6 +427,10 @@ for (const d of docs) {
   mkdirSync(dirname(abs), { recursive: true });
   writeFileSync(abs, render(d));
   written++;
+}
+for (const [rel, text] of Object.entries(COMPUTATION_FILES)) {
+  mkdirSync(dirname(join(ROOT, rel)), { recursive: true });
+  writeFileSync(join(ROOT, rel), text);
 }
 const edgeCount = docs.reduce((n, d) => n + d.links.length, 0);
 console.log(`generated ${written} docs, ${edgeCount} links across ${GENERATED_DIRS.length + 1} bundles`);

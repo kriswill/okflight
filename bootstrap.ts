@@ -31,7 +31,8 @@ script = "${tomlStr(scaffoldScript)}"  # repo-owned pass; default export gets th
 # command = ["python3", "tools/scaffold.py"]  # non-JS alternative (OKF_* env); exclusive with script`
     : `# [scaffold]                     # the workspace's metadata pass (okf scaffold)
 # script = "${dir}/_okflight/scripts/main.ts"  # TS/JS module; default export gets the ScaffoldContext API
-# command = ["python3", "tools/scaffold.py"]  # non-JS alternative (OKF_* env); exclusive with script`;
+# command = ["python3", "tools/scaffold.py"]  # non-JS alternative (OKF_* env); exclusive with script
+# actor = "human:<you>"           # generated.by stamped by scaffold/migrate (default: okflight/<version>)`;
   return `# okflight.toml — workspace settings for the okf CLI (all sections optional;
 # this file's directory is the workspace root). Reference: the okflight README.
 
@@ -41,7 +42,7 @@ dir = "${tomlStr(dir)}" # OKF bundle root, workspace-relative
 
 # [profile]                      # validation policy (defaults shown)
 # required-fields = ["type"]
-# recommended-fields = ["title", "description", "timestamp"]
+# recommended-fields = ["title", "description", "generated"]
 # reserved-files = ["index.md", "log.md"]
 # rooted-links = "error"         # "error" | "allow"
 # repo-links = "check"           # "check" | "ignore" | "forbid"
@@ -80,7 +81,7 @@ ${scaffoldSection}
 }
 
 export const starterIndex = (dir: string): string => `---
-okf_version: '0.1'
+okf_version: '0.2'
 ---
 
 # ${basename(dir)}

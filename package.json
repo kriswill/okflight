@@ -1,6 +1,6 @@
 {
   "name": "@kriswill/okflight",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "publishConfig": {
     "access": "public"
   },
@@ -33,6 +33,8 @@
     "config-cli.ts",
     "vcs/",
     "scaffold.ts",
+    "migrate.ts",
+    "migrate-doc.ts",
     "scaffold-api.ts",
     "index-gen.ts",
     "validate.ts",
@@ -47,7 +49,7 @@
     "tsconfig.json"
   ],
   "engines": {
-    "bun": ">=1.2"
+    "bun": ">=1.3.13"
   },
   "dependencies": {
     "@threlte/core": "^8.5.16",

@@ -8,6 +8,7 @@
 // (re-normalizing its own output) spellings, so it is idempotent.
 
 import { DATE_FORMATS, type DateFormat } from "./dates";
+import { SLOT_COUNT } from "./themes";
 
 export interface VizConfig {
   bundle: {
@@ -40,7 +41,8 @@ export interface VizConfig {
     maxBytes: number;
   };
   taxonomy: {
-    /** Palette slot order: entry N -> CSS var --sN (12 theme slots; overflow
+    /** Palette slot order: entry N -> CSS var --sN (SLOT_COUNT theme slots — 12
+     *  curated + 20 derived, see themes.ts; overflow
      *  gets stable generated colors). Append-only. Empty: alphabetical types,
      *  all generated colors. */
     types: string[];
@@ -121,7 +123,7 @@ export const DEFAULT_BUNDLE_DIR = "knowledge";
 
 const GENERIC_ABOUT =
   'A navigable map of this repository’s OKF knowledge bundle — concepts authored in the ' +
-  '<a href="https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md" ' +
+  '<a href="https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md" ' +
   'target="_blank" rel="noopener">Open Knowledge Format</a> and cross-linked into a graph. ' +
   "Click a node to read its document.";
 
@@ -388,8 +390,8 @@ export function normalizeVizConfig(raw: unknown, opts?: { strict?: boolean; warn
         errors.push(`taxonomy.dir-groups."${d}": "${g}" is not in taxonomy.group-order`);
     if (!cfg.vcs.commitUrlTemplate.includes("{hash}"))
       errors.push('vcs.commit-url-template: must contain "{hash}"');
-    if (cfg.taxonomy.types.length > 12)
-      warn(`taxonomy.types: ${cfg.taxonomy.types.length} entries but only 12 palette slots — overflow types get generated colors`);
+    if (cfg.taxonomy.types.length > SLOT_COUNT)
+      warn(`taxonomy.types: ${cfg.taxonomy.types.length} entries but only ${SLOT_COUNT} palette slots — overflow types get generated colors`);
     if (errors.length) throw new VizConfigError("invalid okflight.toml:\n  " + errors.join("\n  "));
   }
 

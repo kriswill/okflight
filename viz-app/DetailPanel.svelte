@@ -1,5 +1,6 @@
 <script lang="ts">
   import { formatDate } from "./dates";
+  import { familyRows } from "./families";
   import { encodeHash } from "./hash";
   import { createMd, esc } from "./markdown";
   import type { VizState } from "./state.svelte";
@@ -52,6 +53,34 @@
     return val;
   };
 
+  /** In-panel link for an OKF path-valued field (§6.2) of the selected
+   *  concept: a concept (data-node), or an embedded file/dir (data-file /
+   *  data-dir). `/`-rooted values are bundle-relative; relative ones are
+   *  doc-relative, then bundle-root-relative (the spec's own spelling), then
+   *  repo-relative like `resource`. Null: nothing embedded answers. */
+  const pathLink = (fromId: string, value: string): string | null => {
+    const bundleDir = viz.model.cfg.bundle.dir;
+    const clean = value.replace(/\/$/, "");
+    const candidates = clean.startsWith("/")
+      ? [`${bundleDir}${clean}`]
+      : [md.resolveFrom(fromId, clean), `${bundleDir}/${clean}`, clean];
+    for (const p of candidates) {
+      if (!p) continue;
+      const nid = p.startsWith(bundleDir + "/") && p.endsWith(".md") ? p.slice(bundleDir.length + 1, -3) : null;
+      if (nid && viz.model.byId[nid]) return `<a href="#" data-node="${esc(nid)}">${esc(value)}</a>`;
+      if (viz.model.files[p]) return `<a href="#" data-file="${esc(p)}">${esc(value)}</a>`;
+      if (viz.model.dirs[p]) return `<a href="#" data-dir="${esc(p)}">${esc(value)}</a>`;
+    }
+    return null;
+  };
+
+  const fmRows = (n: { id: string; fm: Record<string, unknown> }) =>
+    familyRows({ fmtDate, pathLink: (v) => pathLink(n.id, v), plain: fmCell }, n.fm);
+
+  /** The concept's `sources` entries, for footnote resolution in the body. */
+  const sourcesOf = (fm: Record<string, unknown>) =>
+    Array.isArray(fm.sources) ? (fm.sources.filter((s) => s && typeof s === "object") as Record<string, unknown>[]) : [];
+
   const NONE = '<span style="color:var(--ink-muted)">none</span>';
   const linkList = (ids: string[]) =>
     ids.map((i) => `<a href="#" data-node="${esc(i)}">${esc(viz.model.byId[i]!.title)}</a>`).join(" · ") || NONE;
@@ -100,6 +129,15 @@
     if (a) {
       e.preventDefault();
       viz.selectConcept(a.dataset.node!, true);
+      return;
+    }
+    // Footnote marks scroll to their definition (and back) inside the panel —
+    // never a real hash navigation, which would clobber the view state.
+    const fn = t.closest("a[data-fn]") as HTMLElement | null;
+    if (fn) {
+      e.preventDefault();
+      const target = panelEl?.querySelector(`[data-fn-target="${CSS.escape(fn.dataset.fn!)}"]`);
+      target?.scrollIntoView({ block: "nearest" });
     }
   }
 
@@ -172,13 +210,9 @@
       {@const n = viz.selectedConcept}
       <span class="chip"><span class="dot" style="background:{viz.colorOf(n.type)}"></span>{n.type}</span>
       <table class="fm">
-        <tbody>
-          {#each Object.entries(n.fm).filter(([k]) => k !== "title" && k !== "type") as [k, v] (k)}
-            <tr><td>{k}</td><td>{@html fmCell(k, v)}</td></tr>
-          {/each}
-        </tbody>
+        <tbody>{@html fmRows(n)}</tbody>
       </table>
-      <div id="body-md">{@html md.mdToHtml(n.body, n.id)}</div>
+      <div id="body-md">{@html md.mdToHtml(n.body, n.id, { sources: sourcesOf(n.fm) })}</div>
       <div class="backlinks"><h4>Links to</h4>{@html linkList(outLinks(n.id))}</div>
       <div class="backlinks"><h4>Cited by</h4>{@html linkList(viz.model.inLinks[n.id] || [])}</div>
     {:else if file}
@@ -353,6 +387,103 @@
     color: var(--ink-muted);
     white-space: nowrap;
     width: 1%;
+  }
+  /* OKF v0.2 families (families.ts): nested tables, actor tags, tier/status
+     chips, the stale badge. Global — the rows are @html strings. */
+  table.fm :global(table.sub) {
+    border-collapse: collapse;
+    font-size: 11.5px;
+    margin: 2px 0;
+  }
+  table.fm :global(table.sub td),
+  table.fm :global(table.sub th) {
+    border-top: 0;
+    padding: 1px 8px 1px 0;
+    text-align: left;
+    white-space: normal;
+    width: auto;
+    color: inherit;
+  }
+  table.fm :global(table.sub th) {
+    color: var(--ink-muted);
+    font-weight: 500;
+  }
+  table.fm :global(table.sub td:first-child) {
+    color: var(--ink-muted);
+  }
+  table.fm :global(table.sources td:first-child) {
+    color: inherit;
+  }
+  table.fm :global(tr.win td) {
+    color: var(--ink-muted);
+    font-size: 11px;
+  }
+  table.fm :global(ul.events) {
+    margin: 2px 0 0;
+    padding-left: 0;
+    list-style: none;
+  }
+  table.fm :global(ol.sub) {
+    margin: 0;
+    padding-left: 16px;
+  }
+  table.fm :global(.actor .kind) {
+    color: var(--ink-muted);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-right: 3px;
+  }
+  table.fm :global(.actor-human) {
+    color: var(--link);
+  }
+  table.fm :global(.when),
+  table.fm :global(.dim),
+  table.fm :global(.range) {
+    color: var(--ink-muted);
+  }
+  table.fm :global(.fam-chip) {
+    display: inline-block;
+    font-size: 10.5px;
+    line-height: 16px;
+    padding: 0 7px;
+    border-radius: 999px;
+    border: 1px solid var(--grid);
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  table.fm :global(.tier-human-reviewed),
+  table.fm :global(.status-stable) {
+    border-color: color-mix(in srgb, var(--ok, #3fb950) 60%, transparent);
+    color: var(--ok, #3fb950);
+  }
+  table.fm :global(.tier-machine-confirmed),
+  table.fm :global(.status-draft) {
+    border-color: color-mix(in srgb, var(--warn, #d29922) 60%, transparent);
+    color: var(--warn, #d29922);
+  }
+  table.fm :global(.tier-unverified) {
+    color: var(--ink-muted);
+  }
+  table.fm :global(.status-deprecated),
+  table.fm :global(.stale) {
+    border-color: color-mix(in srgb, var(--danger, #f85149) 60%, transparent);
+    color: var(--danger, #f85149);
+  }
+  #body-md :global(sup.fn) {
+    font-size: 10px;
+    line-height: 0;
+  }
+  #body-md :global(.footnotes) {
+    border-top: 1px solid var(--grid);
+    margin-top: 12px;
+    padding-top: 6px;
+    font-size: 11.5px;
+    color: var(--ink-muted);
+  }
+  #body-md :global(.footnotes ol) {
+    padding-left: 18px;
+    margin: 0;
   }
   .backlinks {
     border-top: 1px solid var(--grid);

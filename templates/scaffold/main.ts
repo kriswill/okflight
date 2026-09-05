@@ -27,7 +27,7 @@ export default async function scaffold(ctx: ScaffoldContext) {
   //         title: ctx.titleFromSlug(name),
   //         description: ctx.firstSentence(blurb ?? ctx.titleFromSlug(name)),
   //         resource: path,
-  //         timestamp: ctx.timestamp(path),
+  //         generated: ctx.generated(path), // { by: ctx.actor, at: <vcs last-modified> } — OKF v0.2 §5.2
   //       },
   //       `${ctx.mdSafe(ctx.sentence(blurb ?? ""))}\n\n## Source\n\n- Source: [\`${path}\`](../../${path})`,
   //     );

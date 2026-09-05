@@ -11,7 +11,7 @@ describe("splitCliSections: [profile]", () => {
     const { profile } = splitCliSections({});
     expect(profile).toEqual({
       requiredFields: ["type"],
-      recommendedFields: ["title", "description", "timestamp"],
+      recommendedFields: ["title", "description", "generated"],
       reservedFiles: ["index.md", "log.md"],
       rootedLinks: "error",
       repoLinks: "check",

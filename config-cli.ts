@@ -10,6 +10,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { ACTOR_RE } from "./lib";
 import { createProvider, gitRoot, type VcsProvider } from "./vcs";
 import { fieldIn, isObj, normalizeVizConfig, VizConfigError, type VizConfig } from "./viz-app/config";
 
@@ -39,7 +40,7 @@ export interface OkfProfile {
 
 const profileDefaults = (): OkfProfile => ({
   requiredFields: ["type"],
-  recommendedFields: ["title", "description", "timestamp"],
+  recommendedFields: ["title", "description", "generated"],
   reservedFiles: ["index.md", "log.md"],
   rootedLinks: "error",
   repoLinks: "check",
@@ -85,7 +86,8 @@ export const COLLECT_PLACEHOLDERS = new Set([
   "name", // basename minus extension
   "Title", // titleFromSlug(name)
   "dir", // root-relative dirname ("." at root)
-  "timestamp", // vcs last-modified, else now
+  "timestamp", // vcs last-modified, else now (the doc's generated.at)
+  "actor", // the generated.by actor ([scaffold] actor, else okflight/<version>)
   "repo", // ../.. chain from the output doc's dir to the workspace root
   "description", // first sentence of the extracted/fallback description
   "description-sentence", // full description as a markdown-safe sentence
@@ -110,9 +112,13 @@ export interface OkfScaffold {
    *  env; owns its own file writes. Mutually exclusive with `script`. */
   command: string[] | null;
   collect: CollectEntry[];
+  /** The `generated.by` actor stamped on docs okf itself writes (scaffold,
+   *  migrate) — OKF §7: `human:<id>`, `process:<id>`, `<producer>/<version>`.
+   *  Null: `okflight/<version>` (defaultActor in scaffold-api.ts). */
+  actor: string | null;
 }
 
-const scaffoldDefaults = (): OkfScaffold => ({ script: null, command: null, collect: [] });
+const scaffoldDefaults = (): OkfScaffold => ({ script: null, command: null, collect: [], actor: null });
 
 export interface OkfConfig {
   viz: VizConfig;
@@ -223,6 +229,10 @@ export function splitCliSections(raw: unknown): {
         }),
       );
       field("command", asStrArr((a) => (scaffold.command = a.length ? a : null)));
+      field("actor", (v, path) => {
+        if (typeof v === "string" && ACTOR_RE.test(v)) scaffold.actor = v;
+        else errors.push(`${path}: expected an OKF actor — human:<id>, process:<id>, or <producer>/<version>`);
+      });
       const entries = s["collect"];
       delete s["collect"];
       if (entries !== undefined && entries !== null) {

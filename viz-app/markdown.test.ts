@@ -296,3 +296,49 @@ describe("math (KaTeX)", () => {
     expect(html("$$\na+b")).toContain("katex-display");
   });
 });
+
+describe("footnotes (OKF §5.1 per-claim attribution)", () => {
+  test("marks number in first-reference order; definitions lift to a footnotes list", () => {
+    const body = "Sharded daily.[^ga4] Also[^two] and again.[^ga4]\n\n[^ga4]: GA4 export schema\n[^two]: Second *note*\n";
+    const html = md.mdToHtml(body, from);
+    expect(html).toBe(
+      '<p>Sharded daily.<sup class="fn"><a href="#" data-fn="ga4" title="ga4">1</a></sup> Also<sup class="fn"><a href="#" data-fn="two" title="two">2</a></sup> and again.<sup class="fn"><a href="#" data-fn="ga4" title="ga4">1</a></sup></p>' +
+        '<div class="footnotes"><ol><li data-fn-target="ga4">GA4 export schema</li><li data-fn-target="two">Second <em>note</em></li></ol></div>',
+    );
+  });
+
+  test("a definition matching a sources[].id links to the source resource (URL, concept, file, or plain)", () => {
+    const sources = [
+      { id: "pol", resource: "https://wiki.acme/policy", title: "Policy" },
+      { id: "arch", resource: "../wiki/architecture.md" },
+      { id: "man", resource: "/svelt/manual.md" },
+      { id: "scope", resource: "all queries in project X" },
+      { id: "untitled", resource: "https://x/y" },
+    ];
+    const body = "a[^pol] b[^arch] c[^man] d[^scope] e[^untitled]\n\n[^pol]: The policy\n[^arch]: Arch\n[^man]: Manual\n[^scope]: Scope\n";
+    const html = md.mdToHtml(body, from);
+    expect(html).not.toContain("footnotes\"><ol><li data-fn-target=\"pol\">The policy —"); // sources not passed: no links
+    const linked = md.mdToHtml(body, from, { sources });
+    expect(linked).toContain('<li data-fn-target="pol">The policy — <a href="https://wiki.acme/policy" target="_blank" rel="noopener">https://wiki.acme/policy</a></li>');
+    expect(linked).toContain('<li data-fn-target="arch">Arch — <a href="#" data-node="wiki/architecture">../wiki/architecture.md</a></li>');
+    expect(linked).toContain('<li data-fn-target="man">Manual — <span class="dim">/svelt/manual.md</span></li>');
+    expect(linked).toContain('<li data-fn-target="scope">Scope — <span class="dim">all queries in project X</span></li>');
+    // No definition line: the source title (or id) stands in.
+    expect(linked).toContain('<li data-fn-target="untitled">untitled — <a href="https://x/y"');
+  });
+
+  test("marks inside code spans and fences stay literal", () => {
+    expect(md.mdToHtml("use `[^x]` here\n\n```\n[^y]: nope\n```\n", from)).toBe("<p>use <code>[^x]</code> here</p><pre><code>[^y]: nope</code></pre>");
+  });
+});
+
+describe("footnotes — code-review follow-ups", () => {
+  test("a /-rooted sources[].resource links to the bundle concept; indented definitions are lifted", () => {
+    const sources = [{ id: "a", resource: "/wiki/architecture.md" }];
+    const html = md.mdToHtml("text[^a]\n\n  [^a]: Arch\n", from, { sources });
+    expect(html).toBe(
+      '<p>text<sup class="fn"><a href="#" data-fn="a" title="a">1</a></sup></p>' +
+        '<div class="footnotes"><ol><li data-fn-target="a">Arch — <a href="#" data-node="wiki/architecture">/wiki/architecture.md</a></li></ol></div>',
+    );
+  });
+});

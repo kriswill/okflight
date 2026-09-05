@@ -1,4 +1,4 @@
-// Regenerate index.md files throughout the bundle (OKF SPEC §6:
+// Regenerate index.md files throughout the bundle (OKF SPEC §8:
 // progressive disclosure — one directory level at a time).
 //
 // Hand-maintained parts are preserved on regeneration:
@@ -10,7 +10,7 @@
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { loadContext } from "./config-cli";
-import { fmToYaml, indexBlurb, parseDoc, parseFrontmatter, titleFromSlug, type FM } from "./lib";
+import { fmToYaml, indexBlurb, OKF_VERSION, parseDoc, parseFrontmatter, statusOf, str, titleFromSlug, type FM } from "./lib";
 
 const { bundle, cfg } = loadContext();
 const bundleName = basename(cfg.viz.bundle.dir);
@@ -41,9 +41,12 @@ function genDir(relDir: string): DirInfo {
 
   const conceptLines = mds.map((f) => {
     const doc = parseDoc(bundle, relDir ? `${relDir}/${f}` : f);
-    const title = (doc.fm?.title as string) || titleFromSlug(f.replace(/\.md$/, ""));
-    const desc = (doc.fm?.description as string) || "";
-    return `* [${title}](${f})${desc ? ` - ${desc}` : ""}`;
+    const title = str(doc.fm, "title") || titleFromSlug(f.replace(/\.md$/, ""));
+    const desc = str(doc.fm, "description") || "";
+    // Lifecycle (OKF §5.4) is liftable into the listing: a deprecated concept
+    // stays listed (links and history) but says so before anyone opens it.
+    const mark = statusOf(doc.fm) === "deprecated" ? " _(deprecated)_" : "";
+    return `* [${title}](${f})${mark}${desc ? ` - ${desc}` : ""}`;
   });
   const dirLines = children.map((c) => {
     const name = c.rel.split("/").pop()!;
@@ -60,8 +63,8 @@ function genDir(relDir: string): DirInfo {
       console.error(`index-gen: ${cfg.viz.bundle.dir}/index.md frontmatter is malformed (${fmError}); fix it and re-run`);
       process.exit(1);
     }
-    const rootFm = fm ?? { okf_version: "0.1" };
-    if (!rootFm.okf_version) rootFm.okf_version = "0.1";
+    const rootFm: FM = fm ?? { okf_version: OKF_VERSION };
+    if (!rootFm.okf_version) rootFm.okf_version = OKF_VERSION; // never rewrites a declared version — that is `okf migrate`'s job
     parts.push(fmToYaml(rootFm));
   }
   parts.push(`# ${isRoot ? bundleName : relDir.split("/").pop()!}\n`);

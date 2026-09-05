@@ -78,14 +78,14 @@ describe("GL injection seam", () => {
     const { state } = mountStage();
     const stub = () => document.querySelector("[data-testid=gl-stub]");
     expect(stub()).not.toBeNull();
-    expect(stub()!.textContent).toBe("graph");
-    state.setViewMode("cards");
-    flushSync();
-    // The GL stage owns mode switching internally — Stage never remounts it.
     expect(stub()!.textContent).toBe("cards");
     state.setViewMode("graph");
     flushSync();
+    // The GL stage owns mode switching internally — Stage never remounts it.
     expect(stub()!.textContent).toBe("graph");
+    state.setViewMode("cards");
+    flushSync();
+    expect(stub()!.textContent).toBe("cards");
   });
 
   test("without a gl component, Stage renders chrome only and never throws", () => {

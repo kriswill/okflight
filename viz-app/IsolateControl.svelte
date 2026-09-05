@@ -4,25 +4,25 @@
   const { viz }: { viz: VizState } = $props();
 </script>
 
-<!-- Graph view: neighborhood isolation needs an anchor concept. Cards view:
-  the same depth drives the layout's ring count for every focus kind
-  (concept, bundle, root), so the control is always meaningful there. -->
-{#if viz.selectedConcept || viz.viewMode === "cards"}
+<!-- Graph view only: neighborhood isolation needs an anchor concept and is
+  off by default. The cards view's ring count ("hops") is a layout setting
+  and lives in the view section (ViewToggle). -->
+{#if viz.viewMode === "graph" && viz.selectedConcept}
   <div id="isolate">
-    <span class="hint">{viz.viewMode === "cards" ? "hops" : "neighbors"}</span>
-    <button
-      class="seg"
-      class:active={viz.isolateDepth === 1}
-      onclick={() => viz.setIsolate(viz.isolateDepth === 1 ? 0 : 1)}
-    >
-      1-hop
-    </button>
+    <span class="hint">neighbors</span>
     <button
       class="seg"
       class:active={viz.isolateDepth === 2}
       onclick={() => viz.setIsolate(viz.isolateDepth === 2 ? 0 : 2)}
     >
       2-hop
+    </button>
+    <button
+      class="seg"
+      class:active={viz.isolateDepth === 1}
+      onclick={() => viz.setIsolate(viz.isolateDepth === 1 ? 0 : 1)}
+    >
+      1-hop
     </button>
     <button class="seg" class:active={viz.isolateDepth === 0} onclick={() => viz.setIsolate(0)}>off</button>
   </div>

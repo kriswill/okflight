@@ -115,7 +115,8 @@ try {
   page.on("pageerror", (e) => pageErrors.push(String(e)));
 
   console.log("1. startup: marks, fit, resident labels, sidebar view shift");
-  await page.goto("file://" + HTML);
+  // The cards view is the default; this script drives the 3D graph.
+  await page.goto("file://" + HTML + "#?view=graph");
   await waitInteractive(page);
   const marks = await page.evaluate(() =>
     Object.fromEntries(
@@ -201,7 +202,7 @@ try {
 
   console.log("5. hide-type dims nodes and their labels");
   await page.evaluate(() => {
-    location.hash = "#c/in-a?hide=Reference";
+    location.hash = "#c/in-a?hide=Reference&view=graph";
   });
   await settle(page);
   p = await probe(page);
@@ -209,7 +210,7 @@ try {
   check("dimmed nodes drop their labels", p.visibleLabelCount < 28 + 6, `got ${p.visibleLabelCount}`);
   const dimmedWithFilter = p.dimmedCount;
   await page.evaluate(() => {
-    location.hash = "#c/in-a";
+    location.hash = "#c/in-a?view=graph";
   });
   await settle(page);
   p = await probe(page);
@@ -218,13 +219,13 @@ try {
   // branch the deleted stage.test.ts dim-bridge test covered; facets stay
   // unit-tested in state.test.ts — this fixture configures none).
   await page.evaluate(() => {
-    location.hash = "#c/in-a?q=hub";
+    location.hash = "#c/in-a?q=hub&view=graph";
   });
   await settle(page);
   p = await probe(page);
   check("search query dims non-matches", p.dimmedCount > 0, `dimmed ${p.dimmedCount}`);
   await page.evaluate(() => {
-    location.hash = "#c/in-a";
+    location.hash = "#c/in-a?view=graph";
   });
   await settle(page);
   p = await probe(page);
@@ -288,7 +289,7 @@ try {
   // Full navigation (not a hash tweak) so the app boots with the selection
   // already applied — the case where the fly effect runs before the fit.
   await page.goto("about:blank");
-  await page.goto("file://" + HTML + "#c/hub");
+  await page.goto("file://" + HTML + "#c/hub?view=graph");
   await waitInteractive(page);
   p = await probe(page);
   check("deep link starts a fly on load", p.flying === true);

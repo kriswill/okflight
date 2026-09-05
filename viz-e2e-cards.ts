@@ -71,18 +71,42 @@ try {
   const pageErrors: string[] = [];
   page.on("pageerror", (e) => pageErrors.push(String(e)));
 
-  console.log("1. default load stays on the graph view");
+  console.log("1. default load is the cards view (2 hops, horizontal); view=graph opts out");
   await page.goto("file://" + HTML);
   await waitInteractive(page);
-  check("view is graph", (await okf(page, "window.__okf.view")) === "graph");
-  check("no cards handle in graph view", (await okf(page, "window.__okf.cards ?? null")) === null);
-
-  console.log("2. cards view without a selection: synthetic root card");
+  check("view is cards", (await okf(page, "window.__okf.view")) === "cards");
+  check("flow is horizontal", (await okf(page, "window.__okf.flow")) === "h");
+  check("bare hash on load (all defaults)", await page.evaluate(() => location.hash === ""));
+  check(
+    "hops control offers 2-hop then 1-hop, no off",
+    await page.evaluate(() =>
+      [...document.querySelectorAll("#hops .seg")].map((b) => b.textContent!.trim()).join(",") === "2-hop,1-hop",
+    ),
+  );
+  check(
+    "view section: cards, 3D, then flow → ↓, then hops 2-hop 1-hop; neighbors control absent",
+    await page.evaluate(
+      () =>
+        [...document.querySelectorAll("#viewtoggle .seg")].map((b) => b.textContent!.trim()).join(",") ===
+          "cards,3D,→,↓,2-hop,1-hop" && !document.querySelector("#isolate"),
+    ),
+  );
   await page.evaluate(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (window as any).__okf.setView("cards");
+    (window as any).__okf.setView("graph");
+  });
+  await settle(page);
+  check("hash carries view=graph", await page.evaluate(() => location.hash === "#?view=graph"));
+  check("no cards handle in graph view", (await okf(page, "window.__okf.cards ?? null")) === null);
+
+  // The rest of this script exercises the vertical flow at 1 hop (the
+  // pre-default layout), entered through a deep link.
+  console.log("2. cards view without a selection: synthetic root card");
+  await page.evaluate(() => {
+    location.hash = "#?isolate=1&flow=v";
   });
   await settleMotion(page);
+  check("view is cards", (await okf(page, "window.__okf.view")) === "cards");
   check(
     "graph render path idle in cards mode (no bloom pass over the cards)",
     (await okf(page, "window.__okf.graph.renderPath")) === "idle",
@@ -142,7 +166,7 @@ try {
     l.focusId === "decisions" && (await page.evaluate(() => !document.querySelector("#panel"))),
   );
   await page.evaluate(() => {
-    location.hash = "#?view=cards"; // back to the root focus (a clear, not a navigation)
+    location.hash = "#?isolate=1&flow=v"; // back to the root focus (a clear, not a navigation)
   });
   await settleMotion(page);
   check(
@@ -164,7 +188,7 @@ try {
     "bundle out-row lists the bundle's concepts",
     l.cards.filter((c) => c.lane === "out" && c.ring === 1).length === 18 && !!l.byId["decisions/adr-001"],
   );
-  check("hash records the bundle focus", await page.evaluate(() => location.hash === "#b/decisions?view=cards"));
+  check("hash records the bundle focus", await page.evaluate(() => location.hash === "#b/decisions?isolate=1&flow=v"));
   const rootPt = await okf<{ x: number; y: number }>(page, 'window.__okf.cards.project("")');
   await page.mouse.click(rootPt.x, rootPt.y);
   await settleMotion(page);
@@ -173,7 +197,7 @@ try {
 
   console.log("2c. the root FOCUS card is inert — clicking it must not reset the hops");
   await page.evaluate(() => {
-    const two = [...document.querySelectorAll("#isolate .seg")].find((b) => b.textContent!.trim() === "2-hop");
+    const two = [...document.querySelectorAll("#hops .seg")].find((b) => b.textContent!.trim() === "2-hop");
     (two as HTMLElement).click();
   });
   await settleMotion(page);
@@ -189,8 +213,8 @@ try {
     l.rootFocus === true && l.cards.filter((c) => c.ring === 2).length === ring2Count,
   );
   await page.evaluate(() => {
-    const off = [...document.querySelectorAll("#isolate .seg")].find((b) => b.textContent!.trim() === "off");
-    (off as HTMLElement).click();
+    const one = [...document.querySelectorAll("#hops .seg")].find((b) => b.textContent!.trim() === "1-hop");
+    (one as HTMLElement).click();
   });
   await settleMotion(page);
 
@@ -240,11 +264,11 @@ try {
 
   console.log("4. hops honored: 2-hop adds the directional second ring");
   await page.evaluate(() => {
-    [...document.querySelectorAll("#isolate .seg")].find((b) => b.textContent!.trim() === "2-hop")!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    [...document.querySelectorAll("#hops .seg")].find((b) => b.textContent!.trim() === "2-hop")!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
   });
   await settleMotion(page);
   l = (await layout(page))!;
-  check("hash carries isolate + view", await page.evaluate(() => location.hash.includes("isolate=2") && location.hash.includes("view=cards")));
+  check("2 hops is the default: isolate drops from the hash", await page.evaluate(() => !location.hash.includes("isolate") && !location.hash.includes("view=")));
   check(
     "ring 2 above: in-of-in under its ring-1 parent",
     eq(l.cards.filter((c) => c.ring === 2 && c.lane === "in").map((c) => [c.id, c.parentId]), [["in2-f", "in-a"]]),
@@ -254,21 +278,22 @@ try {
     eq(l.cards.filter((c) => c.ring === 2 && c.lane === "out").map((c) => [c.id, c.parentId]), [["out2-g", "out-c"]]),
   );
   await page.evaluate(() => {
-    [...document.querySelectorAll("#isolate .seg")].find((b) => b.textContent!.trim() === "off")!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    [...document.querySelectorAll("#hops .seg")].find((b) => b.textContent!.trim() === "1-hop")!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
   });
   await settleMotion(page);
   l = (await layout(page))!;
-  check("hops off: back to one ring", l.cards.every((c) => c.ring < 2));
+  check("1 hop: back to one ring", l.cards.every((c) => c.ring < 2));
+  check("hash carries isolate=1", await page.evaluate(() => location.hash.includes("isolate=1")));
 
   console.log("5. type filter drops cards (deep-link path)");
   await page.evaluate(() => {
-    location.hash = "#c/hub?hide=Reference&view=cards";
+    location.hash = "#c/hub?hide=Reference&isolate=1&flow=v";
   });
   await settleMotion(page);
   l = (await layout(page))!;
   check("hidden type's card gone", !l.byId["out-c"] && eq(l.cards.filter((c) => c.lane === "out").map((c) => c.id), ["out-d"]));
   await page.evaluate(() => {
-    location.hash = "#c/hub?view=cards";
+    location.hash = "#c/hub?isolate=1&flow=v";
   });
   await settleMotion(page);
 
@@ -279,7 +304,7 @@ try {
   l = (await layout(page))!;
   check("clicked card is the new focus", l.focusId === "in-a");
   check("old focus flows out of the new one", l.cards.some((c) => c.id === "hub" && c.lane === "out"));
-  check("hash follows the refocus", await page.evaluate(() => location.hash === "#c/in-a?view=cards"));
+  check("hash follows the refocus", await page.evaluate(() => location.hash === "#c/in-a?isolate=1&flow=v"));
   check(
     "cards that rolled out are gone after settle",
     (await okf(page, 'window.__okf.cards.pose("out-d") ?? null')) === null,
@@ -433,13 +458,13 @@ try {
       l.cards.filter((c) => c.lane === "out").every((c) => c.x > 0) &&
       l.byId[l.focusId]!.x === 0,
   );
-  check("hash carries flow=h", await page.evaluate(() => location.hash.includes("flow=h")));
+  check("horizontal is the default: flow param drops from the hash", await page.evaluate(() => !location.hash.includes("flow")));
   await page.evaluate(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (window as any).__okf.setFlow("v");
   });
   await settleMotion(page);
-  check("back to vertical: flow param drops from the hash", await page.evaluate(() => !location.hash.includes("flow")));
+  check("back to vertical: hash carries flow=v", await page.evaluate(() => location.hash.includes("flow=v")));
 
   console.log("7. reload restores the cards view from the URL");
   await page.reload();
@@ -471,7 +496,7 @@ try {
 
   console.log("7c. bundle deep link applies and survives reload");
   await page.evaluate(() => {
-    location.hash = "#b/notes?view=cards";
+    location.hash = "#b/notes";
   });
   await settleMotion(page);
   l = (await layout(page))!;

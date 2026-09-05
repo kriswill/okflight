@@ -37,13 +37,15 @@ export function createVizState(model: VizModel) {
   let indexPanelHidden = $state(false);
   const hidden = new SvelteSet<string>();
   let query = $state("");
-  let isolateDepth = $state<0 | 1 | 2>(0);
-  // Stage rendering format: the sphere graph or the TheBrain-style card
-  // layout. Filter-class state (rides the hash as `view=cards`), independent
-  // of selection so it survives select/clear cycles.
-  let viewMode = $state<"graph" | "cards">("graph");
-  // Cards-view flow orientation: "v" = top-down (default), "h" = left-right.
-  let cardFlow = $state<"v" | "h">("v");
+  // Cards view: ring count, 2 by default (never 0 there). Graph view:
+  // neighborhood isolation, off (0) by default.
+  let isolateDepth = $state<0 | 1 | 2>(2);
+  // Stage rendering format: the TheBrain-style card layout (default) or the
+  // sphere graph. Filter-class state (rides the hash as `view=graph`),
+  // independent of selection so it survives select/clear cycles.
+  let viewMode = $state<"graph" | "cards">("cards");
+  // Cards-view flow orientation: "h" = left-right (default), "v" = top-down.
+  let cardFlow = $state<"v" | "h">("h");
   // facet name -> "all" or one of that facet's values; keyed in model.facets
   // order (load-bearing: hash.ts's encode walks this same order). Always
   // replaced wholesale (never mutated in place) so effects tracking the
@@ -197,7 +199,9 @@ export function createVizState(model: VizModel) {
       cardsBundle = null;
       fly = false;
       selSeq++;
-      isolateDepth = 0;
+      // Graph isolation is anchored on the selection, so it goes with it;
+      // cards hops are a layout setting and stay.
+      if (viewMode === "graph") isolateDepth = 0;
     },
     get cardsBundle() {
       return cardsBundle;
@@ -209,6 +213,7 @@ export function createVizState(model: VizModel) {
       if (!Object.hasOwn(model.bundles, path)) return;
       cardsBundle = path;
       viewMode = "cards";
+      if (isolateDepth === 0) isolateDepth = 2;
       sel = { kind: "none" };
       lastConceptId = null;
       indexPanelHidden = false;
@@ -256,16 +261,16 @@ export function createVizState(model: VizModel) {
     setFilters(
       hiddenTypes: string[],
       q: string,
-      isolate: 0 | 1 | 2 = 0,
+      isolate: 0 | 1 | 2 = 2,
       sel: Record<string, string> = {},
-      view: "graph" | "cards" = "graph",
-      flow: "v" | "h" = "v",
+      view: "graph" | "cards" = "cards",
+      flow: "v" | "h" = "h",
     ) {
       const want = new Set(hiddenTypes);
       for (const t of [...hidden]) if (!want.has(t)) hidden.delete(t);
       for (const t of want) hidden.add(t);
       query = q;
-      isolateDepth = isolate;
+      isolateDepth = view === "cards" && isolate === 0 ? 2 : isolate;
       viewMode = view;
       cardFlow = flow;
       facetSel = Object.fromEntries(
@@ -296,9 +301,13 @@ export function createVizState(model: VizModel) {
       if (v !== "graph" && v !== "cards") return;
       viewMode = v;
       indexPanelHidden = false;
+      // Each view's own default depth: graph isolation is opt-in, cards
+      // always show a ring count.
+      if (v === "graph") isolateDepth = 0;
+      else if (isolateDepth === 0) isolateDepth = 2;
     },
     /** Card-layout ring depth: the view inherently shows the direct ring, so
-     *  only 2-hop isolation widens it (hops "off" and "1-hop" both mean 1). */
+     *  only 2 hops (the default) widens it; anything else means 1. */
     get cardsDepth(): 1 | 2 {
       return isolateDepth === 2 ? 2 : 1;
     },

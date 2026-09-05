@@ -108,6 +108,7 @@ describe("selection", () => {
 
   test("focusBundle enters the cards view — index links navigate from the graph too", () => {
     const s = createVizState(model());
+    s.setViewMode("graph");
     expect(s.viewMode).toBe("graph");
     s.focusBundle("notes");
     expect(s.viewMode).toBe("cards");
@@ -144,6 +145,7 @@ describe("selection", () => {
 
   test("cardsIndexDoc: the focused index doc, cards view only, no selection open", () => {
     const s = createVizState(model());
+    s.setViewMode("graph");
     expect(s.cardsIndexDoc).toBeNull(); // graph view
     s.setViewMode("cards");
     expect(s.cardsIndexDoc?.title).toBe("KB"); // root focus
@@ -360,13 +362,36 @@ describe("neighborhood isolation", () => {
     expect(s.visibleSorted.map((n) => n.id)).toEqual(["a"]); // b, c are Pattern, hidden by type too
   });
 
-  test("clearSelection resets isolation", () => {
+  test("clearSelection resets graph isolation (anchored on the selection)", () => {
     const s = createVizState(isoModel());
+    s.setViewMode("graph");
     s.selectConcept("a");
     s.setIsolate(2);
     s.clearSelection();
     expect(s.isolateDepth).toBe(0);
     expect(s.visibleSorted).toHaveLength(4);
+  });
+
+  test("clearSelection keeps cards hops (a layout setting, not a selection one)", () => {
+    const s = createVizState(isoModel());
+    s.selectConcept("a");
+    s.setIsolate(1);
+    s.clearSelection();
+    expect(s.isolateDepth).toBe(1);
+    expect(s.visibleSorted).toHaveLength(4); // no anchor: nothing restricted
+  });
+
+  test("switching views applies each view's default depth", () => {
+    const s = createVizState(isoModel());
+    expect(s.isolateDepth).toBe(2); // cards default
+    s.setViewMode("graph");
+    expect(s.isolateDepth).toBe(0); // graph isolation is opt-in
+    s.setViewMode("cards");
+    expect(s.isolateDepth).toBe(2); // never 0 in cards
+    s.setIsolate(1);
+    s.setViewMode("graph");
+    s.setViewMode("cards");
+    expect(s.isolateDepth).toBe(2);
   });
 
   test("isolation is sticky across concept-to-concept navigation, re-rooting on the new selection", () => {
@@ -394,13 +419,17 @@ describe("neighborhood isolation", () => {
     expect(s.hiddenMatchCount).toBe(0); // hiddenMatchCount only tracks type-hidden suppression
   });
 
-  test("setFilters accepts an isolate depth, defaults to 0 for existing 2-arg calls", () => {
+  test("setFilters accepts an isolate depth; defaults to 2 (cards) for existing 2-arg calls, and 0 in cards means 2", () => {
     const s = createVizState(isoModel());
     s.selectConcept("a");
     s.setFilters(["Pattern"], "");
-    expect(s.isolateDepth).toBe(0);
-    s.setFilters([], "", 2);
     expect(s.isolateDepth).toBe(2);
+    s.setFilters([], "", 1);
+    expect(s.isolateDepth).toBe(1);
+    s.setFilters([], "", 0);
+    expect(s.isolateDepth).toBe(2);
+    s.setFilters([], "", 0, {}, "graph");
+    expect(s.isolateDepth).toBe(0);
   });
 
   test("opening a file/dir view suspends isolation (anchored on selectedConcept, not focusedConcept)", () => {
@@ -444,6 +473,7 @@ describe("pinned concept listing", () => {
 
   test("selection with isolation off pins the anchor with direct links; rest excludes tree members", () => {
     const s = createVizState(listModel());
+    s.setViewMode("graph"); // isolation off
     s.selectConcept("a");
     expect(treeShape(s.listing.tree)).toEqual(["a", ["b"]]);
     expect(s.listing.rest.map((n) => n.id)).toEqual(["d", "c"]); // Delta, Gamma
@@ -480,6 +510,7 @@ describe("pinned concept listing", () => {
 
   test("the anchor stays pinned under a non-matching search", () => {
     const s = createVizState(listModel());
+    s.setViewMode("graph"); // isolation off
     s.selectConcept("a");
     s.query = "gamma"; // matches only c, two hops away
     expect(treeShape(s.listing.tree)).toBe("a"); // b fails the search and is spliced out; anchor kept
@@ -705,47 +736,48 @@ describe("theme toggle", () => {
 });
 
 describe("view mode", () => {
-  test("defaults to graph; setViewMode flips; invalid values ignored", () => {
+  test("defaults to cards; setViewMode flips; invalid values ignored", () => {
     const s = createVizState(model());
-    expect(s.viewMode).toBe("graph");
-    s.setViewMode("cards");
-    expect(s.viewMode).toBe("cards");
-    s.setViewMode("nope" as never);
     expect(s.viewMode).toBe("cards");
     s.setViewMode("graph");
     expect(s.viewMode).toBe("graph");
+    s.setViewMode("nope" as never);
+    expect(s.viewMode).toBe("graph");
+    s.setViewMode("cards");
+    expect(s.viewMode).toBe("cards");
   });
 
-  test("cardsDepth: the cards view is inherently one ring; only 2-hop isolation widens it", () => {
+  test("cardsDepth: two rings by default; 1 hop narrows to the direct ring", () => {
     const s = createVizState(model());
     s.selectConcept("a");
-    expect(s.cardsDepth).toBe(1); // isolate off
+    expect(s.cardsDepth).toBe(2);
     s.setIsolate(1);
     expect(s.cardsDepth).toBe(1);
     s.setIsolate(2);
     expect(s.cardsDepth).toBe(2);
   });
 
-  test("setFilters applies the view param; omitted keeps the graph default", () => {
+  test("setFilters applies the view param; omitted keeps the cards default", () => {
     const s = createVizState(model());
-    s.setFilters([], "", 0, {}, "cards");
-    expect(s.viewMode).toBe("cards");
-    s.setFilters([], "");
+    s.setFilters([], "", 0, {}, "graph");
     expect(s.viewMode).toBe("graph");
+    s.setFilters([], "");
+    expect(s.viewMode).toBe("cards");
   });
 
-  test("cardFlow defaults vertical; setCardFlow flips; invalid ignored; setFilters applies", () => {
+  test("cardFlow defaults horizontal; setCardFlow flips; invalid ignored; setFilters applies", () => {
     const s = createVizState(model());
-    expect(s.cardFlow).toBe("v");
-    s.setCardFlow("h");
     expect(s.cardFlow).toBe("h");
+    s.setCardFlow("v");
+    expect(s.cardFlow).toBe("v");
     s.setCardFlow("diagonal" as never);
+    expect(s.cardFlow).toBe("v");
+    s.setFilters([], "", 2, {}, "cards", "h");
     expect(s.cardFlow).toBe("h");
-    s.setFilters([], "", 0, {}, "cards", "v");
-    expect(s.cardFlow).toBe("v");
+    s.setCardFlow("v");
     s.setFilters([], "");
-    expect(s.viewMode).toBe("graph");
-    expect(s.cardFlow).toBe("v");
+    expect(s.viewMode).toBe("cards");
+    expect(s.cardFlow).toBe("h");
   });
 
   test("clearSelection leaves the view mode alone", () => {

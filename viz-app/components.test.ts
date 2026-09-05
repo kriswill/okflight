@@ -274,6 +274,7 @@ describe("ConceptList", () => {
         edges: [{ s: "a", t: "b" }],
       }),
     );
+    state.setViewMode("graph"); // isolation off
     mountC(ConceptList, { viz: state });
     expect(document.querySelector(".tree-divider")).toBeNull(); // no selection: flat list
     expect(document.querySelector("#list .kids")).toBeNull();
@@ -294,36 +295,58 @@ describe("ViewToggle", () => {
   test("renders both segments with the active one highlighted; clicks flip the mode", () => {
     const state = createVizState(model());
     mountC(ViewToggle, { viz: state });
-    const [graph, cards] = [...document.querySelectorAll("#viewtoggle .seg")] as HTMLElement[];
-    expect([graph!.textContent?.trim(), cards!.textContent?.trim()]).toEqual(["3D", "cards"]);
-    expect(graph!.classList.contains("active")).toBe(true);
-    expect(cards!.classList.contains("active")).toBe(false);
-
-    cards!.click();
-    flushSync();
-    expect(state.viewMode).toBe("cards");
+    const [cards, graph] = [...document.querySelectorAll("#viewtoggle .seg")] as HTMLElement[];
+    expect([cards!.textContent?.trim(), graph!.textContent?.trim()]).toEqual(["cards", "3D"]);
     expect(cards!.classList.contains("active")).toBe(true);
     expect(graph!.classList.contains("active")).toBe(false);
 
     graph!.click();
     flushSync();
     expect(state.viewMode).toBe("graph");
+    expect(graph!.classList.contains("active")).toBe(true);
+    expect(cards!.classList.contains("active")).toBe(false);
+
+    cards!.click();
+    flushSync();
+    expect(state.viewMode).toBe("cards");
   });
 
-  test("flow control appears only in cards mode and drives setCardFlow", () => {
+  test("flow row appears only in cards mode (→ first, active by default) and drives setCardFlow", () => {
     const state = createVizState(model());
     mountC(ViewToggle, { viz: state });
-    expect([...document.querySelectorAll("#viewtoggle .seg")]).toHaveLength(2); // no flow control in graph mode
-    state.setViewMode("cards");
-    flushSync();
-    const segs = [...document.querySelectorAll("#viewtoggle .seg")] as HTMLElement[];
-    expect(segs).toHaveLength(4);
-    const [, , down, right] = segs;
-    expect(down!.classList.contains("active")).toBe(true);
-    right!.click();
-    flushSync();
-    expect(state.cardFlow).toBe("h");
+    const [right, down] = [...document.querySelectorAll("#viewtoggle #flow .seg")] as HTMLElement[];
+    expect([right!.textContent?.trim(), down!.textContent?.trim()]).toEqual(["→", "↓"]);
     expect(right!.classList.contains("active")).toBe(true);
+    down!.click();
+    flushSync();
+    expect(state.cardFlow).toBe("v");
+    expect(down!.classList.contains("active")).toBe(true);
+    state.setViewMode("graph");
+    flushSync();
+    expect(document.querySelector("#viewtoggle #flow")).toBeNull(); // no flow row in graph mode
+    expect(document.querySelector("#viewtoggle #hops")).toBeNull(); // nor hops
+    expect([...document.querySelectorAll("#viewtoggle .seg")]).toHaveLength(2);
+  });
+
+  test("hops row: cards only, under the view row, 2-hop then 1-hop with 2 active by default, no off", () => {
+    const state = createVizState(model());
+    mountC(ViewToggle, { viz: state });
+    const rows = [...document.querySelectorAll("#viewtoggle .row")].map((r) => r.id);
+    expect(rows).toEqual(["", "flow", "hops"]);
+    const segs = [...document.querySelectorAll("#viewtoggle #hops .seg")] as HTMLElement[];
+    expect(segs.map((b) => b.textContent?.trim())).toEqual(["2-hop", "1-hop"]);
+    const [twoHop, oneHop] = segs;
+    expect(twoHop!.classList.contains("active")).toBe(true);
+    oneHop!.click();
+    flushSync();
+    expect(state.isolateDepth).toBe(1);
+    expect(oneHop!.classList.contains("active")).toBe(true);
+    oneHop!.click(); // re-clicking the active hop is a no-op: no "off" in cards
+    flushSync();
+    expect(state.isolateDepth).toBe(1);
+    twoHop!.click();
+    flushSync();
+    expect(state.isolateDepth).toBe(2);
   });
 
   test("Sidebar hosts the toggle", () => {
@@ -334,20 +357,29 @@ describe("ViewToggle", () => {
 });
 
 describe("IsolateControl", () => {
-  test("renders nothing when no concept is selected", () => {
+  test("cards view: renders nothing, even with a selection (hops live in the view section)", () => {
     const state = createVizState(model());
+    state.selectConcept("a");
     mountC(IsolateControl, { viz: state });
     expect(document.getElementById("isolate")).toBeNull();
   });
 
-  test("renders 1-hop/2-hop/off once a concept is selected; buttons drive setIsolate", () => {
+  test("graph view: renders nothing when no concept is selected", () => {
     const state = createVizState(model());
+    state.setViewMode("graph");
+    mountC(IsolateControl, { viz: state });
+    expect(document.getElementById("isolate")).toBeNull();
+  });
+
+  test("graph view: renders 2-hop/1-hop/off once a concept is selected; buttons drive setIsolate", () => {
+    const state = createVizState(model());
+    state.setViewMode("graph");
     state.selectConcept("a");
     mountC(IsolateControl, { viz: state });
-    const [oneHop, twoHop, off] = [...document.querySelectorAll("#isolate .seg")] as HTMLElement[];
-    expect([oneHop!.textContent?.trim(), twoHop!.textContent?.trim(), off!.textContent?.trim()]).toEqual([
-      "1-hop",
+    const [twoHop, oneHop, off] = [...document.querySelectorAll("#isolate .seg")] as HTMLElement[];
+    expect([twoHop!.textContent?.trim(), oneHop!.textContent?.trim(), off!.textContent?.trim()]).toEqual([
       "2-hop",
+      "1-hop",
       "off",
     ]);
     expect(off!.classList.contains("active")).toBe(true); // isolateDepth starts at 0
@@ -370,11 +402,12 @@ describe("IsolateControl", () => {
     expect(state.isolateDepth).toBe(0);
   });
 
-  test("switching directly between depths, and re-clicking 2-hop while active, both work", () => {
+  test("graph view: switching directly between depths, and re-clicking 2-hop while active, both work", () => {
     const state = createVizState(model());
+    state.setViewMode("graph");
     state.selectConcept("a");
     mountC(IsolateControl, { viz: state });
-    const [oneHop, twoHop] = [...document.querySelectorAll("#isolate .seg")] as HTMLElement[];
+    const [twoHop, oneHop] = [...document.querySelectorAll("#isolate .seg")] as HTMLElement[];
 
     oneHop!.click(); // 0 -> 1
     flushSync();

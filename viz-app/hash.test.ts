@@ -34,11 +34,11 @@ describe("encodeHash", () => {
 // navigation, so it rides in the selection segment — Back walks through
 // bundles just like concepts.
 describe("bundle selection", () => {
-  const f = { hidden: [], q: "", isolate: 0 as const, facets: {}, view: "cards" as const, flow: "v" as const };
+  const f = { hidden: [], q: "", isolate: 2 as const, facets: {}, view: "cards" as const, flow: "h" as const };
 
   test("encodes as b/<path>", () => {
     expect(encodeHash({ kind: "bundle", path: "notes" })).toBe("b/notes");
-    expect(encodeViewHash({ sel: { kind: "bundle", path: "notes" }, filters: f })).toBe("b/notes?view=cards");
+    expect(encodeViewHash({ sel: { kind: "bundle", path: "notes" }, filters: f })).toBe("b/notes");
   });
 
   test("decodes only known bundles; absent bundle map (old embed) -> none", () => {
@@ -53,20 +53,21 @@ describe("bundle selection", () => {
     }
   });
 
-  test("isolate rides behind '?' for a bundle selection too", () => {
-    expect(encodeViewHash({ sel: { kind: "bundle", path: "notes" }, filters: { ...f, isolate: 2 } })).toBe(
-      "b/notes?isolate=2&view=cards",
+  test("isolate rides behind '?' for a bundle selection too (1 hop; 2 is the default)", () => {
+    expect(encodeViewHash({ sel: { kind: "bundle", path: "notes" }, filters: { ...f, isolate: 1 } })).toBe(
+      "b/notes?isolate=1",
     );
-    expect(decodeViewHash("b/notes?isolate=2", model).filters.isolate).toBe(2);
+    expect(decodeViewHash("b/notes?isolate=1", model).filters.isolate).toBe(1);
+    expect(decodeViewHash("b/notes", model).filters.isolate).toBe(2);
   });
 
   test("isolate rides for the cards view without a selection (root-focus hops)", () => {
     const none = { kind: "none" } as const;
-    expect(encodeViewHash({ sel: none, filters: { ...f, isolate: 2 } })).toBe("?isolate=2&view=cards");
-    expect(decodeViewHash("?isolate=2&view=cards", model).filters.isolate).toBe(2);
+    expect(encodeViewHash({ sel: none, filters: { ...f, isolate: 1 } })).toBe("?isolate=1");
+    expect(decodeViewHash("?isolate=1", model).filters.isolate).toBe(1);
     // The graph view still drops it: isolation needs an anchor concept.
-    expect(encodeViewHash({ sel: none, filters: { ...f, view: "graph" as const, isolate: 2 } })).toBe("");
-    expect(decodeViewHash("?isolate=2", model).filters.isolate).toBe(0);
+    expect(encodeViewHash({ sel: none, filters: { ...f, view: "graph" as const, isolate: 2 } })).toBe("?view=graph");
+    expect(decodeViewHash("?isolate=2&view=graph", model).filters.isolate).toBe(0);
   });
 });
 
@@ -78,117 +79,118 @@ describe("encodeViewHash", () => {
     isolate: 0 as const,
     facets: {},
     view: "graph" as const,
-    flow: "v" as const,
+    flow: "h" as const,
     ...o,
   });
 
-  test("empty filters add nothing", () => {
-    expect(encodeViewHash({ sel: none, filters: f({}) })).toBe("");
+  test("empty filters add nothing beyond the view", () => {
+    expect(encodeViewHash({ sel: none, filters: f({}) })).toBe("?view=graph");
     expect(encodeViewHash({ sel: { kind: "concept", id: "wiki/architecture" }, filters: f({}) })).toBe(
-      "c/wiki/architecture",
+      "c/wiki/architecture?view=graph",
     );
   });
 
   test("filters ride behind '?', hidden types sorted for a canonical form", () => {
     expect(encodeViewHash({ sel: none, filters: f({ hidden: ["Decision", "Alpha Module"] }) })).toBe(
-      "?hide=Alpha+Module%2CDecision",
+      "?hide=Alpha+Module%2CDecision&view=graph",
     );
     expect(encodeViewHash({ sel: none, filters: f({ hidden: ["Alpha Module", "Decision"] }) })).toBe(
-      "?hide=Alpha+Module%2CDecision",
+      "?hide=Alpha+Module%2CDecision&view=graph",
     );
     expect(encodeViewHash({ sel: { kind: "concept", id: "wiki/architecture" }, filters: f({ q: "tmux conf" }) })).toBe(
-      "c/wiki/architecture?q=tmux+conf",
+      "c/wiki/architecture?q=tmux+conf&view=graph",
     );
   });
 
   test("isolate rides behind '?' only for a concept selection and a nonzero depth", () => {
     expect(encodeViewHash({ sel: { kind: "concept", id: "wiki/architecture" }, filters: f({ isolate: 2 }) })).toBe(
-      "c/wiki/architecture?isolate=2",
+      "c/wiki/architecture?isolate=2&view=graph",
     );
     expect(encodeViewHash({ sel: { kind: "concept", id: "wiki/architecture" }, filters: f({ isolate: 0 }) })).toBe(
-      "c/wiki/architecture",
+      "c/wiki/architecture?view=graph",
     );
-    expect(encodeViewHash({ sel: none, filters: f({ isolate: 2 }) })).toBe(""); // no selection -> never emitted
+    expect(encodeViewHash({ sel: none, filters: f({ isolate: 2 }) })).toBe("?view=graph"); // no selection -> never emitted
   });
 
   test("a facet rides behind '?' as its own name, always emittable (no selection gate)", () => {
-    expect(encodeViewHash({ sel: none, filters: f({ facets: { platform: "macos" } }) })).toBe("?platform=macos");
+    expect(encodeViewHash({ sel: none, filters: f({ facets: { platform: "macos" } }) })).toBe("?view=graph&platform=macos");
     expect(
       encodeViewHash({ sel: { kind: "file", path: "docs/50%.md" }, filters: f({ facets: { platform: "linux" } }) }),
-    ).toBe("f/docs/50%25.md?platform=linux");
-    expect(encodeViewHash({ sel: none, filters: f({ facets: { platform: "all" } }) })).toBe(""); // "all" omitted
+    ).toBe("f/docs/50%25.md?view=graph&platform=linux");
+    expect(encodeViewHash({ sel: none, filters: f({ facets: { platform: "all" } }) })).toBe("?view=graph"); // "all" omitted
   });
 
   test("multiple active facets all encode; 'all' entries are skipped", () => {
     expect(encodeViewHash({ sel: none, filters: f({ facets: { platform: "macos", status: "all" } }) })).toBe(
-      "?platform=macos",
+      "?view=graph&platform=macos",
     );
     expect(encodeViewHash({ sel: none, filters: f({ facets: { platform: "macos", status: "stable" } }) })).toBe(
-      "?platform=macos&status=stable",
+      "?view=graph&platform=macos&status=stable",
     );
   });
 
-  test("hide, q, isolate, then facets appear in that order", () => {
+  test("hide, q, isolate, view, then facets appear in that order", () => {
     expect(
       encodeViewHash({
         sel: { kind: "concept", id: "wiki/architecture" },
         filters: f({ hidden: ["Decision"], q: "arch", isolate: 1, facets: { platform: "macos", status: "stable" } }),
       }),
-    ).toBe("c/wiki/architecture?hide=Decision&q=arch&isolate=1&platform=macos&status=stable");
+    ).toBe("c/wiki/architecture?hide=Decision&q=arch&isolate=1&view=graph&platform=macos&status=stable");
   });
 });
 
-// The cards view is a filter-class hash param: selection-independent,
-// "graph" (the default) never emitted so pre-cards links stay canonical.
+// The view is a filter-class hash param: selection-independent, "cards"
+// (the default) never emitted so default links stay bare.
 describe("view mode param", () => {
-  const f = (view: "graph" | "cards") => ({ hidden: [], q: "", isolate: 0 as const, facets: {}, view, flow: "v" as const });
+  const f = (view: "graph" | "cards") => ({ hidden: [], q: "", isolate: 0 as const, facets: {}, view, flow: "h" as const });
 
-  test("view=cards encodes with or without a selection; graph adds nothing", () => {
-    expect(encodeViewHash({ sel: { kind: "none" }, filters: f("cards") })).toBe("?view=cards");
-    expect(encodeViewHash({ sel: { kind: "concept", id: "wiki/architecture" }, filters: f("cards") })).toBe(
-      "c/wiki/architecture?view=cards",
+  test("view=graph encodes with or without a selection; cards adds nothing", () => {
+    expect(encodeViewHash({ sel: { kind: "none" }, filters: f("graph") })).toBe("?view=graph");
+    expect(encodeViewHash({ sel: { kind: "concept", id: "wiki/architecture" }, filters: f("graph") })).toBe(
+      "c/wiki/architecture?view=graph",
     );
-    expect(encodeViewHash({ sel: { kind: "none" }, filters: f("graph") })).toBe("");
+    expect(encodeViewHash({ sel: { kind: "none" }, filters: f("cards") })).toBe("");
   });
 
   test("composes with the other filter params, after isolate", () => {
     expect(
       encodeViewHash({
         sel: { kind: "concept", id: "wiki/architecture" },
-        filters: { hidden: ["Decision"], q: "arch", isolate: 1, facets: { platform: "macos" }, view: "cards", flow: "v" },
+        filters: { hidden: ["Decision"], q: "arch", isolate: 1, facets: { platform: "macos" }, view: "graph", flow: "h" },
       }),
-    ).toBe("c/wiki/architecture?hide=Decision&q=arch&isolate=1&view=cards&platform=macos");
+    ).toBe("c/wiki/architecture?hide=Decision&q=arch&isolate=1&view=graph&platform=macos");
   });
 
-  test("round-trips; absent or garbage decodes to graph", () => {
-    const view = { sel: { kind: "none" } as const, filters: f("cards") };
-    expect(decodeViewHash(encodeViewHash(view), model).filters.view).toBe("cards");
-    expect(decodeViewHash("c/wiki/architecture", model).filters.view).toBe("graph");
-    expect(decodeViewHash("?view=bogus", model).filters.view).toBe("graph");
-    expect(decodeViewHash("", model).filters.view).toBe("graph");
+  test("round-trips; absent or garbage decodes to cards", () => {
+    const view = { sel: { kind: "none" } as const, filters: f("graph") };
+    expect(decodeViewHash(encodeViewHash(view), model).filters.view).toBe("graph");
+    expect(decodeViewHash("c/wiki/architecture", model).filters.view).toBe("cards");
+    expect(decodeViewHash("?view=bogus", model).filters.view).toBe("cards");
+    expect(decodeViewHash("", model).filters.view).toBe("cards");
   });
 });
 
-// Horizontal card flow rides the hash the same way as view=cards.
+// Vertical card flow rides the hash the same way as view=graph.
 describe("flow param", () => {
   const f = (flow: "v" | "h") => ({
     hidden: [],
     q: "",
-    isolate: 0 as const,
+    isolate: 2 as const,
     facets: {},
     view: "cards" as const,
     flow,
   });
 
-  test("flow=h encodes only when horizontal; composes after view", () => {
-    expect(encodeViewHash({ sel: { kind: "none" }, filters: f("h") })).toBe("?view=cards&flow=h");
-    expect(encodeViewHash({ sel: { kind: "none" }, filters: f("v") })).toBe("?view=cards");
+  test("flow=v encodes only when vertical; composes after isolate", () => {
+    expect(encodeViewHash({ sel: { kind: "none" }, filters: f("v") })).toBe("?flow=v");
+    expect(encodeViewHash({ sel: { kind: "none" }, filters: f("h") })).toBe("");
+    expect(encodeViewHash({ sel: { kind: "none" }, filters: { ...f("v"), isolate: 1 } })).toBe("?isolate=1&flow=v");
   });
 
-  test("round-trips; absent or garbage decode to vertical", () => {
-    expect(decodeViewHash(encodeViewHash({ sel: { kind: "none" }, filters: f("h") }), model).filters.flow).toBe("h");
-    expect(decodeViewHash("?view=cards", model).filters.flow).toBe("v");
-    expect(decodeViewHash("?flow=sideways", model).filters.flow).toBe("v");
+  test("round-trips; absent or garbage decode to horizontal", () => {
+    expect(decodeViewHash(encodeViewHash({ sel: { kind: "none" }, filters: f("v") }), model).filters.flow).toBe("v");
+    expect(decodeViewHash("", model).filters.flow).toBe("h");
+    expect(decodeViewHash("?flow=sideways", model).filters.flow).toBe("h");
   });
 });
 
@@ -218,10 +220,10 @@ describe("decodeViewHash", () => {
     }
   });
 
-  test("bare selection hashes decode with empty filters, every facet 'all' (old links stay valid)", () => {
+  test("bare selection hashes decode to the defaults: cards, 2 hops, horizontal, every facet 'all'", () => {
     expect(decodeViewHash("c/wiki/architecture", model)).toEqual({
       sel: { kind: "concept", id: "wiki/architecture" },
-      filters: { hidden: [], q: "", isolate: 0, facets: { platform: "all", status: "all" }, view: "graph", flow: "v" },
+      filters: { hidden: [], q: "", isolate: 2, facets: { platform: "all", status: "all" }, view: "cards", flow: "h" },
     });
   });
 
@@ -236,14 +238,16 @@ describe("decodeViewHash", () => {
     });
   });
 
-  test("a stray isolate= on a non-concept selection is dropped on decode", () => {
-    expect(decodeViewHash("?isolate=2", model).filters.isolate).toBe(0);
-    expect(decodeViewHash("f/flakes/okf/viz.ts?isolate=1", model).filters.isolate).toBe(0);
+  test("graph view: a stray isolate= on a non-concept selection is dropped on decode", () => {
+    expect(decodeViewHash("?isolate=2&view=graph", model).filters.isolate).toBe(0);
+    expect(decodeViewHash("f/flakes/okf/viz.ts?isolate=1&view=graph", model).filters.isolate).toBe(0);
   });
 
-  test("garbage isolate values clamp to 0", () => {
-    expect(decodeViewHash("c/wiki/architecture?isolate=3", model).filters.isolate).toBe(0);
-    expect(decodeViewHash("c/wiki/architecture?isolate=abc", model).filters.isolate).toBe(0);
+  test("garbage isolate values clamp to the view's default (graph 0, cards 2)", () => {
+    expect(decodeViewHash("c/wiki/architecture?isolate=3&view=graph", model).filters.isolate).toBe(0);
+    expect(decodeViewHash("c/wiki/architecture?isolate=abc&view=graph", model).filters.isolate).toBe(0);
+    expect(decodeViewHash("c/wiki/architecture?isolate=3", model).filters.isolate).toBe(2);
+    expect(decodeViewHash("c/wiki/architecture?isolate=0", model).filters.isolate).toBe(2);
   });
 
   test("only known facet names decode; a param outside a facet's values clamps to 'all'", () => {

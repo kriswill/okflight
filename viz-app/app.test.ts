@@ -93,8 +93,8 @@ describe("App hash handling", () => {
     mountApp(viz);
     viz.focusBundle("notes");
     flushSync();
-    // focusBundle enters the cards view, and the hash carries both.
-    expect(location.hash).toBe("#b/notes?view=cards");
+    // focusBundle enters the (default) cards view: only the bundle encodes.
+    expect(location.hash).toBe("#b/notes");
     // A bundle navigation replaces a concept one on Back.
     location.hash = "#c/wiki/architecture";
     window.dispatchEvent(new Event("hashchange"));
@@ -116,7 +116,7 @@ describe("App hash handling", () => {
     flushSync();
     // The file panel is what the user is looking at — share/back must
     // reproduce it, not the bundle layout still underneath.
-    expect(location.hash).toBe("#f/docs/50%25.md?view=cards");
+    expect(location.hash).toBe("#f/docs/50%25.md");
     expect(viz.cardsBundle).toBe("notes");
   });
 });
@@ -126,6 +126,8 @@ describe("App filter persistence", () => {
     const viz = createVizState(model());
     mountApp(viz);
     viz.selectConcept("wiki/architecture");
+    flushSync();
+    expect(location.hash).toBe("#c/wiki/architecture"); // cards, 2 hops, horizontal: all defaults
     flushSync();
     viz.toggleType("Reference");
     viz.query = "arch";
@@ -137,6 +139,9 @@ describe("App filter persistence", () => {
     viz.setFacet("platform", "macos");
     flushSync();
     expect(location.hash).toBe("#c/wiki/architecture?hide=Reference&q=arch&isolate=1&platform=macos");
+    viz.setCardFlow("v");
+    flushSync();
+    expect(location.hash).toBe("#c/wiki/architecture?hide=Reference&q=arch&isolate=1&flow=v&platform=macos");
     viz.setFilters([], "");
     flushSync();
     expect(location.hash).toBe("#c/wiki/architecture");
@@ -161,15 +166,15 @@ describe("App filter persistence", () => {
     expect(location.hash).toBe("#c/wiki/architecture?hide=Reference&q=arch&isolate=1"); // applied, never rewritten
   });
 
-  test("a deep link combining a file selection with hide=/q= still applies both (isolate stays 0, not a concept)", () => {
-    location.hash = "#f/docs/50%25.md?hide=Reference&q=arch";
+  test("a deep link combining a file selection with hide=/q= still applies both (graph: isolate stays 0, not a concept)", () => {
+    location.hash = "#f/docs/50%25.md?hide=Reference&q=arch&view=graph";
     const viz = createVizState(model());
     mountApp(viz);
     expect(viz.sel).toEqual({ kind: "file", path: "docs/50%.md" });
     expect([...viz.hidden]).toEqual(["Reference"]);
     expect(viz.query).toBe("arch");
     expect(viz.isolateDepth).toBe(0);
-    expect(location.hash).toBe("#f/docs/50%25.md?hide=Reference&q=arch"); // applied, never rewritten
+    expect(location.hash).toBe("#f/docs/50%25.md?hide=Reference&q=arch&view=graph"); // applied, never rewritten
   });
 
   test("a canonical ?platform= deep link applies the facet lens on mount (any selection kind)", () => {
@@ -224,24 +229,24 @@ describe("App filter persistence", () => {
     viz.selectConcept("wiki/architecture");
     flushSync();
     expect(location.hash).toBe("#c/wiki/architecture?hide=Reference");
-    viz.setIsolate(2);
+    viz.setIsolate(1);
     flushSync();
-    expect(location.hash).toBe("#c/wiki/architecture?hide=Reference&isolate=2");
+    expect(location.hash).toBe("#c/wiki/architecture?hide=Reference&isolate=1");
     location.hash = "#c/wiki/architecture"; // simulate Back to an unfiltered entry
     window.dispatchEvent(new Event("hashchange"));
     flushSync();
     expect(viz.hidden.size).toBe(0);
-    expect(viz.isolateDepth).toBe(0);
+    expect(viz.isolateDepth).toBe(2);
     expect(viz.sel).toEqual({ kind: "concept", id: "wiki/architecture" });
   });
 });
 
 describe("cards view mode", () => {
-  test("a deep link with view=cards applies on mount, selection intact", () => {
-    location.hash = "#c/wiki/architecture?view=cards";
+  test("a deep link with view=graph applies on mount, selection intact", () => {
+    location.hash = "#c/wiki/architecture?view=graph";
     const viz = createVizState(model());
     mountApp(viz);
-    expect(viz.viewMode).toBe("cards");
+    expect(viz.viewMode).toBe("graph");
     expect(viz.sel).toEqual({ kind: "concept", id: "wiki/architecture" });
   });
 
@@ -249,34 +254,34 @@ describe("cards view mode", () => {
     const viz = createVizState(model());
     mountApp(viz);
     const pushes = spyOn(history, "pushState");
-    viz.setViewMode("cards");
+    viz.setViewMode("graph");
     flushSync();
-    expect(location.hash).toBe("#?view=cards");
+    expect(location.hash).toBe("#?view=graph");
     expect(pushes).not.toHaveBeenCalled();
     pushes.mockRestore();
-    viz.setViewMode("graph");
+    viz.setViewMode("cards");
     flushSync();
     expect(location.hash).toBe("");
   });
 
   test("flow deep link applies; setCardFlow amends the URL in place", () => {
-    location.hash = "#c/wiki/architecture?view=cards&flow=h";
+    location.hash = "#c/wiki/architecture?flow=v";
     const viz = createVizState(model());
     mountApp(viz);
-    expect(viz.cardFlow).toBe("h");
-    viz.setCardFlow("v");
+    expect(viz.cardFlow).toBe("v");
+    viz.setCardFlow("h");
     flushSync();
-    expect(location.hash).toBe("#c/wiki/architecture?view=cards");
+    expect(location.hash).toBe("#c/wiki/architecture");
   });
 
   test("__okf exposes view accessors for browser automation", () => {
     const viz = createVizState(model());
     mountApp(viz);
     const okf = (window as unknown as { __okf: { view: string; setView(v: string): void } }).__okf;
-    expect(okf.view).toBe("graph");
-    okf.setView("cards");
-    flushSync();
-    expect(viz.viewMode).toBe("cards");
     expect(okf.view).toBe("cards");
+    okf.setView("graph");
+    flushSync();
+    expect(viz.viewMode).toBe("graph");
+    expect(okf.view).toBe("graph");
   });
 });

@@ -19,13 +19,15 @@ export interface ViewFilters {
   hidden: string[];
   /** Search box contents. */
   q: string;
-  /** Neighborhood isolation depth (0 = off); only meaningful for a concept selection. */
+  /** Graph view: neighborhood isolation depth (0 = off, the default), only
+   *  meaningful for a concept selection. Cards view: ring count (2 is the
+   *  default and never encodes; 1 rides as `isolate=1`). */
   isolate: 0 | 1 | 2;
   /** Facet name -> "all" (encodes to nothing) or one of that facet's values. */
   facets: Record<string, string>;
-  /** Stage rendering format; "graph" (the default) never encodes. */
+  /** Stage rendering format; "cards" (the default) never encodes. */
   view: "graph" | "cards";
-  /** Cards-view flow orientation; "v" (the default) never encodes. */
+  /** Cards-view flow orientation; "h" (the default) never encodes. */
   flow: "v" | "h";
 }
 
@@ -71,13 +73,12 @@ export function encodeViewHash(view: ViewState): string {
   if (view.filters.q) p.set("q", view.filters.q);
   // Depth is meaningful for concept/bundle anchors, and for ANY cards-view
   // state (the layout's ring count) — but not for an unanchored graph.
-  if (
-    (view.sel.kind === "concept" || view.sel.kind === "bundle" || view.filters.view === "cards") &&
-    view.filters.isolate
-  )
+  if (view.filters.view === "cards") {
+    if (view.filters.isolate === 1) p.set("isolate", "1");
+  } else if ((view.sel.kind === "concept" || view.sel.kind === "bundle") && view.filters.isolate)
     p.set("isolate", String(view.filters.isolate));
-  if (view.filters.view === "cards") p.set("view", "cards");
-  if (view.filters.flow === "h") p.set("flow", "h");
+  if (view.filters.view === "graph") p.set("view", "graph");
+  if (view.filters.flow === "v") p.set("flow", "v");
   for (const [name, v] of Object.entries(view.filters.facets)) if (v && v !== "all") p.set(name, v);
   const qs = p.toString();
   return encodeHash(view.sel) + (qs ? "?" + qs : "");
@@ -108,16 +109,20 @@ export function decodeViewHash(raw: string, model: HashModel): ViewState {
   const hide = p.get("hide");
   const hidden = hide ? hide.split(",").filter((t) => t && (!model.typeCounts || t in model.typeCounts)) : [];
   const q = p.get("q") ?? "";
-  const view: "graph" | "cards" = p.get("view") === "cards" ? "cards" : "graph";
+  const view: "graph" | "cards" = p.get("view") === "graph" ? "graph" : "cards";
   const iv = p.get("isolate");
   const isolate: 0 | 1 | 2 =
-    sel.kind !== "concept" && sel.kind !== "bundle" && view !== "cards"
-      ? 0
-      : iv === "1"
+    view === "cards"
+      ? iv === "1"
         ? 1
-        : iv === "2"
-          ? 2
-          : 0;
+        : 2
+      : sel.kind !== "concept" && sel.kind !== "bundle"
+        ? 0
+        : iv === "1"
+          ? 1
+          : iv === "2"
+            ? 2
+            : 0;
   const facets: Record<string, string> = {};
   for (const f of model.facets ?? []) {
     // Legacy alias: pre-facets links used `os=`. Read it only for a facet
@@ -126,6 +131,6 @@ export function decodeViewHash(raw: string, model: HashModel): ViewState {
     const v = p.get(f.name) ?? (f.name === "platform" && !p.has("platform") ? p.get("os") : null);
     facets[f.name] = v && f.values.includes(v) ? v : "all";
   }
-  const flow: "v" | "h" = p.get("flow") === "h" ? "h" : "v";
+  const flow: "v" | "h" = p.get("flow") === "v" ? "v" : "h";
   return { sel, filters: { hidden, q, isolate, facets, view, flow } };
 }

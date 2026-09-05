@@ -282,3 +282,16 @@ describe("code-review follow-ups", () => {
     expect(extractFootnoteRefs(body)).toEqual(["x", "y"]);
   });
 });
+
+describe("extractCitationsSection — prefixed items (dotfiles shapes)", () => {
+  test("first link/URL anywhere in the item is the source; prose before it joins the title", () => {
+    const b = "## Citations\n\n- nix-darwin homebrew options — <https://nix-darwin.github.io/manual>\n- Fork supervision layer: [nix/tools/README.md](https://gh/x/README.md)\n- Manual: [`docs/helium.md`](../../docs/helium.md) — dated learned-behaviour\n- Commits `abc` (PR #22)\n";
+    expect(extractCitationsSection(b)!.items.map(({ resource, title }) => [resource, title])).toEqual([
+      ["https://nix-darwin.github.io/manual", "nix-darwin homebrew options"],
+      ["https://gh/x/README.md", "Fork supervision layer: nix/tools/README.md"],
+      ["../../docs/helium.md", "Manual: docs/helium.md"],
+      [null, "Commits `abc` (PR #22)"],
+    ]);
+    expect(sourceId("How the Open Knowledge Format can improve data sharing")).toBe("how-the-open-knowledge-format-can-improve-data");
+  });
+});

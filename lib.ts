@@ -346,13 +346,21 @@ export function extractCitationsSection(body: string): { items: CitationItem[]; 
     const m = /^\s*[-*+]\s+(.*\S)\s*$/.exec(lines[i]!);
     if (!m) continue;
     const raw = m[1]!;
-    const link = /^\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)\s*(.*)$/.exec(raw);
-    if (link) items.push({ resource: link[2]!, title: link[1]! || link[2]!, raw });
-    else {
-      const bare = /^<?(https?:\/\/[^\s>]+)>?\s*(.*)$/.exec(raw);
-      if (bare) items.push({ resource: bare[1]!, title: bare[2]?.replace(/^[-–—:]\s*/, "") || bare[1]!, raw });
-      else items.push({ resource: null, title: raw, raw });
-    }
+    // The first markdown link or bare URL anywhere in the item is the source;
+    // prose before it ("Manual: ", "Upstream server — ") joins the link text
+    // as the title, and a trailing gloss is dropped (it lives on in the id).
+    const link = /^(.*?)\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/.exec(raw);
+    const bare = link ? null : /^(.*?)<?(https?:\/\/[^\s>)]+)>?/.exec(raw);
+    const label = (prefix: string, text: string) => {
+      const pre = prefix.replace(/[\s:—–-]+$/, "").trim();
+      const body = text.replace(/`/g, "").trim();
+      return pre && body ? `${pre}: ${body}` : pre || body;
+    };
+    if (link) items.push({ resource: link[3]!, title: label(link[1]!, link[2]!) || link[3]!, raw });
+    else if (bare) {
+      const after = raw.slice(bare[0].length).replace(/^[\s:—–-]+/, "").trim();
+      items.push({ resource: bare[2]!, title: label(bare[1]!, "") || after || bare[2]!, raw });
+    } else items.push({ resource: null, title: raw, raw });
   }
   // Trim trailing blank lines out of the range so removal leaves one separator.
   while (end > start + 1 && lines[end - 1]!.trim() === "") end--;
@@ -373,7 +381,7 @@ export function sourceId(titleOrUrl: string): string {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "")
-      .slice(0, 48)
+      .replace(/^(.{1,48})(?:-.*)?$/s, "$1") // cut at a word boundary
       .replace(/-+$/g, "") || "source"
   );
 }

@@ -2,11 +2,11 @@
 
 ## Concepts
 
-* [ADR-001: Adopt event sourcing for billing](adr-001.md) - Accepted. Adopt event sourcing for billing.
-* [ADR-002: Standardize on queue-broker for async work](adr-002.md)
-* [ADR-003: Single sign-on across surfaces](adr-003.md)
-* [ADR-004: Deprecate the legacy export path](adr-004.md) - Accepted. Deprecate the legacy export path.
-* [ADR-005: Rate limit all public endpoints](adr-005.md)
+* [ADR-001: Adopt event sourcing for billing](adr-001.md) _(deprecated)_ - Accepted. Adopt event sourcing for billing.
+* [ADR-002: Standardize on queue-broker for async work](adr-002.md) _(deprecated)_
+* [ADR-003: Single sign-on across surfaces](adr-003.md) _(deprecated)_
+* [ADR-004: Deprecate the legacy export path](adr-004.md) _(deprecated)_ - Accepted. Deprecate the legacy export path.
+* [ADR-005: Rate limit all public endpoints](adr-005.md) _(deprecated)_
 * [ADR-006: Move session state out of process](adr-006.md)
 * [ADR-007: Introduce feature flags](adr-007.md) - Accepted. Introduce feature flags.
 * [ADR-008: Progressive delivery for user-facing services](adr-008.md)

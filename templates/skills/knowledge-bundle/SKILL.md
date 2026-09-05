@@ -5,7 +5,7 @@ description: Maintain the {bundle}/ OKF bundle — this repo's authored knowledg
 
 # Maintaining the {bundle}/ OKF bundle
 
-`{bundle}/` is an [Open Knowledge Format v0.1](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md)
+`{bundle}/` is an [Open Knowledge Format v0.2](https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md)
 bundle: markdown concept docs with YAML frontmatter, cross-linked into a
 graph. It exists so rationale survives outside commit bodies and chat
 history — **keep it current as part of any change, not as an afterthought.**
@@ -23,6 +23,7 @@ Run as `okf <cmd>` however this repo provides it (nix devshell,
 okf scaffold  # stub concept docs from the repo sources (never overwrites)
 okf index     # regenerate index.md listings (blurbs above the first heading are preserved)
 okf validate  # conformance + link check; must exit 0 before committing
+okf migrate   # dry-run upgrade of v0.1 docs (timestamp, ## Citations) — add --write to apply
 okf viz       # regenerate {bundle}/viz.html interactive graph (gitignored)
 ```
 
@@ -48,9 +49,18 @@ Run this before committing any concept doc you created or touched:
 - **Body** says what the source can't: wiring, deliberate deviations,
   gotchas. Concise — delete anything that restates the description or the
   code.
-- **`## Citations`** links upstream docs / man pages / reference material;
-  commit hashes for decisions. Fetch each URL to confirm it resolves — a
-  guessed link is worse than none.
+- **`sources`** (frontmatter) lists the upstream docs / man pages /
+  reference material the entry derives from, each with an `id`, and the
+  body attributes claims with footnotes keyed to those ids
+  (`…as documented.[^style-guide]`). Fetch each URL to confirm it resolves
+  — a guessed link is worse than none. Commit hashes go in the body prose
+  (`Commits \`<hash>\``), not in `sources`.
+- **`generated`** is `{ by: <actor>, at: <ISO-8601> }` — `human:<your id>`
+  when you author by hand, `<agent>/<version>` when an agent does. Add a
+  `verified: { by: human:<id>, at }` entry only after a person has actually
+  checked the content against its sources; set `status: deprecated` (never
+  delete) when an entry stops being current, and `stale_after` when a fact
+  has a known shelf life.
 - **Cross-links** — every concept the body names is a link, with a backlink
   from the target when the relationship is load-bearing. Aim for ≥2 edges
   beyond any scaffolded links.
@@ -65,10 +75,15 @@ type: Decision
 title: <Short Imperative Title>
 description: <one sentence — what was decided and the key why.>
 tags: [<topic>]
-timestamp: '<ISO-8601 now>'
+status: stable
+generated: { by: human:<your id>, at: <ISO-8601 now> }
+sources:
+  - id: <short-id>
+    resource: <URL or ../path/to/reference.md>
+    title: <what it is>
 ---
 
-**Status:** active. **Where:** [<concept>](<relative link to the affected concept doc>).
+**Where:** [<concept>](<relative link to the affected concept doc>).
 
 ## Context
 
@@ -80,26 +95,28 @@ timestamp: '<ISO-8601 now>'
 
 ## Consequences
 
-<what got better, what to watch out for>
+<what got better, what to watch out for — per the reference.[^<short-id>]>
+Landed in commits `<hash>`.
 
-## Citations
-
-- Commits `<hash>`
+[^<short-id>]: <what it is>
 ```
 
 ## Profile rules that trip people up
 
-- Frontmatter requires `type`; `title`, `description`, `timestamp`
-  (ISO-8601) are recommended (warnings; `okf validate --strict` promotes
-  them to errors).
+- Frontmatter requires `type`; `title`, `description`, `generated`
+  are recommended (warnings; `okf validate --strict` promotes them to
+  errors). A v0.1 `timestamp` or body `## Citations` list is a warning that
+  says `okf migrate` — run it rather than hand-porting.
+- Every footnote label (`[^x]`) must match a `sources[].id` — an unmatched
+  one is an error; every timestamp is ISO-8601 with an explicit offset.
 - Links are **file-relative** (`../patterns/foo.md`) — never `/`-rooted;
   links may escape into the repo (`../../src/...`) but must resolve.
-- Body section headings are **H2** (`## Context`, `## Citations`); no H1 in
+- Body section headings are **H2** (`## Context`, `## Decision`); no H1 in
   concept bodies (frontmatter `title` is the H1).
 - Never hand-edit generated `index.md` listing sections — only the blurb
   above the first heading; `viz.html` is generated and gitignored.
 - ⚠️ **Logs are bundle-scoped; the root `{bundle}/log.md` is NOT the
-  default.** Per OKF SPEC §7 a `log.md` may appear at any level, recording
+  default.** Per OKF SPEC §9 a `log.md` may appear at any level, recording
   changes to that scope — so entries go in the `log.md` of the directory
   owning the change's primary subject. The root log records bundle-level
   events only: new bundle types or directories, root-level concept docs,

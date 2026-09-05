@@ -17,7 +17,7 @@ const commands: Record<string, Cmd> = {
     file: "./init.ts",
     args: "[--dir=<dir>]",
     brief: "create a starter okflight.toml + skeleton here",
-    summary: "Bootstrap an okf workspace in the current directory: a commented starter okflight.toml (this directory becomes the workspace root) plus the bundle skeleton (<dir>/index.md with okf_version frontmatter, <dir>/log.md). Never overwrites — re-running on an initialized workspace is a no-op. For the full guided integration (agent skill, scaffold scripts, gitignore) use setup.",
+    summary: "Bootstrap an okf workspace in the current directory: a commented starter okflight.toml (this directory becomes the workspace root) plus the bundle skeleton (<dir>/index.md declaring okf_version 0.2, <dir>/log.md). Never overwrites — re-running on an initialized workspace is a no-op. For the full guided integration (agent skill, scaffold scripts, gitignore) use setup.",
     flags: [["--dir=<dir>", "bundle directory for the new workspace (default: knowledge)"]],
   },
   setup: {
@@ -53,8 +53,18 @@ const commands: Record<string, Cmd> = {
     file: "./validate.ts",
     args: "[--strict]",
     brief: "check conformance + links; exit 1 on errors",
-    summary: "Check OKF v0.1 + profile conformance: frontmatter, required fields, reserved files, link style, dangling links. The profile policy comes from okflight.toml [profile]. Exits 1 on errors.",
-    flags: [["--strict", "treat warnings (missing recommended fields, dangling links) as errors"]],
+    summary: "Check OKF v0.2 + profile conformance: frontmatter, required fields, reserved files, link style, dangling links, and — when present — the trust, lifecycle, provenance and Attested Computation families (generated/verified actors and datetimes, status, stale_after, sources + footnote attribution, runtime/parameters/computation/executor/attester). v0.1 leftovers (timestamp, a body Citations list) warn and point at migrate. The profile policy comes from okflight.toml [profile]. Exits 1 on errors.",
+    flags: [["--strict", "treat warnings (missing recommended fields, dangling links, v0.1 leftovers, stale content) as errors"]],
+  },
+  migrate: {
+    file: "./migrate.ts",
+    args: "[--write] [--actor=<actor>]",
+    brief: "upgrade v0.1 docs to v0.2 (dry run; --write)",
+    summary: "Rewrite v0.1 concept docs in the OKF v0.2 shape (SPEC §13.1): frontmatter `timestamp` becomes `generated: { by: <actor>, at: <timestamp> }`, a body Citations list becomes `sources` entries (linked items only — revision hashes and prose stay put and are reported), and the root index.md okf_version is bumped. Idempotent and dry-run by default; unknown frontmatter keys are preserved. Run index + validate afterwards.",
+    flags: [
+      ["--write", "apply the changes (default: print what would change)"],
+      ["--actor=<actor>", "generated.by for migrated docs (default: okflight.toml [scaffold] actor, else okflight/<version>)"],
+    ],
   },
   viz: {
     file: "./viz.ts",

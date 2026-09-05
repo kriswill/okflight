@@ -897,3 +897,79 @@ describe("AboutModal", () => {
     expect(closed).toBe(2);
   });
 });
+
+describe("DetailPanel — OKF v0.2 families", () => {
+  const stage = () => {
+    const el = document.createElement("main");
+    document.body.appendChild(el);
+    return el;
+  };
+  const v02Model = () =>
+    buildModel({
+      nodes: [
+        node("computations/revenue", "Attested Computation", "Revenue", {
+          fm: {
+            type: "Attested Computation",
+            title: "Revenue",
+            status: "stable",
+            runtime: "bigquery",
+            parameters: [{ name: "year", type: "integer", required: true }],
+            executor: { resource: "references/skills/run-on-bq.md", receipt: ["job_id"] },
+            attester: { resource: "references/attesters/sql-equality.py" },
+            generated: { by: "reference_agent/gemini-2.5-pro", at: "2026-06-28T14:00:00Z" },
+            verified: { by: "human:ahormati", at: "2026-06-25T09:00:00Z" },
+            stale_after: "2026-06-15T00:00:00Z",
+            sources: [{ id: "rev-policy", resource: "https://wiki.acme/finance/revenue-recognition", title: "Revenue recognition policy" }],
+          },
+          body: "# Computation\n\n    SELECT 1\n\nPer the policy.[^rev-policy]\n\n[^rev-policy]: Revenue recognition policy\n",
+        }),
+        node("metrics/income", "Metric", "Income", { fm: { type: "Metric", title: "Income", status: "draft" }, body: "See [revenue](../computations/revenue.md)." }),
+      ],
+      edges: [{ s: "metrics/income", t: "computations/revenue" }],
+      cfg: cfg({
+        facets: [
+          { name: "status", values: ["draft", "stable", "deprecated"], ids: { "computations/revenue": "stable", "metrics/income": "draft" } },
+          { name: "trust", values: ["unverified", "machine-confirmed", "human-reviewed"], ids: { "computations/revenue": "human-reviewed", "metrics/income": "unverified" } },
+        ],
+      }),
+      files: {
+        "knowledge/references/attesters/sql-equality.py": { html: "", lines: 1, size: 10, date: "2026-01-02", lang: "python", refs: ["computations/revenue"] },
+      },
+    });
+
+  test("trust/lifecycle/provenance/computation rows render purpose-built, paths link, footnotes resolve to sources", () => {
+    const state = createVizState(v02Model());
+    state.selectConcept("computations/revenue");
+    mountC(DetailPanel, { viz: state, stageEl: stage() });
+    const panel = document.getElementById("panel")!;
+    const rows = Object.fromEntries([...panel.querySelectorAll("table.fm > tbody > tr")].map((tr) => [tr.children[0]!.textContent, tr.children[1]!]));
+    expect(Object.keys(rows)).toEqual(["status", "runtime", "parameters", "executor", "attester", "generated", "verified", "stale_after", "sources"]);
+    expect(rows.status!.querySelector(".fam-chip.status-stable")!.textContent).toBe("stable");
+    expect(rows.generated!.textContent).toBe("reference_agent/gemini-2.5-pro · 2026-06-28T14:00:00Z");
+    expect(rows.verified!.querySelector(".fam-chip.tier-human-reviewed")).not.toBeNull();
+    expect(rows.verified!.querySelector(".actor-human")!.textContent).toBe("humanahormati");
+    expect(rows.stale_after!.querySelector(".fam-chip.stale")).not.toBeNull();
+    expect(rows.parameters!.querySelector("table.params code")!.textContent).toBe("year");
+    expect(rows.attester!.querySelector('a[data-file="knowledge/references/attesters/sql-equality.py"]')).not.toBeNull();
+    expect(rows.executor!.querySelector("code")!.textContent).toBe("references/skills/run-on-bq.md"); // not embedded: plain
+    expect(rows.sources!.querySelector('table.sources a[href="https://wiki.acme/finance/revenue-recognition"]')!.textContent).toBe("Revenue recognition policy");
+    expect(panel.textContent).not.toContain("[object Object]");
+    const sup = panel.querySelector('#body-md sup.fn a[data-fn="rev-policy"]')!;
+    expect(sup.textContent).toBe("1");
+    expect(panel.querySelector('#body-md .footnotes li[data-fn-target="rev-policy"] a[href="https://wiki.acme/finance/revenue-recognition"]')).not.toBeNull();
+    // Clicking the mark is an in-panel scroll, never a navigation.
+    (sup as HTMLElement).click();
+    flushSync();
+    expect(state.sel).toEqual({ kind: "concept", id: "computations/revenue" });
+  });
+
+  test("built-in status/trust lenses arrive as ordinary facets and filter", () => {
+    const state = createVizState(v02Model());
+    expect(state.model.facets.map((f) => f.name)).toEqual(["status", "trust"]);
+    mountC(FacetControls, { viz: state });
+    const segs = [...document.querySelectorAll(".facet .seg")].map((b) => b.textContent);
+    expect(segs).toEqual(["all", "draft", "stable", "deprecated", "all", "unverified", "machine-confirmed", "human-reviewed"]);
+    state.setFacet("trust", "human-reviewed");
+    expect(state.visibleSorted.map((n) => n.id)).toEqual(["computations/revenue"]);
+  });
+});

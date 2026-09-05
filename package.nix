@@ -28,6 +28,8 @@ let
     ./vcs
     ./scaffold.ts
     ./scaffold-api.ts
+    ./migrate.ts
+    ./migrate-doc.ts
     ./index-gen.ts
     ./validate.ts
     ./viz.ts

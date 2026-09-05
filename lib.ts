@@ -1,15 +1,26 @@
 // Shared PURE helpers for the OKF knowledge-bundle tooling (validate/index/
-// scaffold/viz): frontmatter parse/serialize, link extraction/resolution,
-// bundle walking, slugs, ANSI. Zero-dependency by design: the YAML parser
-// below handles only the frontmatter subset this tooling emits (string
-// scalars, flow lists, block lists) so the bundle stays consumable without a
-// package.json. Anything VCS-shaped lives behind vcs/ providers; config and
+// scaffold/migrate/viz): frontmatter parse/serialize, the OKF v0.2 trust/
+// lifecycle/provenance readers, link extraction/resolution, bundle walking,
+// slugs, ANSI. No package dependency by design — frontmatter YAML is parsed
+// by Bun's built-in Bun.YAML (Bun >= 1.2.21), so the bundle stays consumable
+// without a package.json; serialization is our own, so emitted docs keep the
+// spec's hand-written style (flow mappings for {by, at}, block lists for
+// sources). Anything VCS-shaped lives behind vcs/ providers; config and
 // workspace context live in config-cli.ts.
 
-import { readdirSync, statSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
 
-export type FM = Record<string, string | string[]>;
+// The v0.2 readers (trust tier, status, staleness, generated.at fallback) and
+// the FM type live in the browser-safe viz-app/okf-fields.ts so the viewer
+// derives them identically; re-exported here for the CLI modules.
+export * from "./viz-app/okf-fields";
+import { asVerifiedList, isPlainObject, obj, str, type FM } from "./viz-app/okf-fields";
+
+/** The spec revision this tooling implements (SPEC.md §12). */
+export const OKF_VERSION = "0.2";
+/** Bundle-root `okf_version` values consumed without a best-effort warning. */
+export const SUPPORTED_OKF_VERSIONS: readonly string[] = ["0.1", "0.2"];
 
 interface ConceptDoc {
   rel: string; // path relative to bundle root, e.g. "modules/nh.md"
@@ -46,6 +57,11 @@ export function parseDoc(root: string, rel: string): ConceptDoc {
   return { rel, abs, fm, fmError, body, raw };
 }
 
+/** Split a doc into its YAML frontmatter mapping and body. No frontmatter
+ *  (file doesn't open with `---`) is fm: null with no error; an unterminated
+ *  block, unparseable YAML, or a non-mapping document is fm: null WITH an
+ *  fmError. Non-string scalars (numbers, booleans) come through typed;
+ *  YAML timestamps are kept as the literal string they were written as. */
 export function parseFrontmatter(raw: string): {
   fm: FM | null;
   fmError: string | null;
@@ -56,51 +72,252 @@ export function parseFrontmatter(raw: string): {
   if (end === -1) return { fm: null, fmError: "unterminated frontmatter block", body: raw };
   const block = raw.slice(4, end);
   const body = raw.slice(end + 5);
-  const fm: FM = {};
-  const lines = block.split("\n");
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (!line.trim() || line.trim().startsWith("#")) continue;
-    if (/^\s/.test(line)) return { fm: null, fmError: `unexpected indented line: ${line.trim()}`, body };
-    const m = line.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
-    if (!m) return { fm: null, fmError: `unparseable line: ${line}`, body };
-    const [, key, rest] = m;
-    if (rest === "") {
-      // block list
-      const items: string[] = [];
-      while (i + 1 < lines.length && /^\s+-\s+/.test(lines[i + 1])) {
-        items.push(unquote(lines[++i].replace(/^\s+-\s+/, "")));
-      }
-      fm[key] = items;
-    } else if (rest.startsWith("[")) {
-      const inner = rest.replace(/^\[/, "").replace(/\]\s*$/, "");
-      fm[key] = inner.trim() === "" ? [] : inner.split(",").map((s) => unquote(s.trim()));
-    } else {
-      fm[key] = unquote(rest);
-    }
+  let parsed: unknown;
+  try {
+    parsed = Bun.YAML.parse(block);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { fm: null, fmError: `invalid YAML — ${msg.split("\n")[0]}`, body };
   }
-  return { fm, fmError: null, body };
+  if (parsed === null || parsed === undefined) return { fm: {}, fmError: null, body };
+  if (!isPlainObject(parsed)) return { fm: null, fmError: "frontmatter must be a YAML mapping", body };
+  return { fm: revive(parsed) as FM, fmError: null, body };
 }
 
-function unquote(s: string): string {
-  if ((s.startsWith("'") && s.endsWith("'")) || (s.startsWith('"') && s.endsWith('"')))
-    return s.slice(1, -1).replace(/''/g, "'");
-  return s;
+/** Bun.YAML turns bare ISO timestamps into Date objects; OKF treats every
+ *  timestamp as the literal string written (§5), so put them back. */
+function revive(v: unknown): unknown {
+  if (v instanceof Date) return v.toISOString().replace(/\.000Z$/, "Z");
+  if (Array.isArray(v)) return v.map(revive);
+  if (isPlainObject(v)) {
+    const out: Record<string, unknown> = {};
+    for (const [k, x] of Object.entries(v)) out[k] = revive(x);
+    return out;
+  }
+  return v;
 }
+
+// --- Serialization ------------------------------------------------------------
+// Emits the spec's own hand-written style: bare scalars where YAML allows
+// (quoted otherwise), flat string lists as flow lists, small mappings
+// ({by, at}, usage_window, parameter entries) as flow mappings, lists of
+// mappings (sources, verified) as block lists, other mappings as indented
+// block mappings. Round-trips through parseFrontmatter.
 
 function yamlScalar(s: string): string {
-  if (s === "" || /[:#'\[\]{}]|^\s|\s$|^[-?&*!|>%@`"]/.test(s) || /^[\d.]+$/.test(s))
+  if (
+    s === "" ||
+    /: |\s#|[,\[\]{}'"]/.test(s) || // mapping/comment/flow/quote indicators inside
+    /:$/.test(s) ||
+    /^[-?:,\[\]{}#&*!|>'"%@`]/.test(s) ||
+    /^\s|\s$/.test(s) ||
+    /^[+-]?(\d[\d_]*\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test(s) || // would parse as a number
+    /^0x[0-9a-f]+$/i.test(s) ||
+    /^(true|false|null|yes|no|on|off|~)$/i.test(s)
+  )
     return `'${s.replace(/'/g, "''")}'`;
+  // Bare ISO timestamps and `human:x` / `https://…` stay bare, as in the
+  // spec's examples — parseFrontmatter revives YAML dates back to strings.
   return s;
+}
+
+function yamlValueInline(v: unknown): string {
+  if (typeof v === "string") return yamlScalar(v);
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  if (v === null || v === undefined) return "null";
+  if (Array.isArray(v)) return `[${v.map(yamlValueInline).join(", ")}]`;
+  if (isPlainObject(v))
+    return `{ ${Object.entries(v).map(([k, x]) => `${k}: ${yamlValueInline(x)}`).join(", ")} }`;
+  return yamlScalar(String(v));
+}
+
+/** A mapping is "small" (flow style) when every value is a scalar, it has at
+ *  most four keys — {by, at}, {from, to}, {name, type, required} — and it
+ *  names no `resource`: entries that point somewhere (sources, executor,
+ *  attester) are block style, as the spec writes them. */
+const isSmallMap = (v: Record<string, unknown>) =>
+  Object.keys(v).length <= 4 &&
+  !("resource" in v) &&
+  Object.values(v).every((x) => !Array.isArray(x) && !isPlainObject(x));
+
+function yamlLines(key: string, v: unknown, indent: string): string[] {
+  if (Array.isArray(v)) {
+    if (v.every((x) => !isPlainObject(x) && !Array.isArray(x))) return [`${indent}${key}: ${yamlValueInline(v)}`];
+    const out = [`${indent}${key}:`];
+    for (const item of v) {
+      if (isPlainObject(item)) {
+        if (isSmallMap(item)) out.push(`${indent}  - ${yamlValueInline(item)}`);
+        else {
+          const entries = Object.entries(item);
+          entries.forEach(([k, x], i) => {
+            const sub = yamlLines(k, x, indent + "    ");
+            if (i === 0) sub[0] = `${indent}  - ${sub[0]!.slice(indent.length + 4)}`;
+            out.push(...sub);
+          });
+        }
+      } else out.push(`${indent}  - ${yamlValueInline(item)}`);
+    }
+    return out;
+  }
+  if (isPlainObject(v)) {
+    if (isSmallMap(v)) return [`${indent}${key}: ${yamlValueInline(v)}`];
+    const out = [`${indent}${key}:`];
+    for (const [k, x] of Object.entries(v)) out.push(...yamlLines(k, x, indent + "  "));
+    return out;
+  }
+  return [`${indent}${key}: ${yamlValueInline(v)}`];
 }
 
 export function fmToYaml(fm: FM): string {
   const lines: string[] = [];
   for (const [k, v] of Object.entries(fm)) {
-    if (Array.isArray(v)) lines.push(`${k}: [${v.map(yamlScalar).join(", ")}]`);
-    else lines.push(`${k}: ${yamlScalar(v)}`);
+    if (v === undefined) continue;
+    lines.push(...yamlLines(k, v, ""));
   }
   return `---\n${lines.join("\n")}\n---\n`;
+}
+
+/** ISO 8601 datetime with an explicit UTC offset (§5) — or a bare date,
+ *  which the v0.1 tooling emitted and the spec's examples tolerate. */
+export function isIsoDateTime(s: unknown): boolean {
+  return (
+    typeof s === "string" &&
+    /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2}))?$/.test(s) &&
+    !Number.isNaN(Date.parse(s))
+  );
+}
+
+/** Actor convention (§7): `human:<id>`, `process:<id>`, or `<producer>/<version>`. */
+export function isActor(s: unknown): boolean {
+  return typeof s === "string" && /^(human:\S+|process:\S+|[^\s:/]+\/\S+)$/.test(s);
+}
+
+export type PathKind = "url" | "rooted" | "relative" | "descriptor";
+
+/** Classify a path-valued field (§6.2). A scope descriptor ("all queries in
+ *  project X") is prose: it contains whitespace, or has neither a slash nor a
+ *  file extension. */
+export function pathKind(s: string): PathKind {
+  if (/^[a-z][a-z0-9+.-]*:/i.test(s)) return "url";
+  if (/\s/.test(s)) return "descriptor";
+  if (s.startsWith("/")) return "rooted";
+  if (s.includes("/") || /\.[A-Za-z0-9]{1,6}$/.test(s) || s.startsWith(".")) return "relative";
+  return "descriptor";
+}
+
+/** Resolve a path-valued field to a bundle-relative path: `/`-rooted values
+ *  are bundle-relative (§6.1), relative ones doc-relative. Null: escapes the
+ *  bundle (or is a URL/descriptor). */
+export function resolvePathField(root: string, docRel: string, value: string): string | null {
+  const kind = pathKind(value);
+  if (kind === "url" || kind === "descriptor") return null;
+  if (kind === "rooted") {
+    const abs = resolve(root, value.slice(1));
+    return abs.startsWith(root + "/") ? abs.slice(root.length + 1) : null;
+  }
+  return resolveLink(root, docRel, value);
+}
+
+/** resolvePathField, then — when the doc-relative reading names nothing on
+ *  disk — the same value read from the bundle root, which is how the spec's
+ *  own examples write `references/…` from inside `computations/` (Appendix
+ *  A). Returns the bundle-relative path that exists, else the doc-relative
+ *  candidate (or null if none). */
+export function resolvePathFieldLenient(root: string, docRel: string, value: string): { rel: string | null; exists: boolean } {
+  const rel = resolvePathField(root, docRel, value);
+  if (rel !== null && existsSync(join(root, rel))) return { rel, exists: true };
+  if (pathKind(value) === "relative" && !value.startsWith(".")) {
+    const fromRoot = resolvePathField(root, "index.md", value);
+    if (fromRoot !== null && existsSync(join(root, fromRoot))) return { rel: fromRoot, exists: true };
+  }
+  return { rel, exists: false };
+}
+
+// --- Body conventions: footnotes (§5.1) and the legacy Citations list (§13.1) --
+
+/** Lines of a markdown body with fenced code blocks blanked (kept as empty
+ *  strings so line indices survive). */
+function proseLines(body: string): string[] {
+  let inFence = false;
+  return body.split("\n").map((line) => {
+    if (/^\s*(```|~~~)/.test(line)) { inFence = !inFence; return ""; }
+    return inFence ? "" : line;
+  });
+}
+
+/** Footnote labels referenced in prose (`…[^ga4-schema]`), in order, deduped. */
+export function extractFootnoteRefs(body: string): string[] {
+  const out: string[] = [];
+  for (const line of proseLines(body)) {
+    if (/^\s*\[\^[^\]]+\]:/.test(line)) continue; // a definition, not a use
+    for (const m of line.matchAll(/\[\^([^\]\s]+)\]/g)) if (!out.includes(m[1]!)) out.push(m[1]!);
+  }
+  return out;
+}
+
+/** Footnote definitions (`[^id]: text`) as label -> text. */
+export function extractFootnoteDefs(body: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const line of proseLines(body)) {
+    const m = /^\s*\[\^([^\]\s]+)\]:\s*(.*)$/.exec(line);
+    if (m) out[m[1]!] = m[2]!.trim();
+  }
+  return out;
+}
+
+export interface CitationItem {
+  /** Link target or bare URL; null for a non-link item (prose, revision hashes). */
+  resource: string | null;
+  /** Link text, or the whole item for non-links. */
+  title: string;
+  raw: string;
+}
+
+/** The v0.1 body `# Citations` (any heading level) list. Null: no such
+ *  section. `range` is the [start, end) line span of the whole section
+ *  (heading through the last item), for removal by migrate. */
+export function extractCitationsSection(body: string): { items: CitationItem[]; range: [number, number] } | null {
+  const lines = body.split("\n");
+  const prose = proseLines(body);
+  const start = prose.findIndex((l) => /^#{1,6}\s+Citations\s*$/i.test(l));
+  if (start === -1) return null;
+  let end = start + 1;
+  while (end < lines.length && !/^#{1,6}\s/.test(prose[end]!)) end++;
+  const items: CitationItem[] = [];
+  for (let i = start + 1; i < end; i++) {
+    const m = /^\s*[-*+]\s+(.*\S)\s*$/.exec(lines[i]!);
+    if (!m) continue;
+    const raw = m[1]!;
+    const link = /^\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)\s*(.*)$/.exec(raw);
+    if (link) items.push({ resource: link[2]!, title: link[1]! || link[2]!, raw });
+    else {
+      const bare = /^<?(https?:\/\/[^\s>]+)>?\s*(.*)$/.exec(raw);
+      if (bare) items.push({ resource: bare[1]!, title: bare[2]?.replace(/^[-–—:]\s*/, "") || bare[1]!, raw });
+      else items.push({ resource: null, title: raw, raw });
+    }
+  }
+  // Trim trailing blank lines out of the range so removal leaves one separator.
+  while (end > start + 1 && lines[end - 1]!.trim() === "") end--;
+  return { items, range: [start, end] };
+}
+
+/** Stable footnote/source id from a title or URL: lowercase, dashed. */
+export function sourceId(titleOrUrl: string): string {
+  let s = titleOrUrl;
+  try {
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(s)) {
+      const u = new URL(s);
+      s = u.hostname.replace(/^www\./, "") + u.pathname;
+    }
+  } catch { /* not a URL */ }
+  return (
+    s
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 48)
+      .replace(/-+$/g, "") || "source"
+  );
 }
 
 /** Markdown link targets in body order (skips images and fenced code blocks). */

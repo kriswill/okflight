@@ -121,7 +121,7 @@ export const DEFAULT_BUNDLE_DIR = "knowledge";
 
 const GENERIC_ABOUT =
   'A navigable map of this repository’s OKF knowledge bundle — concepts authored in the ' +
-  '<a href="https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md" ' +
+  '<a href="https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md" ' +
   'target="_blank" rel="noopener">Open Knowledge Format</a> and cross-linked into a graph. ' +
   "Click a node to read its document.";
 

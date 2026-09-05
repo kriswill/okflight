@@ -10,7 +10,7 @@ import { readFileSync } from "node:fs";
 import { basename, dirname, extname, join } from "node:path";
 import { loadContext } from "./config-cli";
 import type { CollectEntry } from "./config-cli";
-import { createScaffoldContext, expandTemplate, type ScaffoldContext } from "./scaffold-api";
+import { createScaffoldContext, expandTemplate, type FM, type ScaffoldContext } from "./scaffold-api";
 
 const FORCE = process.argv.includes("--force");
 const ctx = loadContext();
@@ -74,6 +74,7 @@ function runCollect(entry: CollectEntry) {
       Title: sctx.titleFromSlug(name),
       dir,
       timestamp: sctx.timestamp(path),
+      actor: sctx.actor,
       repo: "", // filled once the output path (and thus the doc's depth) is known
     };
     const out = expandTemplate(entry.output, env);
@@ -93,13 +94,14 @@ function runCollect(entry: CollectEntry) {
       continue;
     }
     emitted.add(out);
-    const fm: Record<string, string | string[]> = {
+    const fm: FM = {
       type: entry.type,
       title: entry.title ? expandTemplate(entry.title, env) : env.Title,
       description: env.description,
       resource: path,
       ...(entry.tags.length ? { tags: entry.tags } : {}),
-      timestamp: env.timestamp,
+      // OKF v0.2 trust stamp (§5.2); the v0.1 `timestamp` key is retired.
+      generated: { by: env.actor, at: env.timestamp },
     };
     for (const [k, v] of Object.entries(entry.frontmatter)) fm[k] = expandTemplate(v, env);
     const body = entry.body

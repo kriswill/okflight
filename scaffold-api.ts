@@ -6,7 +6,7 @@
 // this module for editor support (bun erases type imports) plus node/bun
 // builtins; they must not depend on their own node_modules.
 
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { PLACEHOLDER_RE, type OkfConfig, type OkfContext } from "./config-cli";
 import { fmToYaml, nowISO, parseFrontmatter, titleFromSlug, type FM } from "./lib";
@@ -25,6 +25,9 @@ export interface ScaffoldContext {
   vcs: VcsProvider;
   /** --force was passed: existing docs are overwritten. */
   force: boolean;
+  /** The `generated.by` actor for docs this pass writes (OKF §7):
+   *  `[scaffold] actor` from okflight.toml, else `okflight/<version>`. */
+  actor: string;
 
   /** Write a concept doc at a bundle-relative path. The idempotence
    *  contract lives here: existing files are skipped unless `force`;
@@ -34,8 +37,13 @@ export interface ScaffoldContext {
   emit(rel: string, fm: FM, body: string): boolean;
 
   /** ISO-8601 last-modified of a workspace-relative path (VCS-backed,
-   *  falling back to the current time — the old gitISO contract). */
+   *  falling back to the current time — the old gitISO contract). Feed it
+   *  to `generated.at`. */
   timestamp(path: string): string;
+
+  /** `generated: { by: ctx.actor, at: ctx.timestamp(path) }` — the OKF v0.2
+   *  trust stamp (§5.2) for a doc derived from a workspace path. */
+  generated(path: string): { by: string; at: string };
 
   /** Leading comment block at the top of a source file, joined to one
    *  string. `marker` is a line prefix ("#", "--", "//") or a RegExp whose
@@ -97,8 +105,26 @@ function leadingComment(src: string, marker: string | RegExp): string | null {
   return text || null;
 }
 
+/** okflight's own actor string, `okflight/<version>` (§7 `<producer>/<version>`),
+ *  read from the package.json beside this file so it names the build that
+ *  actually ran. */
+export function defaultActor(): string {
+  try {
+    const pkg = JSON.parse(readFileSync(new URL("package.json", import.meta.url), "utf8")) as { version?: string };
+    return `okflight/${pkg.version || "0"}`;
+  } catch {
+    return "okflight/0";
+  }
+}
+
+/** The actor okf stamps as `generated.by`: the workspace's `[scaffold]
+ *  actor`, else okflight's own. */
+export const resolveActor = (cfg: OkfConfig): string => cfg.scaffold.actor ?? defaultActor();
+
 export function createScaffoldContext(ctx: OkfContext, force: boolean): ScaffoldContext {
   const counts = { written: 0, skipped: 0 };
+  const actor = resolveActor(ctx.cfg);
+  const timestamp = (path: string) => ctx.vcs.lastModified(path) ?? nowISO();
   return {
     root: ctx.root,
     bundle: ctx.bundle,
@@ -106,6 +132,7 @@ export function createScaffoldContext(ctx: OkfContext, force: boolean): Scaffold
     config: ctx.cfg,
     vcs: ctx.vcs,
     force,
+    actor,
     counts,
 
     emit(rel: string, fm: FM, body: string): boolean {
@@ -121,7 +148,8 @@ export function createScaffoldContext(ctx: OkfContext, force: boolean): Scaffold
       return true;
     },
 
-    timestamp: (path: string) => ctx.vcs.lastModified(path) ?? nowISO(),
+    timestamp,
+    generated: (path: string) => ({ by: actor, at: timestamp(path) }),
     leadingComment,
     firstMatch,
     clean,

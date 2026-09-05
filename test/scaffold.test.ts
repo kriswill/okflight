@@ -17,7 +17,7 @@ describe("expandTemplate", () => {
 
 describe("splitCliSections: [scaffold]", () => {
   test("defaults: no script, no command, no collect", () => {
-    expect(splitCliSections({}).scaffold).toEqual({ script: null, command: null, collect: [] });
+    expect(splitCliSections({}).scaffold).toEqual({ script: null, command: null, collect: [], actor: null });
   });
 
   test("script consumed; collect entries normalized with defaults", () => {

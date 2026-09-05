@@ -135,6 +135,9 @@ export function createMd({
     return conceptOf(resolveRel(conceptDir(fromId), target));
   }
 
+  /** Repo-relative path a concept-relative target names (no existence check). */
+  const resolveFrom = (fromId: string, target: string): string | null => resolveRel(conceptDir(fromId), target);
+
   function resolveRepoFile(fromId: string, target: string): string | null {
     const p = resolveRel(conceptDir(fromId), target);
     return p && files[p] ? p : null;
@@ -196,12 +199,52 @@ export function createMd({
         return `<a title="${esc(href)}">${txt}</a>`;
       });
 
-  function render(md: string, dir: string[]): string {
+  /** Footnote marks `[^id]` (OKF §5.1 per-claim attribution) -> numbered
+   *  superscripts, skipping text inside code/anchor tags; `order` records
+   *  first-reference order so the footnotes list numbers to match. */
+  function footnoteMarks(html: string, order: string[]): string {
+    let depth = 0;
+    return html
+      .split(/(<[^>]*>)/)
+      .map((seg) => {
+        if (seg.startsWith("<")) {
+          if (/^<(code|a)[\s>]/i.test(seg)) depth++;
+          else if (/^<\/(code|a)>/i.test(seg)) depth = Math.max(0, depth - 1);
+          return seg;
+        }
+        if (depth) return seg;
+        return seg.replace(/\[\^([^\]\s]+)\]/g, (_m, id: string) => {
+          let n = order.indexOf(id);
+          if (n < 0) n = order.push(id) - 1;
+          return `<sup class="fn"><a href="#" data-fn="${esc(id)}" title="${esc(id)}">${n + 1}</a></sup>`;
+        });
+      })
+      .join("");
+  }
+
+  function render(md: string, dir: string[], sources: Record<string, unknown>[] = []): string {
+    const fnOrder: string[] = [];
     const inline = (s: string) => {
-      if (!math) return autolinkPaths(inlineRaw(s, dir));
-      const spans: string[] = [];
-      return restoreMath(autolinkPaths(inlineRaw(extractMath(s, spans), dir)), spans);
+      const html = math
+        ? (() => {
+            const spans: string[] = [];
+            return restoreMath(autolinkPaths(inlineRaw(extractMath(s, spans), dir)), spans);
+          })()
+        : autolinkPaths(inlineRaw(s, dir));
+      return footnoteMarks(html, fnOrder);
     };
+    // Footnote definitions (`[^id]: text`) are lifted out of the flow and
+    // rendered as a list at the end, in first-reference order; a definition
+    // whose id matches a `sources[].id` links to that source's resource.
+    const fnDefs: Record<string, string> = {};
+    const lines: string[] = [];
+    let scanFence = false;
+    for (const line of md.split("\n")) {
+      if (/^(```|~~~)/.test(line)) scanFence = !scanFence;
+      const m = !scanFence && /^\[\^([^\]\s]+)\]:\s*(.*)$/.exec(line);
+      if (m) fnDefs[m[1]!] = m[2]!;
+      else lines.push(line);
+    }
     const out: string[] = [];
     let inFence = false;
     let fence: string[] = [];
@@ -254,7 +297,7 @@ export function createMd({
         .join("");
       out.push(`<div class="tbl-wrap"><table>${head}${body ? `<tbody>${body}</tbody>` : ""}</table></div>`);
     };
-    for (const line of md.split("\n")) {
+    for (const line of lines) {
       if (mathBlock) {
         const end = line.indexOf(mathBlock.close);
         if (end < 0) {
@@ -338,14 +381,38 @@ export function createMd({
     flushList();
     flushPara();
     if (inFence) out.push(`<pre><code>${esc(fence.join("\n"))}</code></pre>`);
+    const noted = [...fnOrder, ...Object.keys(fnDefs).filter((id) => !fnOrder.includes(id))];
+    if (noted.length) {
+      const items = noted.map((id) => {
+        const src = sources.find((s) => s.id === id);
+        const res = src && typeof src.resource === "string" ? src.resource : null;
+        const text = fnDefs[id] !== undefined ? inline(fnDefs[id]!) : src && typeof src.title === "string" ? esc(src.title) : esc(id);
+        let link = "";
+        if (res) {
+          const p = resolveRel(dir, res) ?? (res.startsWith("/") ? bundlePrefix + res.slice(1) : null);
+          const nid = conceptOf(p) ?? conceptOf(bundlePrefix + res);
+          if (/^https?:\/\//.test(res)) link = `<a href="${esc(res)}" target="_blank" rel="noopener">${esc(res)}</a>`;
+          else if (nid) link = `<a href="#" data-node="${esc(nid)}">${esc(res)}</a>`;
+          else if (p && files[p]) link = `<a href="#" data-file="${esc(p)}">${esc(res)}</a>`;
+          else if (files[bundlePrefix + res]) link = `<a href="#" data-file="${esc(bundlePrefix + res)}">${esc(res)}</a>`;
+          else if (files[res]) link = `<a href="#" data-file="${esc(res)}">${esc(res)}</a>`;
+          else link = `<span class="dim">${esc(res)}</span>`;
+        }
+        return `<li data-fn-target="${esc(id)}">${text}${link ? ` — ${link}` : ""}</li>`;
+      });
+      out.push(`<div class="footnotes"><ol>${items.join("")}</ol></div>`);
+    }
     return out.join("");
   }
 
-  /** Render a concept body; links resolve relative to the concept's id. */
-  const mdToHtml = (md: string, fromId: string) => render(md, conceptDir(fromId));
+  /** Render a concept body; links resolve relative to the concept's id.
+   *  `sources` (the concept's frontmatter list) lets footnotes resolve to
+   *  their source resource (OKF §5.1). */
+  const mdToHtml = (md: string, fromId: string, opts: { sources?: Record<string, unknown>[] } = {}) =>
+    render(md, conceptDir(fromId), opts.sources ?? []);
 
   /** Render an embedded repo markdown file; links resolve relative to it. */
   const mdFileToHtml = (md: string, path: string) => render(md, path.split("/").slice(0, -1));
 
-  return { mdToHtml, mdFileToHtml, autolinkPaths, resolveMd, resolveRepoFile };
+  return { mdToHtml, mdFileToHtml, autolinkPaths, resolveMd, resolveRepoFile, resolveFrom };
 }

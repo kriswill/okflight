@@ -11,7 +11,25 @@
 import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { extname, join } from "node:path";
 import { loadContext } from "./config-cli";
-import { extractLinks, firstHeading, indexBlurb, isExternal, nowISO, parseDoc, resolveLink, titleFromSlug, walkMd } from "./lib";
+import {
+  extractLinks,
+  firstHeading,
+  indexBlurb,
+  isExternal,
+  nowISO,
+  parseDoc,
+  pathFieldValues,
+  pathKind,
+  resolveLink,
+  resolvePathFieldLenient,
+  STATUSES,
+  statusOf,
+  str,
+  titleFromSlug,
+  TRUST_TIERS,
+  trustTier,
+  walkMd,
+} from "./lib";
 import { layout3d } from "./layout3d";
 import { collectLicenses, generatorInfo, OPTIONAL_DEPS, packageDir } from "./licenses";
 import { displayName } from "./viz-app/config";
@@ -98,9 +116,9 @@ for (const rel of walkMd(bundle)) {
   ids.add(id);
   nodes.push({
     id,
-    type: (doc.fm?.type as string) ?? "Unknown",
-    title: (doc.fm?.title as string) ?? id,
-    desc: (doc.fm?.description as string) ?? "",
+    type: str(doc.fm, "type") ?? "Unknown",
+    title: str(doc.fm, "title") ?? id,
+    desc: str(doc.fm, "description") ?? "",
     fm: doc.fm ?? {},
     body: doc.body,
   });
@@ -152,8 +170,8 @@ let root: RootDoc | null = null;
 if (existsSync(join(bundle, "index.md"))) {
   const doc = parseDoc(bundle, "index.md");
   root = {
-    title: (doc.fm?.title as string) ?? "",
-    desc: (doc.fm?.description as string) ?? firstSentence(indexBlurb(doc.body)),
+    title: str(doc.fm, "title") ?? "",
+    desc: str(doc.fm, "description") ?? firstSentence(indexBlurb(doc.body)),
     body: doc.body,
     links: indexLinks(doc.body, "index.md"),
   };
@@ -171,8 +189,8 @@ for (const rel of walkMd(bundle)) {
   // slug doesn't; otherwise prettify the slug.
   const h1 = firstHeading(doc.body);
   bundles[path] = {
-    title: (doc.fm?.title as string) ?? (h1 && h1 !== base ? h1 : titleFromSlug(base)),
-    desc: (doc.fm?.description as string) ?? firstSentence(indexBlurb(doc.body)),
+    title: str(doc.fm, "title") ?? (h1 && h1 !== base ? h1 : titleFromSlug(base)),
+    desc: str(doc.fm, "description") ?? firstSentence(indexBlurb(doc.body)),
     body: doc.body,
     // A self-link would render a dir card pointing at its own focus — drop it.
     links: indexLinks(doc.body, rel).filter((l) => !(l.kind === "dir" && l.path === path)),
@@ -322,6 +340,16 @@ function addRepoPath(rel: string, ref: string) {
 for (const n of nodes) {
   const res = n.fm?.resource;
   if (typeof res === "string") addRepoPath(res, n.id);
+  // OKF v0.2 path-valued fields (§6.2, §10): computation, executor.resource,
+  // attester.resource and file-shaped sources[].resource. Resolved against the
+  // bundle first (rooted = bundle-relative; relative = doc-relative, then the
+  // spec's own bundle-root spelling), else read as a repo path like `resource`.
+  for (const value of pathFieldValues(n.fm)) {
+    if (pathKind(value) === "url" || pathKind(value) === "descriptor") continue;
+    const r = resolvePathFieldLenient(bundle, n.id + ".md", value);
+    if (r.exists && r.rel) addRepoPath(join(cfg.bundle.dir, r.rel), n.id);
+    else if (pathKind(value) === "relative") addRepoPath(value, n.id);
+  }
   for (const target of extractLinks(n.body)) {
     if (isExternal(target)) continue;
     if (resolveLink(bundle, n.id + ".md", target)) continue; // stays inside the bundle
@@ -404,6 +432,19 @@ for (const f of cfg.facets) {
       );
   }
 }
+// Built-in OKF v0.2 lenses (§5.3, §5.4): a `status` facet when any concept
+// leaves the stable default, and a `trust` facet when any concept carries
+// `verified`. Every concept resolves (absence has spec meaning), so they ride
+// the facet `ids` map. A workspace facet of the same name wins untouched.
+const builtinFacet = (name: string, values: readonly string[], valueOf: (fm: Record<string, unknown>) => string, dflt: string) => {
+  if (cfg.facets.some((f) => f.name === name)) return;
+  const ids: Record<string, string> = {};
+  for (const n of nodes) ids[n.id] = valueOf(n.fm);
+  if (!Object.values(ids).some((v) => v !== dflt)) return;
+  cfg.facets.push({ name, values: [...values], types: {}, ids, frontmatter: null, classify: null });
+};
+builtinFacet("status", STATUSES, statusOf, "stable");
+builtinFacet("trust", TRUST_TIERS, trustTier, "unverified");
 lap("sources");
 
 // --- Frozen 3D layout ---------------------------------------------------------

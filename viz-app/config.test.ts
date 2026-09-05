@@ -335,12 +335,12 @@ describe("normalizeVizConfig", () => {
     expect(cl?.provider === "nix-optional-attrs" ? cl.file : null).toBe("pkgs.nix");
   });
 
-  test("strict: >12 taxonomy types warns but does not throw", () => {
+  test("strict: more taxonomy types than palette slots warns but does not throw", () => {
     const warnings: string[] = [];
-    const types = Array.from({ length: 13 }, (_, i) => "T" + i);
+    const types = Array.from({ length: 33 }, (_, i) => "T" + i);
     const c = normalizeVizConfig({ taxonomy: { types } }, { strict: true, warn: (m) => warnings.push(m) });
-    expect(c.taxonomy.types).toHaveLength(13);
-    expect(warnings.join()).toContain("12 palette slots");
+    expect(c.taxonomy.types).toHaveLength(33);
+    expect(warnings.join()).toContain("32 palette slots");
   });
 
   test("[vcs]: url + commit-url-template, kebab and camel", () => {

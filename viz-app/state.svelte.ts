@@ -4,7 +4,7 @@ import { SvelteSet } from "svelte/reactivity";
 import { nameColor } from "./color";
 import { conceptTree, neighborsWithin, treeIds, type ConceptNode, type ConceptTree, type VizModel } from "./data";
 import type { Selection } from "./hash";
-import { applyThemeVars, defaultThemeIndex, THEMES } from "./themes";
+import { applyThemeVars, defaultThemeIndex, SLOT_COUNT, THEMES } from "./themes";
 
 export interface Hover {
   i: number;
@@ -76,9 +76,9 @@ export function createVizState(model: VizModel) {
 
   const computeSlots = () => {
     const m: Record<string, string> = {};
-    // Slot N = --sN; the themes ship 12 slots, overflow types fall through to
+    // Slot N = --sN; the themes ship SLOT_COUNT slots, overflow types fall through to
     // nameColor in colorOf (missing CSS var -> "" -> falsy).
-    model.cfg.taxonomy.types.slice(0, 12).forEach((t, i) => (m[t] = cssVar("--s" + (i + 1))));
+    model.cfg.taxonomy.types.slice(0, SLOT_COUNT).forEach((t, i) => (m[t] = cssVar("--s" + (i + 1))));
     return m;
   };
   // Re-read on repaint() — the CSS custom properties flip with the color scheme.

@@ -5,15 +5,37 @@
 // from the "light" and "dark" stops at build time — viz.ts imports THEMES —
 // so they can never drift.
 //
-// The 12 categorical slots (--s1..--s12, mapped by data.ts TYPE_ORDER) were
-// optimized per surface against the dataviz six checks and PASS all-pairs
+// The first 12 categorical slots (--s1..--s12, mapped by taxonomy.types order)
+// were optimized per surface against the dataviz six checks and PASS all-pairs
 // CVD separation (Machado protan/deutan ΔE ≥ 15 worst pair, target 12) with
 // hue families frozen as identity anchors. Sub-3:1 contrast entries are the
 // validator's documented relief case — node labels, legend text, and
-// tooltips carry identity alongside color. `gen` feeds viz-app/color.ts for
-// types beyond the curated slots.
+// tooltips carry identity alongside color. Slots 13..SLOT_COUNT are derived
+// at module load (extendSlots): evenly spaced OKLCH hues at the theme's `gen`
+// lightness/chroma, alternating lightness so neighbours separate — stable per
+// slot index, so a taxonomy of up to SLOT_COUNT types keeps fixed colors, but
+// not CVD-validated like the curated dozen. `gen` also feeds viz-app/color.ts
+// for types beyond every slot.
 
-import type { GenParams } from "./color";
+import { oklchToHex, type GenParams } from "./color";
+
+/** Palette slots every theme ships (--s1..--s32): 12 curated + 20 derived. */
+export const SLOT_COUNT = 32;
+const CURATED = 12;
+
+/** Fill --s13..--sSLOT_COUNT from the theme's generator params. Hues start
+ *  off the curated anchors and step 360/20 apart; odd/even slots sit a little
+ *  lighter/darker than `gen.l` so adjacent slots differ in two channels. */
+function extendSlots(vars: Record<string, string>, gen: GenParams): Record<string, string> {
+  const out = { ...vars };
+  const n = SLOT_COUNT - CURATED;
+  for (let k = CURATED + 1; k <= SLOT_COUNT; k++) {
+    const i = k - CURATED - 1;
+    const hue = (9 + (i * 360) / n) % 360;
+    out[`--s${k}`] = oklchToHex(gen.l + (i % 2 ? 0.06 : -0.06), gen.c, hue);
+  }
+  return out;
+}
 
 export interface ThemeDef {
   name: string;
@@ -21,7 +43,7 @@ export interface ThemeDef {
   gen: GenParams;
 }
 
-export const THEMES: ThemeDef[] = [
+const CURATED_THEMES: ThemeDef[] = [
   {
     name: "light",
     gen: { l: 0.55, c: 0.13 },
@@ -51,6 +73,8 @@ export const THEMES: ThemeDef[] = [
     },
   },
 ];
+
+export const THEMES: ThemeDef[] = CURATED_THEMES.map((t) => ({ ...t, vars: extendSlots(t.vars, t.gen) }));
 
 /** Index the toggle rests at when the user hasn't picked a theme. */
 export const defaultThemeIndex = (dark: boolean) => (dark ? 1 : 0);

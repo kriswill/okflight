@@ -62,7 +62,8 @@ y
     const body = "## Decision\n\nz\n\n## Citations\n\n- [Doc](https://x/doc)\n- Commits `abc1234`\n";
     const m = migrateDoc({ type: "Decision" }, body, BY)!;
     expect(m.fm.sources).toEqual([{ id: "doc", resource: "https://x/doc", title: "Doc" }]);
-    expect(m.body).toBe(body);
+    // The moved link line is gone; the heading and the non-source item remain.
+    expect(m.body).toBe("## Decision\n\nz\n\n## Citations\n\n- Commits `abc1234`\n");
     expect(m.notes[1]).toContain('1 Citations item(s) are not sources, left in place: "Commits `abc1234`"');
   });
 

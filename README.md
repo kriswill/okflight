@@ -186,7 +186,7 @@ bunx @kriswill/okflight setup   # guided integration (or `init` for the bare ske
 npx @kriswill/okflight setup    # identical — no bun preinstalled required, see below
 ```
 
-okf runs on Bun ≥ 1.2.21 (`Bun.TOML`, `Bun.YAML` for frontmatter, `Bun.Glob`, and `okf viz` invokes `Bun.build` +
+okf runs on Bun ≥ 1.3.13 (`Bun.TOML`, `Bun.YAML` for frontmatter, `Bun.Glob`, and `okf viz` invokes `Bun.build` +
 the Svelte plugin at generation time), so the launcher re-execs through a
 bun: first the one on `PATH`, else the [`bun` npm
 package](https://www.npmjs.com/package/bun) that installs alongside as an

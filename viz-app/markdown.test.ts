@@ -331,3 +331,14 @@ describe("footnotes (OKF §5.1 per-claim attribution)", () => {
     expect(md.mdToHtml("use `[^x]` here\n\n```\n[^y]: nope\n```\n", from)).toBe("<p>use <code>[^x]</code> here</p><pre><code>[^y]: nope</code></pre>");
   });
 });
+
+describe("footnotes — code-review follow-ups", () => {
+  test("a /-rooted sources[].resource links to the bundle concept; indented definitions are lifted", () => {
+    const sources = [{ id: "a", resource: "/wiki/architecture.md" }];
+    const html = md.mdToHtml("text[^a]\n\n  [^a]: Arch\n", from, { sources });
+    expect(html).toBe(
+      '<p>text<sup class="fn"><a href="#" data-fn="a" title="a">1</a></sup></p>' +
+        '<div class="footnotes"><ol><li data-fn-target="a">Arch — <a href="#" data-node="wiki/architecture">/wiki/architecture.md</a></li></ol></div>',
+    );
+  });
+});

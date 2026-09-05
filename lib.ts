@@ -2,7 +2,7 @@
 // scaffold/migrate/viz): frontmatter parse/serialize, the OKF v0.2 trust/
 // lifecycle/provenance readers, link extraction/resolution, bundle walking,
 // slugs, ANSI. No package dependency by design — frontmatter YAML is parsed
-// by Bun's built-in Bun.YAML (Bun >= 1.2.21), so the bundle stays consumable
+// by Bun's built-in Bun.YAML (Bun >= 1.3.13), so the bundle stays consumable
 // without a package.json; serialization is our own, so emitted docs keep the
 // spec's hand-written style (flow mappings for {by, at}, block lists for
 // sources). Anything VCS-shaped lives behind vcs/ providers; config and
@@ -15,7 +15,7 @@ import { join, resolve, dirname } from "node:path";
 // the FM type live in the browser-safe viz-app/okf-fields.ts so the viewer
 // derives them identically; re-exported here for the CLI modules.
 export * from "./viz-app/okf-fields";
-import { asVerifiedList, isPlainObject, obj, str, type FM } from "./viz-app/okf-fields";
+import { asVerifiedList, FENCE_RE, FOOTNOTE_DEF_RE, isPlainObject, obj, str, type FM } from "./viz-app/okf-fields";
 
 /** The spec revision this tooling implements (SPEC.md §12). */
 export const OKF_VERSION = "0.2";
@@ -74,14 +74,57 @@ export function parseFrontmatter(raw: string): {
   const body = raw.slice(end + 5);
   let parsed: unknown;
   try {
-    parsed = Bun.YAML.parse(block);
+    parsed = Bun.YAML.parse(lenientScalars(block));
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return { fm: null, fmError: `invalid YAML — ${msg.split("\n")[0]}`, body };
   }
   if (parsed === null || parsed === undefined) return { fm: {}, fmError: null, body };
   if (!isPlainObject(parsed)) return { fm: null, fmError: "frontmatter must be a YAML mapping", body };
-  return { fm: revive(parsed) as FM, fmError: null, body };
+  return { fm: coerceStringFields(revive(parsed) as FM), fmError: null, body };
+}
+
+/** Hand-written v0.1 frontmatter (and most humans) write plain scalars
+ *  YAML reads differently: `description: Note: see X` is a parse error,
+ *  `title: Issue #42` silently drops the `#42`, `- Commits: abc` too. Before
+ *  parsing, single-quote any unquoted plain scalar in a `key: value` /
+ *  `- value` line that contains `: ` or ` #` or ends in `:` — the same
+ *  cases yamlScalar quotes on the way out — so what was written is what is
+ *  read. Block scalars, flow collections, and already-quoted values are
+ *  left alone. */
+export function lenientScalars(block: string): string {
+  let inBlockScalar: number | null = null; // indent of an open `|`/`>` body
+  return block
+    .split("\n")
+    .map((line) => {
+      const indent = line.match(/^\s*/)![0].length;
+      if (inBlockScalar !== null) {
+        if (line.trim() === "" || indent > inBlockScalar) return line;
+        inBlockScalar = null;
+      }
+      const m = /^(\s*(?:-\s+)?(?:[A-Za-z0-9_.-]+:\s+)?)(.*)$/.exec(line);
+      if (!m || !m[1]) return line;
+      const [, head, value] = m;
+      if (/^[|>]/.test(value)) {
+        inBlockScalar = indent;
+        return line;
+      }
+      if (value === "" || /^['"\[{&*!%@`]/.test(value)) return line;
+      if (/^#/.test(value)) return line; // a comment, not a value
+      if (!(/: /.test(value) || /\s#/.test(value) || /:$/.test(value))) return line;
+      return `${head}'${value.replace(/'/g, "''")}'`;
+    })
+    .join("\n");
+}
+
+/** The spec's string-typed keys keep their written text even when YAML
+ *  would read a number, boolean, or date (`title: 2024`, `tags: [2024]`). */
+function coerceStringFields(fm: FM): FM {
+  for (const k of ["type", "title", "description", "resource", "timestamp", "okf_version"])
+    if (fm[k] !== undefined && fm[k] !== null && typeof fm[k] !== "string" && !isPlainObject(fm[k]) && !Array.isArray(fm[k]))
+      fm[k] = String(fm[k]);
+  if (Array.isArray(fm.tags)) fm.tags = fm.tags.map((t) => (typeof t === "string" || isPlainObject(t) || Array.isArray(t) ? t : String(t)));
+  return fm;
 }
 
 /** Bun.YAML turns bare ISO timestamps into Date objects; OKF treats every
@@ -122,7 +165,9 @@ function yamlScalar(s: string): string {
 }
 
 function yamlValueInline(v: unknown): string {
-  if (typeof v === "string") return yamlScalar(v);
+  // Newlines can't live in a single-quoted flow scalar; JSON's double-quoted
+  // form (\n escapes) is valid YAML anywhere.
+  if (typeof v === "string") return v.includes("\n") ? JSON.stringify(v) : yamlScalar(v);
   if (typeof v === "number" || typeof v === "boolean") return String(v);
   if (v === null || v === undefined) return "null";
   if (Array.isArray(v)) return `[${v.map(yamlValueInline).join(", ")}]`;
@@ -141,6 +186,13 @@ const isSmallMap = (v: Record<string, unknown>) =>
   Object.values(v).every((x) => !Array.isArray(x) && !isPlainObject(x));
 
 function yamlLines(key: string, v: unknown, indent: string): string[] {
+  // Multi-line strings keep the block form they were written in (`|` keeps
+  // the final newline, `|-` drops it), one line per source line.
+  if (typeof v === "string" && v.includes("\n")) {
+    const keep = v.endsWith("\n");
+    const text = keep ? v.slice(0, -1) : v;
+    return [`${indent}${key}: ${keep ? "|" : "|-"}`, ...text.split("\n").map((l) => (l ? `${indent}  ${l}` : ""))];
+  }
   if (Array.isArray(v)) {
     if (v.every((x) => !isPlainObject(x) && !Array.isArray(x))) return [`${indent}${key}: ${yamlValueInline(v)}`];
     const out = [`${indent}${key}:`];
@@ -188,9 +240,13 @@ export function isIsoDateTime(s: unknown): boolean {
 }
 
 /** Actor convention (§7): `human:<id>`, `process:<id>`, or `<producer>/<version>`. */
+export const ACTOR_RE = /^(human:\S+|process:\S+|[^\s:/]+\/\S+)$/;
 export function isActor(s: unknown): boolean {
-  return typeof s === "string" && /^(human:\S+|process:\S+|[^\s:/]+\/\S+)$/.test(s);
+  return typeof s === "string" && ACTOR_RE.test(s);
 }
+/** The looser shape `sources[].author` may take: any actor, or a
+ *  `<kind>:<id>` tag such as the spec's own `team:ga4-docs`. */
+export const AUTHOR_RE = /^(human:\S+|process:\S+|[^\s:/]+\/\S+|[^\s:/]+:\S+)$/;
 
 export type PathKind = "url" | "rooted" | "relative" | "descriptor";
 
@@ -212,7 +268,9 @@ export function resolvePathField(root: string, docRel: string, value: string): s
   const kind = pathKind(value);
   if (kind === "url" || kind === "descriptor") return null;
   if (kind === "rooted") {
-    const abs = resolve(root, value.slice(1));
+    const clean = value.split("#")[0]!.slice(1); // fragments name a heading, not a file
+    if (!clean) return null;
+    const abs = resolve(root, clean);
     return abs.startsWith(root + "/") ? abs.slice(root.length + 1) : null;
   }
   return resolveLink(root, docRel, value);
@@ -237,10 +295,10 @@ export function resolvePathFieldLenient(root: string, docRel: string, value: str
 
 /** Lines of a markdown body with fenced code blocks blanked (kept as empty
  *  strings so line indices survive). */
-function proseLines(body: string): string[] {
+export function proseLines(body: string): string[] {
   let inFence = false;
   return body.split("\n").map((line) => {
-    if (/^\s*(```|~~~)/.test(line)) { inFence = !inFence; return ""; }
+    if (FENCE_RE.test(line)) { inFence = !inFence; return ""; }
     return inFence ? "" : line;
   });
 }
@@ -249,7 +307,7 @@ function proseLines(body: string): string[] {
 export function extractFootnoteRefs(body: string): string[] {
   const out: string[] = [];
   for (const line of proseLines(body)) {
-    if (/^\s*\[\^[^\]]+\]:/.test(line)) continue; // a definition, not a use
+    if (FOOTNOTE_DEF_RE.test(line)) continue; // a definition, not a use
     for (const m of line.matchAll(/\[\^([^\]\s]+)\]/g)) if (!out.includes(m[1]!)) out.push(m[1]!);
   }
   return out;
@@ -259,7 +317,7 @@ export function extractFootnoteRefs(body: string): string[] {
 export function extractFootnoteDefs(body: string): Record<string, string> {
   const out: Record<string, string> = {};
   for (const line of proseLines(body)) {
-    const m = /^\s*\[\^([^\]\s]+)\]:\s*(.*)$/.exec(line);
+    const m = FOOTNOTE_DEF_RE.exec(line);
     if (m) out[m[1]!] = m[2]!.trim();
   }
   return out;

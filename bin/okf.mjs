@@ -24,7 +24,20 @@ import { fileURLToPath } from "node:url";
 const entry = fileURLToPath(new URL("../okf.ts", import.meta.url));
 process.env.OKF_PROG ??= basename(process.argv[1] ?? "", ".mjs") || "okf";
 
+/** Oldest Bun this CLI runs on (Bun.YAML for frontmatter) — mirrors package.json engines. */
+const MIN_BUN = "1.3.13";
+const olderThan = (v, min) => {
+  const a = v.split(".").map(Number);
+  const b = min.split(".").map(Number);
+  for (let i = 0; i < 3; i++) if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) < (b[i] ?? 0);
+  return false;
+};
+
 if (typeof Bun !== "undefined") {
+  if (olderThan(Bun.version, MIN_BUN)) {
+    console.error(`okf: Bun ${MIN_BUN} or newer is required (found ${Bun.version}) — run \`bun upgrade\`.`);
+    process.exit(1);
+  }
   await import(entry);
 } else {
   const isWin = process.platform === "win32";

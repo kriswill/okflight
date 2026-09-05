@@ -69,16 +69,19 @@ export function migrateDoc(fm: FM, body: string, by: string): { fm: FM; body: st
       out.sources = [...existing, ...added];
       notes.push(`Citations -> sources (${added.length} added${existing.length ? `, ${existing.length} kept` : ""})`);
     }
-    if (kept.length) {
-      // Non-source items stay under the heading — leave the section, and say
-      // so once, alongside the change that moved its links (a section holding
-      // only such items is simply not a migration target, so re-runs stay silent).
-      if (added.length)
-        notes.push(`${kept.length} Citations item(s) are not sources, left in place: ${kept.map((k) => `"${k}"`).join(", ")}`);
-    } else if (added.length || cites.items.length === 0) {
-      // Remove the heading through the last item plus the blank lines around it.
-      const lines = body.split("\n");
-      const [start, end] = cites.range;
+    const lines = body.split("\n");
+    const [start, end] = cites.range;
+    const moved = cites.items.filter((i) => i.resource);
+    if (kept.length && moved.length) {
+      // Linked items moved to sources: drop exactly those lines; the
+      // non-source items (revision hashes, prose) keep the heading.
+      const dropped = new Set(moved.map((i) => i.raw));
+      const keptLines = lines.filter((l, i) => !(i > start && i < end && dropped.has((/^\s*[-*+]\s+(.*\S)\s*$/.exec(l) ?? [])[1] ?? "")));
+      nextBody = keptLines.join("\n");
+      notes.push(`${kept.length} Citations item(s) are not sources, left in place: ${kept.map((k) => `"${k}"`).join(", ")}`);
+    } else if (!kept.length && (moved.length || cites.items.length === 0)) {
+      // Nothing left to say under the heading: remove the section and the
+      // blank lines around it.
       let cut = end;
       while (cut < lines.length && lines[cut]!.trim() === "") cut++;
       let from = start;

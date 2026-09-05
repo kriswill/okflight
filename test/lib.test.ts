@@ -244,3 +244,41 @@ x
     expect(sourceId("!!!")).toBe("source");
   });
 });
+
+describe("code-review follow-ups", () => {
+  test("lenient scalars: unquoted ': ' and ' #' values read as written; block scalars untouched", () => {
+    const { fm, fmError } = parseFrontmatter(
+      "---\ntype: Note\ntitle: Issue #42 follow-up\ndescription: Note: see X\nrefs:\n  - Commits: abc\n  - see: also\nbody_text: |\n  a: b # not a comment\n  c\n---\n",
+    );
+    expect(fmError).toBeNull();
+    expect(fm!.title).toBe("Issue #42 follow-up");
+    expect(fm!.description).toBe("Note: see X");
+    expect(fm!.refs).toEqual([{ Commits: "abc" }, { see: "also" }]);
+    expect(fm!.body_text).toBe("a: b # not a comment\nc\n");
+    expect(fmToYaml(fm!)).toContain("title: 'Issue #42 follow-up'\ndescription: 'Note: see X'");
+  });
+
+  test("string-typed keys keep bare numbers/booleans as text", () => {
+    const { fm } = parseFrontmatter("---\ntype: 2024\ntitle: 2024\ndescription: true\ntags: [2024, foo]\nokf_version: 0.2\ncount: 3\n---\n");
+    expect(fm).toEqual({ type: "2024", title: "2024", description: "true", tags: ["2024", "foo"], okf_version: "0.2", count: 3 });
+  });
+
+  test("multi-line strings serialize as block scalars and round-trip", () => {
+    const fm = { type: "X", description: "first line\nsecond line\n", note: "no trailing\nnewline", generated: { by: "human:k", at: "a\nb" } };
+    const yaml = fmToYaml(fm);
+    expect(yaml).toContain("description: |\n  first line\n  second line\nnote: |-\n  no trailing\n  newline\n");
+    expect(yaml).toContain('generated: { by: human:k, at: "a\\nb" }');
+    expect(parseFrontmatter(yaml + "\n").fm).toEqual(fm);
+  });
+
+  test("rooted path fields drop a #fragment before resolving", () => {
+    expect(resolvePathField("/b", "x.md", "/tables/customers.md#joins")).toBe("tables/customers.md");
+    expect(resolvePathField("/b", "x.md", "/#top")).toBeNull();
+  });
+
+  test("footnote grammar: indented definitions count, indented fences do not hide marks (viewer parity)", () => {
+    const body = "text[^x]\n\n  [^x]: note\n\n    ```\n    [^y]\n    ```\n";
+    expect(extractFootnoteDefs(body)).toEqual({ x: "note" });
+    expect(extractFootnoteRefs(body)).toEqual(["x", "y"]);
+  });
+});

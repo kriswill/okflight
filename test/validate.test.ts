@@ -163,3 +163,31 @@ describe("okf validate (OKF v0.2)", () => {
     expect(r.errors.join("\n")).toContain("c.md: resource '../../outside' escapes the repository");
   });
 });
+
+describe("code-review follow-ups", () => {
+  test("workspace-relative resource (what scaffold writes) resolves through the repo, not as a bundle miss", () => {
+    const root = workspace({
+      "modules/foo.md": "---\ntype: Module\ntitle: t\ndescription: d\ngenerated: { by: human:k }\nresource: src/foo.py\n---\nbody\n",
+      "modules/bar.md": "---\ntype: Module\ntitle: t\ndescription: d\ngenerated: { by: human:k }\nresource: src/missing.py\nattester: { resource: ../../tools/attest.py }\nruntime: x\n---\nbody\n",
+    });
+    mkdirSync(join(root, "src"));
+    writeFileSync(join(root, "src/foo.py"), "");
+    mkdirSync(join(root, "tools"));
+    writeFileSync(join(root, "tools/attest.py"), "");
+    const r = run(root, "--strict");
+    expect(r.out).not.toContain("modules/foo.md");
+    expect(r.warnings.join("\n")).toContain("modules/bar.md: resource 'src/missing.py' does not resolve in the bundle or the repository");
+    expect(r.out).not.toContain("attester.resource");
+  });
+
+  test("rooted body links with a #fragment resolve; Citations with only revision items never nag; migrated sources need no footnote", () => {
+    const root = workspace({
+      "modules/x.md": "---\ntype: X\ntitle: t\ndescription: d\ngenerated: { by: human:k }\n---\nsee [y](/modules/y.md#sec) and [z](/modules/nope.md)\n\n## Citations\n\n- Commits `abc1234`\n",
+      "modules/y.md": "---\ntype: X\ntitle: t\ndescription: d\ngenerated: { by: human:k }\nsources:\n  - { id: doc, resource: https://x/doc }\n---\nno footnote here\n",
+    });
+    writeFileSync(join(root, "okflight.toml"), '[bundle]\ndir = "kb"\n[vcs]\nprovider = "none"\n[profile]\nrooted-links = "allow"\n');
+    const r = run(root, "--strict");
+    expect(r.warnings).toEqual(["warn:  modules/x.md: dangling bundle link '/modules/nope.md'"]);
+    expect(r.errors).toEqual([]);
+  });
+});

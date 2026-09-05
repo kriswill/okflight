@@ -22,6 +22,7 @@ import { join } from "node:path";
 import { loadContext } from "./config-cli";
 import {
   asVerifiedList,
+  AUTHOR_RE,
   c,
   extractCitationsSection,
   extractFootnoteDefs,
@@ -81,20 +82,28 @@ function checkPathField(rel: string, field: string, value: unknown) {
   const kind = pathKind(value);
   if (kind === "url" || kind === "descriptor") return;
   const inBundle = resolvePathFieldLenient(bundle, rel, value);
-  if (inBundle.rel !== null) {
-    if (!inBundle.exists) warnings.push(`${rel}: ${field} '${value}' does not resolve in the bundle`);
-    return;
-  }
+  if (inBundle.exists) return;
   if (kind === "rooted") {
-    warnings.push(`${rel}: ${field} '${value}' escapes the bundle (/-rooted paths are bundle-relative, §6.1)`);
+    warnings.push(
+      inBundle.rel === null
+        ? `${rel}: ${field} '${value}' escapes the bundle (/-rooted paths are bundle-relative, §6.1)`
+        : `${rel}: ${field} '${value}' does not resolve in the bundle`,
+    );
     return;
   }
-  if (repoLinks === "forbid") errors.push(`${rel}: ${field} '${value}' leaves the bundle — profile forbids repo links`);
-  else if (repoLinks === "check") {
-    const inRepo = resolveLink(repo, join(cfg.viz.bundle.dir, rel), value);
-    if (inRepo === null) errors.push(`${rel}: ${field} '${value}' escapes the repository`);
-    else if (!existsSync(join(repo, inRepo))) warnings.push(`${rel}: ${field} '${value}' does not resolve in the repository`);
+  // Relative and not in the bundle: it names something in the repository —
+  // doc-relative (`../../src/x.py`), or workspace-relative as `okf scaffold`
+  // writes `resource` (`src/x.py`); viz reads both the same way.
+  if (repoLinks === "forbid") {
+    errors.push(`${rel}: ${field} '${value}' leaves the bundle — profile forbids repo links`);
+    return;
   }
+  if (repoLinks !== "check") return;
+  const docRel = resolveLink(repo, join(cfg.viz.bundle.dir, rel), value);
+  const rootRel = value.split("#")[0]!.split("/").includes("..") ? null : value.split("#")[0]!;
+  if (docRel === null && rootRel === null) errors.push(`${rel}: ${field} '${value}' escapes the repository`);
+  else if (!(docRel && existsSync(join(repo, docRel))) && !(rootRel && existsSync(join(repo, rootRel))))
+    warnings.push(`${rel}: ${field} '${value}' does not resolve in the bundle or the repository`);
 }
 
 const checkActorAt = (rel: string, field: string, e: Record<string, unknown>, byRequired: boolean) => {
@@ -166,7 +175,7 @@ function checkFamilies(rel: string, fm: FM, body: string) {
           else if (ids.has(s.id)) errors.push(`${rel}: duplicate sources id '${s.id}'`);
           else ids.add(s.id);
         }
-        if (s.author !== undefined && !(isActor(s.author) || (typeof s.author === "string" && /^[^\s:\/]+:\S+$/.test(s.author))))
+        if (s.author !== undefined && !(typeof s.author === "string" && AUTHOR_RE.test(s.author)))
           warnings.push(`${rel}: ${f}.author '${String(s.author)}' is not actor-shaped (§7: human:<id>, process:<id>, team:<id>, <producer>/<version>)`);
         if (s.usage_count !== undefined) {
           if (typeof s.usage_count !== "number" || s.usage_count < 0) errors.push(`${rel}: ${f}.usage_count must be a non-negative number`);
@@ -187,14 +196,17 @@ function checkFamilies(rel: string, fm: FM, body: string) {
     else if (!Array.isArray(src)) warnings.push(`${rel}: footnote [^${label}] but no sources frontmatter to key into`);
     if (!(label in defs)) warnings.push(`${rel}: footnote [^${label}] has no definition line`);
   }
-  for (const id of ids) if (!refs.includes(id)) warnings.push(`${rel}: sources id '${id}' is never cited by a footnote`);
   // v0.1 leftovers (§13.1)
   if (fm.timestamp !== undefined) {
     if (gen === undefined) warnings.push(`${rel}: 'timestamp' is superseded by generated.at in OKF v0.2 — run okf migrate`);
     if (typeof fm.timestamp === "string" && fm.timestamp && Number.isNaN(Date.parse(fm.timestamp)))
       warnings.push(`${rel}: timestamp '${fm.timestamp}' is not ISO-8601 parseable`);
   }
-  if (src === undefined && extractCitationsSection(body))
+  // A Citations section is a migration target only while it still holds
+  // linked items — migrate moves those into sources; prose/revision items
+  // (`Commits \`abc\``) legitimately stay, so they never nag.
+  const cites = extractCitationsSection(body);
+  if (cites?.items.some((i) => i.resource))
     warnings.push(`${rel}: body Citations list is superseded by 'sources' frontmatter in OKF v0.2 — run okf migrate`);
 }
 
@@ -299,8 +311,10 @@ for (const rel of files) {
     if (target.startsWith("/")) {
       if (rootedLinks === "error")
         errors.push(`${rel}: /-rooted link '${target}' — profile requires file-relative links`);
-      else if (resolvePathField(bundle, rel, target) === null || !existsSync(join(bundle, resolvePathField(bundle, rel, target)!)))
-        warnings.push(`${rel}: dangling bundle link '${target}'`);
+      else {
+        const rooted = resolvePathField(bundle, rel, target);
+        if (rooted === null || !existsSync(join(bundle, rooted))) warnings.push(`${rel}: dangling bundle link '${target}'`);
+      }
       continue;
     }
     const inBundle = resolveLink(bundle, rel, target);

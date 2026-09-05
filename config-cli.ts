@@ -10,6 +10,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { ACTOR_RE } from "./lib";
 import { createProvider, gitRoot, type VcsProvider } from "./vcs";
 import { fieldIn, isObj, normalizeVizConfig, VizConfigError, type VizConfig } from "./viz-app/config";
 
@@ -229,7 +230,7 @@ export function splitCliSections(raw: unknown): {
       );
       field("command", asStrArr((a) => (scaffold.command = a.length ? a : null)));
       field("actor", (v, path) => {
-        if (typeof v === "string" && /^(human:\S+|process:\S+|[^\s:/]+\/\S+)$/.test(v)) scaffold.actor = v;
+        if (typeof v === "string" && ACTOR_RE.test(v)) scaffold.actor = v;
         else errors.push(`${path}: expected an OKF actor — human:<id>, process:<id>, or <producer>/<version>`);
       });
       const entries = s["collect"];

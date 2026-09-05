@@ -92,3 +92,10 @@ export function pathFieldValues(fm: FM | null | undefined): string[] {
     if (isPlainObject(s) && typeof s.resource === "string" && s.resource) out.push(s.resource);
   return out;
 }
+
+/** Fence and footnote-definition grammar shared by validate (lib.ts) and the
+ *  viewer's renderer (markdown.ts), so both agree on what is prose: a fence
+ *  opens at column 0 (as the renderer treats it); a definition may be
+ *  indented. */
+export const FENCE_RE = /^(```|~~~)/;
+export const FOOTNOTE_DEF_RE = /^\s*\[\^([^\]\s]+)\]:\s*(.*)$/;

@@ -5,6 +5,7 @@
 import katex from "katex";
 
 import { DEFAULT_BUNDLE_DIR } from "./config";
+import { FENCE_RE, FOOTNOTE_DEF_RE } from "./okf-fields";
 
 export const esc = (s: unknown) =>
   String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
@@ -240,9 +241,9 @@ export function createMd({
     const lines: string[] = [];
     let scanFence = false;
     for (const line of md.split("\n")) {
-      if (/^(```|~~~)/.test(line)) scanFence = !scanFence;
-      const m = !scanFence && /^\[\^([^\]\s]+)\]:\s*(.*)$/.exec(line);
-      if (m) fnDefs[m[1]!] = m[2]!;
+      if (FENCE_RE.test(line)) scanFence = !scanFence;
+      const m = !scanFence && FOOTNOTE_DEF_RE.exec(line);
+      if (m) fnDefs[m[1]!] = m[2]!.trim();
       else lines.push(line);
     }
     const out: string[] = [];
@@ -389,8 +390,10 @@ export function createMd({
         const text = fnDefs[id] !== undefined ? inline(fnDefs[id]!) : src && typeof src.title === "string" ? esc(src.title) : esc(id);
         let link = "";
         if (res) {
-          const p = resolveRel(dir, res) ?? (res.startsWith("/") ? bundlePrefix + res.slice(1) : null);
-          const nid = conceptOf(p) ?? conceptOf(bundlePrefix + res);
+          // `/`-rooted is bundle-relative (§6.1); relative is doc-relative,
+          // then the spec's bundle-root spelling — same order as the panel.
+          const p = res.startsWith("/") ? bundlePrefix + res.slice(1) : resolveRel(dir, res);
+          const nid = conceptOf(p) ?? (res.startsWith("/") ? null : conceptOf(bundlePrefix + res));
           if (/^https?:\/\//.test(res)) link = `<a href="${esc(res)}" target="_blank" rel="noopener">${esc(res)}</a>`;
           else if (nid) link = `<a href="#" data-node="${esc(nid)}">${esc(res)}</a>`;
           else if (p && files[p]) link = `<a href="#" data-file="${esc(p)}">${esc(res)}</a>`;

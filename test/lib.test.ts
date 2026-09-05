@@ -295,3 +295,9 @@ describe("extractCitationsSection — prefixed items (dotfiles shapes)", () => {
     expect(sourceId("How the Open Knowledge Format can improve data sharing")).toBe("how-the-open-knowledge-format-can-improve-data");
   });
 });
+
+describe("footnote refs ignore inline code (viewer parity)", () => {
+  test("a [^id] inside backticks is prose about footnotes, not a citation", () => {
+    expect(extractFootnoteRefs("write `…documented.[^manual]` to cite; real one here[^real]\n\n[^real]: r\n")).toEqual(["real"]);
+  });
+});

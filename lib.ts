@@ -308,7 +308,8 @@ export function extractFootnoteRefs(body: string): string[] {
   const out: string[] = [];
   for (const line of proseLines(body)) {
     if (FOOTNOTE_DEF_RE.test(line)) continue; // a definition, not a use
-    for (const m of line.matchAll(/\[\^([^\]\s]+)\]/g)) if (!out.includes(m[1]!)) out.push(m[1]!);
+    // Code spans are literal text — the viewer skips them too (markdown.ts footnoteMarks).
+    for (const m of line.replace(/`[^`]*`/g, "").matchAll(/\[\^([^\]\s]+)\]/g)) if (!out.includes(m[1]!)) out.push(m[1]!);
   }
   return out;
 }

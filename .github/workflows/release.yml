@@ -6,6 +6,10 @@
 # settings are updated to match.
 #
 # Release flow: bump package.json version -> merge -> push tag vX.Y.Z.
+# After a successful npm publish the job also creates the GitHub Release
+# for the tag with auto-generated notes (skipped if one already exists, so
+# re-runs are safe). GITHUB_TOKEN-created releases don't trigger other
+# workflows; flakehub-publish keys off the tag push itself, so that's fine.
 # workflow_dispatch smoke-tests the pipeline (tests + tarball) without
 # publishing — it uses `npm pack --dry-run`, NOT `npm publish --dry-run`,
 # because publish's dry-run still runs the registry version-collision
@@ -19,7 +23,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write # create the GitHub Release
   id-token: write # the OIDC token npm exchanges for the tokenless publish
 
 jobs:
@@ -47,4 +51,15 @@ jobs:
             npm publish
           else
             npm pack --dry-run
+          fi
+      - name: Create GitHub Release (tag push)
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "release $GITHUB_REF_NAME already exists; skipping"
+          else
+            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+              --verify-tag --title "$GITHUB_REF_NAME" --generate-notes
           fi

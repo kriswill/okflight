@@ -15,6 +15,15 @@ export function gitRoot(cwd?: string): string | null {
   return root || null;
 }
 
+/** Is `cwd` the git toplevel itself? Git's own answer (`--show-prefix` is
+ *  empty there), not a path comparison: on Windows git prints the toplevel
+ *  as `C:/Users/runneradmin/...` while the OS hands out the same directory
+ *  as `C:\Users\RUNNER~1\...`, and no realpath spells both the same way. */
+export function isGitToplevel(cwd: string): boolean {
+  const r = spawnSync("git", ["rev-parse", "--show-prefix"], { encoding: "utf8", cwd });
+  return !r.error && r.status === 0 && (r.stdout ?? "").trim() === "";
+}
+
 /** Normalize any common git remote spelling to a https web URL:
  *  https://host/path(.git), git@host:path(.git), ssh://git@host/path(.git)
  *  -> https://host/path. Unrecognized shapes yield null (set `[vcs] url`). */

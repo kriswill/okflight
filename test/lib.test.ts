@@ -8,6 +8,7 @@ import {
   bundleFilter,
   extractCitationsSection,
   extractFootnoteDefs,
+  firstHeading,
   extractFootnoteRefs,
   fmToYaml,
   generatedAt,
@@ -15,7 +16,9 @@ import {
   isActor,
   isIsoDateTime,
   isStale,
+  lenientScalars,
   linkFieldValues,
+  listItemText,
   parseFrontmatter,
   pathKind,
   relUnder,
@@ -409,5 +412,42 @@ describe("frontmatter link fields", () => {
     expect(r("missing")).toEqual({ id: null });
     expect(r("../../escape").id).toBeNull();
     expect(r("https://example.com/x.md").id).toBeNull();
+  });
+});
+
+describe("markdown regexes stay linear on hostile input (CodeQL js/polynomial-redos)", () => {
+  // Each input is the pump CodeQL named for the old pattern, long enough that
+  // a quadratic regex would take seconds; the rewritten ones finish instantly.
+  const big = 200_000;
+  const timed = <T>(f: () => T): T => {
+    const t0 = performance.now();
+    const r = f();
+    expect(performance.now() - t0).toBeLessThan(1000);
+    return r;
+  };
+
+  test("list items, headings, footnote definitions", () => {
+    expect(timed(() => listItemText("- " + " ".repeat(big) + "\u2028"))).toBeNull();
+    expect(timed(() => listItemText("  *  text  "))).toBe("text");
+    expect(listItemText("-text")).toBeNull();
+    expect(timed(() => firstHeading("# " + " ".repeat(big) + "\u2028"))).toBeNull();
+    expect(firstHeading("#   \n# Real  ")).toBe("Real"); // an empty heading is not a title
+    expect(timed(() => extractFootnoteDefs("[^a]:" + " ".repeat(big) + "\u2028"))).toEqual({ a: "" });
+    expect(extractFootnoteDefs("  [^b]:   text  \r\n[^c]:\r\n")).toEqual({ b: "text", c: "" });
+  });
+
+  test("frontmatter scalars, link fields, citation items", () => {
+    const line = "key:" + " ".repeat(big) + "\u2028";
+    expect(timed(() => lenientScalars(line))).toBe(line);
+    expect(lenientScalars("title: Issue: 42")).toBe("title: 'Issue: 42'");
+    expect(timed(() => linkFieldValues({ r: "[[" + "|".repeat(big) }, "r"))).toEqual(["[[" + "|".repeat(big)]);
+    expect(linkFieldValues({ r: "[[a|b|c]]" }, "r")).toEqual(["a"]);
+    const items = timed(() => extractCitationsSection("## Citations\n- " + "[".repeat(big) + "\n- " + "\t".repeat(big) + "x\n"));
+    expect(items?.items.map((i) => i.resource)).toEqual([null, null]);
+    expect(extractCitationsSection("## Citations\n- Manual — : [T](http://x) gloss\n- see <https://y> — after\n")?.items.map((i) => [i.resource, i.title])).toEqual([
+      ["http://x", "Manual: T"],
+      ["https://y", "see"],
+    ]);
+    expect(timed(() => sourceId("-".repeat(big) + "x"))).toBe("x");
   });
 });

@@ -151,9 +151,12 @@ export function lenientScalars(block: string): string {
         if (line.trim() === "" || indent > inBlockScalar) return line;
         inBlockScalar = null;
       }
-      const m = /^(\s*(?:-\s+)?(?:[A-Za-z0-9_.-]+:\s+)?)(.*)$/.exec(line);
+      // The value starts at its first non-space, so the leading whitespace runs
+      // never overlap it (no quadratic backtracking on a line that fails `$`).
+      const m = /^(\s*(?:-\s+)?(?:[A-Za-z0-9_.-]+:\s+)?)(\S.*)?$/.exec(line);
       if (!m || !m[1]) return line;
-      const [, head, value] = m;
+      const head = m[1];
+      const value = m[2] ?? "";
       if (/^[|>]/.test(value)) {
         inBlockScalar = indent;
         return line;
@@ -351,6 +354,23 @@ export function proseLines(body: string): string[] {
   });
 }
 
+/** The text of a markdown list item (`- text`, `* text`, `+ text`), trimmed;
+ *  null when the line is not one. */
+export function listItemText(line: string): string | null {
+  const m = /^\s*[-*+]\s+(\S.*)/.exec(line);
+  return m ? m[1]!.trimEnd() : null;
+}
+
+/** Strip trailing whitespace and `:`/dash separators, the glue between a
+ *  citation's prose and its link. A loop, not `/[...]+$/`, which backtracks
+ *  quadratically when the string does not end in a separator. */
+const SEP_RE = /[\s:—–-]/;
+function trimSepEnd(s: string): string {
+  let end = s.length;
+  while (end > 0 && SEP_RE.test(s[end - 1]!)) end--;
+  return s.slice(0, end);
+}
+
 /** Footnote labels referenced in prose (`…[^ga4-schema]`), in order, deduped. */
 export function extractFootnoteRefs(body: string): string[] {
   const out: string[] = [];
@@ -392,23 +412,27 @@ export function extractCitationsSection(body: string): { items: CitationItem[]; 
   while (end < lines.length && !/^#{1,6}\s/.test(prose[end]!)) end++;
   const items: CitationItem[] = [];
   for (let i = start + 1; i < end; i++) {
-    const m = /^\s*[-*+]\s+(.*\S)\s*$/.exec(lines[i]!);
-    if (!m) continue;
-    const raw = m[1]!;
+    const raw = listItemText(lines[i]!);
+    if (raw === null) continue;
     // The first markdown link or bare URL anywhere in the item is the source;
     // prose before it ("Manual: ", "Upstream server — ") joins the link text
     // as the title, and a trailing gloss is dropped (it lives on in the id).
-    const link = /^(.*?)\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/.exec(raw);
-    const bare = link ? null : /^(.*?)<?(https?:\/\/[^\s>)]+)>?/.exec(raw);
+    // Unanchored: the engine's scan finds the first link, and the prose before
+    // it is the prefix by index (a lazy `^(.*?)` ahead of it backtracks
+    // quadratically on bracket-heavy items). No part of a candidate may cross
+    // a `[`, so each start position's attempt ends at the next one and the
+    // whole scan stays linear.
+    const link = /\[([^[\]]*)\]\(([^[)\s]+)(?:\s+"[^"[]*")?\)/.exec(raw);
+    const bare = link ? null : /<?(https?:\/\/[^\s>)]+)>?/.exec(raw);
     const label = (prefix: string, text: string) => {
-      const pre = prefix.replace(/[\s:—–-]+$/, "").trim();
+      const pre = trimSepEnd(prefix).trim();
       const body = text.replace(/`/g, "").trim();
       return pre && body ? `${pre}: ${body}` : pre || body;
     };
-    if (link) items.push({ resource: link[3]!, title: label(link[1]!, link[2]!) || link[3]!, raw });
+    if (link) items.push({ resource: link[2]!, title: label(raw.slice(0, link.index), link[1]!) || link[2]!, raw });
     else if (bare) {
-      const after = raw.slice(bare[0].length).replace(/^[\s:—–-]+/, "").trim();
-      items.push({ resource: bare[2]!, title: label(bare[1]!, "") || after || bare[2]!, raw });
+      const after = raw.slice(bare.index + bare[0].length).replace(/^[\s:—–-]+/, "").trim();
+      items.push({ resource: bare[1]!, title: label(raw.slice(0, bare.index), "") || after || bare[1]!, raw });
     } else items.push({ resource: null, title: raw, raw });
   }
   // Trim trailing blank lines out of the range so removal leaves one separator.
@@ -428,10 +452,10 @@ export function sourceId(titleOrUrl: string): string {
   return (
     s
       .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
+      .replace(/[^a-z0-9]+/g, "-") // every non-alnum run is now exactly one dash
+      .replace(/^-|-$/g, "")
       .replace(/^(.{1,48})(?:-.*)?$/s, "$1") // cut at a word boundary
-      .replace(/-+$/g, "") || "source"
+      .replace(/-$/, "") || "source"
   );
 }
 
@@ -460,7 +484,7 @@ export function linkFieldValues(fm: FM | null, field: string): string[] {
   const items = Array.isArray(v) ? v : v === undefined || v === null ? [] : [v];
   return items
     .filter((x): x is string => typeof x === "string")
-    .map((x) => x.trim().replace(/^\[\[(.*?)(?:\|.*)?\]\]$/, "$1").split("#")[0]!.trim())
+    .map((x) => x.trim().replace(/^\[\[([^|]*)(?:\|.*)?\]\]$/, "$1").split("#")[0]!.trim())
     .filter(Boolean);
 }
 
@@ -536,8 +560,8 @@ export function firstHeading(body: string): string | null {
   for (const line of body.split("\n")) {
     if (/^\s*(```|~~~)/.test(line)) { inFence = !inFence; continue; }
     if (inFence) continue;
-    const m = /^#\s+(.+?)\s*$/.exec(line);
-    if (m) return m[1]!;
+    const m = /^#\s+(\S.*)/.exec(line);
+    if (m) return m[1]!.trimEnd();
   }
   return null;
 }

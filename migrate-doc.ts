@@ -11,7 +11,7 @@
 // untouched except for the removed section. Run `okf index` + `okf validate`
 // afterwards. This module is the pure per-doc step; migrate.ts is the driver.
 
-import { extractCitationsSection, isPlainObject, sourceId, str, type FM } from "./lib";
+import { extractCitationsSection, isPlainObject, listItemText, sourceId, str, type FM } from "./lib";
 
 /** Migrate one concept doc; null when nothing changes. */
 export function migrateDoc(fm: FM, body: string, by: string): { fm: FM; body: string; notes: string[] } | null {
@@ -76,7 +76,7 @@ export function migrateDoc(fm: FM, body: string, by: string): { fm: FM; body: st
       // Linked items moved to sources: drop exactly those lines; the
       // non-source items (revision hashes, prose) keep the heading.
       const dropped = new Set(moved.map((i) => i.raw));
-      const keptLines = lines.filter((l, i) => !(i > start && i < end && dropped.has((/^\s*[-*+]\s+(.*\S)\s*$/.exec(l) ?? [])[1] ?? "")));
+      const keptLines = lines.filter((l, i) => !(i > start && i < end && dropped.has(listItemText(l) ?? "")));
       nextBody = keptLines.join("\n");
       notes.push(`${kept.length} Citations item(s) are not sources, left in place: ${kept.map((k) => `"${k}"`).join(", ")}`);
     } else if (!kept.length && (moved.length || cites.items.length === 0)) {

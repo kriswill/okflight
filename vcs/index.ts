@@ -3,8 +3,7 @@
 // toplevel) because the config file names are its domain; this module turns
 // a chosen root into a provider.
 
-import { realpathSync } from "node:fs";
-import { gitProvider, gitRoot } from "./git";
+import { gitProvider, gitRoot, isGitToplevel } from "./git";
 import { noneProvider } from "./none";
 import type { VcsProvider } from "./types";
 
@@ -23,7 +22,7 @@ export type { VcsProvider };
 export function createProvider(kind: "auto" | "git" | "none", root: string, ignore: string[]): VcsProvider {
   if (kind === "none") return noneProvider(root, ignore);
   const top = gitRoot(root);
-  const same = top !== null && realpathSync(top) === realpathSync(root);
+  const same = top !== null && isGitToplevel(root);
   if (same) return gitProvider(root);
   if (kind === "git")
     throw new Error(

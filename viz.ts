@@ -31,7 +31,7 @@ import {
   titleFromSlug,
   TRUST_TIERS,
   trustTier,
-  walkMd,
+  bundleFilter, walkMd,
 } from "./lib";
 import { layout3d } from "./layout3d";
 import { collectLicenses, generatorInfo, OPTIONAL_DEPS, packageDir } from "./licenses";
@@ -95,6 +95,7 @@ const lap = (name: string) => {
 // defaults (no facet filters, alphabetical types, flat legend).
 const { root: repo, bundle, cfg: okfCfg, vcs } = loadContext();
 const cfg = okfCfg.viz;
+const inBundle = bundleFilter(cfg.bundle.include, cfg.bundle.exclude);
 // --math: one-off override of display.math — KaTeX in, whatever the TOML says.
 if (argv.includes("--math")) cfg.display.math = true;
 const math = cfg.display.math;
@@ -112,7 +113,7 @@ const nodes: Node[] = [];
 const edges: { s: string; t: string }[] = [];
 const ids = new Set<string>();
 
-for (const rel of walkMd(bundle)) {
+for (const rel of walkMd(bundle, inBundle)) {
   if (reserved.has(rel.split("/").pop()!)) continue;
   const doc = parseDoc(bundle, rel);
   const id = rel.replace(/\.md$/, "");
@@ -191,7 +192,7 @@ if (existsSync(join(bundle, "index.md"))) {
 }
 
 const bundles: Record<string, RootDoc> = {};
-for (const rel of walkMd(bundle)) {
+for (const rel of walkMd(bundle, inBundle)) {
   if (!rel.endsWith("/index.md")) continue;
   if (ids.has(rel.replace(/\.md$/, ""))) continue; // unreserved index = a node, never a dir card
   const doc = parseDoc(bundle, rel);

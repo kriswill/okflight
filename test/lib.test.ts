@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
   asVerifiedList,
+  bundleFilter,
   extractCitationsSection,
   extractFootnoteDefs,
   extractFootnoteRefs,
@@ -338,6 +339,52 @@ describe("extractCitationsSection — prefixed items (dotfiles shapes)", () => {
 describe("footnote refs ignore inline code (viewer parity)", () => {
   test("a [^id] inside backticks is prose about footnotes, not a citation", () => {
     expect(extractFootnoteRefs("write `…documented.[^manual]` to cite; real one here[^real]\n\n[^real]: r\n")).toEqual(["real"]);
+  });
+});
+
+describe("[bundle] include / exclude", () => {
+  test("doc: include narrows (none = all), exclude wins", () => {
+    const f = bundleFilter(["wiki/**", "sources/**"], ["sources/drafts/**", "**/scratch.md"]);
+    expect(f.doc("wiki/a.md")).toBe(true);
+    expect(f.doc("sources/web/b.md")).toBe(true);
+    expect(f.doc("TASKS.md")).toBe(false);
+    expect(f.doc("projects/x/notes.md")).toBe(false);
+    expect(f.doc("sources/drafts/c.md")).toBe(false);
+    expect(f.doc("wiki/sub/scratch.md")).toBe(false);
+    expect(bundleFilter().doc("anything/at/all.md")).toBe(true);
+    expect(bundleFilter([], ["memory/**"]).doc("memory/m.md")).toBe(false);
+  });
+
+  test("dir: prunes only trees that cannot hold a match", () => {
+    const f = bundleFilter(["wiki/**", "sources/web/*.md"], ["sources/web/old/**"]);
+    expect(f.dir("wiki")).toBe(true);
+    expect(f.dir("wiki/deep/er")).toBe(true);
+    expect(f.dir("sources")).toBe(true); // on the way to sources/web
+    expect(f.dir("sources/web")).toBe(true);
+    expect(f.dir("sources/web/old")).toBe(false); // X/** excludes the whole tree
+    expect(f.dir("projects")).toBe(false); // off every include's literal path
+    // a leading wildcard has no literal path, so nothing is pruned for it
+    expect(bundleFilter(["**/*.md"]).dir("projects")).toBe(true);
+    // a non-/** exclude never prunes: deeper files may still be in
+    expect(bundleFilter([], ["projects/*"]).dir("projects")).toBe(true);
+  });
+
+  test("walkMd applies the filter and never descends into pruned trees", () => {
+    const dir = mkdtempSync(join(tmpdir(), "okf-incl-"));
+    try {
+      for (const p of ["wiki/a.md", "wiki/sub/b.md", "sources/web/c.md", "projects/p/d.md", "TASKS.md"]) {
+        mkdirSync(join(dir, ...p.split("/").slice(0, -1)), { recursive: true });
+        writeFileSync(join(dir, ...p.split("/")), "---\ntype: T\n---\n");
+      }
+      const f = bundleFilter(["wiki/**", "sources/**"]);
+      const seen: string[] = [];
+      const spy = { doc: f.doc, dir: (rel: string) => (seen.push(rel), f.dir(rel)) };
+      expect(walkMd(dir, spy).map((r) => r.split("\\").join("/"))).toEqual(["sources/web/c.md", "wiki/a.md", "wiki/sub/b.md"]);
+      expect(seen.map((r) => r.split("\\").join("/"))).not.toContain("projects/p");
+      expect(walkMd(dir)).toHaveLength(5);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

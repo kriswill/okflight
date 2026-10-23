@@ -45,15 +45,49 @@ export function relUnder(root: string, abs: string): string | null {
   return sep === "/" ? r : r.split(sep).join("/");
 }
 
-/** All .md files under root, as sorted bundle-relative paths. */
-export function walkMd(root: string): string[] {
+/** The `[bundle] include` / `exclude` globs as one filter over
+ *  bundle-relative paths. `doc`: is this .md part of the bundle (matches an
+ *  include, or there are none, and matches no exclude). `dir`: may anything
+ *  under this directory be — false only when that is certain, so a walk can
+ *  skip whole trees (a repo-root bundle limited to a few directories never
+ *  descends into the rest). */
+export interface BundleFilter {
+  doc(rel: string): boolean;
+  dir(rel: string): boolean;
+}
+
+export function bundleFilter(include: readonly string[] = [], exclude: readonly string[] = []): BundleFilter {
+  const inc = include.map((g) => new Bun.Glob(g));
+  const exc = exclude.map((g) => new Bun.Glob(g));
+  // Each include's literal leading directories: a directory off every one of
+  // those paths can hold no match.
+  const prefixes = include.map((g) => {
+    const segs = g.split("/");
+    const wild = segs.findIndex((s) => /[*?[\]{}!]/.test(s));
+    return (wild === -1 ? segs.slice(0, -1) : segs.slice(0, wild)).join("/");
+  });
+  // `X/**` excludes everything under a directory matching X.
+  const excDirs = exclude.filter((g) => g.endsWith("/**")).map((g) => new Bun.Glob(g.slice(0, -3)));
+  return {
+    doc: (rel) => (!inc.length || inc.some((g) => g.match(rel))) && !exc.some((g) => g.match(rel)),
+    dir: (rel) =>
+      !excDirs.some((g) => g.match(rel)) &&
+      (!prefixes.length || prefixes.some((p) => !p || p === rel || rel.startsWith(p + "/") || p.startsWith(rel + "/"))),
+  };
+}
+
+/** All .md files under root, as sorted bundle-relative paths, limited by
+ *  `filter` (the `[bundle] include` / `exclude` globs) when given. */
+export function walkMd(root: string, filter?: BundleFilter): string[] {
   const out: string[] = [];
   const walk = (dir: string) => {
     for (const entry of readdirSync(dir).sort()) {
       if (entry.startsWith(".") || entry.startsWith("_")) continue;
       const abs = join(dir, entry);
-      if (statSync(abs).isDirectory()) walk(abs);
-      else if (entry.endsWith(".md")) out.push(relUnder(root, abs)!);
+      const rel = relUnder(root, abs)!;
+      if (statSync(abs).isDirectory()) {
+        if (!filter || filter.dir(rel)) walk(abs);
+      } else if (entry.endsWith(".md") && (!filter || filter.doc(rel))) out.push(rel);
     }
   };
   walk(root);

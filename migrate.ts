@@ -4,7 +4,7 @@
 
 import { writeFileSync } from "node:fs";
 import { loadContext } from "./config-cli";
-import { c, fmToYaml, isActor, OKF_VERSION, parseDoc, walkMd, type FM } from "./lib";
+import { c, fmToYaml, isActor, OKF_VERSION, parseDoc, bundleFilter, walkMd, type FM } from "./lib";
 import { migrateDoc } from "./migrate-doc";
 import { resolveActor } from "./scaffold-api";
 
@@ -20,7 +20,7 @@ if (!isActor(actor)) {
 
 const changes: { rel: string; notes: string[]; next: string }[] = [];
 const leftovers: string[] = [];
-for (const rel of walkMd(bundle)) {
+for (const rel of walkMd(bundle, bundleFilter(cfg.viz.bundle.include, cfg.viz.bundle.exclude))) {
   const doc = parseDoc(bundle, rel);
   const base = rel.split("/").pop()!;
   if (doc.fmError) {

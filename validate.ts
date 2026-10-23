@@ -48,6 +48,7 @@ import {
   STATUSES,
   str,
   SUPPORTED_OKF_VERSIONS,
+  bundleFilter,
   walkMd,
 } from "./lib";
 
@@ -271,7 +272,7 @@ function hasComputationFence(body: string): boolean {
   return false;
 }
 
-const files = walkMd(bundle);
+const files = walkMd(bundle, bundleFilter(cfg.viz.bundle.include, cfg.viz.bundle.exclude));
 // Concept ids, for resolving frontmatter link fields ([bundle] link-fields).
 const linkFields = cfg.viz.bundle.linkFields;
 const conceptIds = new Set(files.filter((f) => !reserved.has(f.split("/").pop()!)).map((f) => f.slice(0, -3)));

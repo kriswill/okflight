@@ -44,7 +44,7 @@ describe("normalizeVizConfig", () => {
   test("empty/undefined input yields generic defaults", () => {
     for (const raw of [undefined, null, {}]) {
       const c = normalizeVizConfig(raw);
-      expect(c.bundle).toEqual({ dir: "knowledge", out: "viz.html", linkFields: [] });
+      expect(c.bundle).toEqual({ dir: "knowledge", out: "viz.html", include: [], exclude: [], linkFields: [] });
       expect(c.display.badge).toBe("OKFlight");
       expect(c.display.fallbackName).toBe("OKF bundle");
       expect(c.display.name).toBeNull();
@@ -110,6 +110,17 @@ describe("normalizeVizConfig", () => {
     expect(() => normalizeVizConfig({ facet: { platform: { bogus: 1 } } }, { strict: true })).toThrow(
       /facet\.platform\.bogus: unknown key/,
     );
+  });
+
+  test("bundle include/exclude: string lists, bundle-relative only", () => {
+    const c = normalizeVizConfig({ bundle: { include: ["wiki/**"], exclude: ["wiki/drafts/**"] } }, { strict: true });
+    expect(c.bundle.include).toEqual(["wiki/**"]);
+    expect(c.bundle.exclude).toEqual(["wiki/drafts/**"]);
+    expect(() => normalizeVizConfig({ bundle: { include: "wiki/**" } }, { strict: true })).toThrow(VizConfigError);
+    expect(() => normalizeVizConfig({ bundle: { include: ["../up/**"] } }, { strict: true })).toThrow(
+      /bundle\.include: '\.\.\/up\/\*\*' must be a bundle-relative glob/,
+    );
+    expect(() => normalizeVizConfig({ bundle: { exclude: ["/abs/**"] } }, { strict: true })).toThrow(/bundle\.exclude/);
   });
 
   test("bundle link-fields: a list of frontmatter keys", () => {

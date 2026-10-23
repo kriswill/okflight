@@ -29,7 +29,7 @@ jobs:
 
       - uses: DeterminateSystems/determinate-nix-action@96c5ee93a9dddf2830d31e1da6ec719077336c28 # v3.23.3
 
-      - uses: DeterminateSystems/flakehub-cache-action@83293488abfd33fbfb2ab084097467491c029962 # main 2026-07
+      - uses: DeterminateSystems/flakehub-cache-action@5a904648441896ace9bab97c70b321339eb127ed # main 2026-07
 
       - run: nix build .#okf -L
 

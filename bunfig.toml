@@ -10,3 +10,9 @@ printWidth = 120
 # Markdown keeps its compact hand-written tables. test/fixtures holds test
 # inputs, some of them generated, so formatting would change what is tested.
 ignorePatterns = ["*.md", "test/fixtures/"]
+# Components: "strict" stops the formatter adding or removing whitespace
+# around text and inline tags. It can still turn an existing space into a
+# line break, which renders the same but shows up in textContent.
+[[fmt.overrides]]
+files = ["*.svelte"]
+options = { htmlWhitespaceSensitivity = "strict" }

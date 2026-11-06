@@ -20,7 +20,11 @@ const fovsRad = (fovDeg: number, aspect: number) => {
  *  whole bounding sphere fits both the vertical and horizontal FOV. The
  *  layout is not origin-centered, so a fixed camera leaves the graph small
  *  and off-center. */
-export function fitView(nodes: FlyNode[], fovDeg: number, aspect: number): { pos: THREE.Vector3; target: THREE.Vector3 } {
+export function fitView(
+  nodes: FlyNode[],
+  fovDeg: number,
+  aspect: number,
+): { pos: THREE.Vector3; target: THREE.Vector3 } {
   const center = new THREE.Vector3();
   for (const n of nodes) center.add(new THREE.Vector3(n.x, n.y, n.z));
   center.multiplyScalar(1 / Math.max(1, nodes.length));
@@ -60,7 +64,10 @@ export function flyTarget(
   }
   if (dir.lengthSq() < 1) dir.copy(camPos).sub(curTarget);
   if (dir.lengthSq() < 1) dir.set(0, 0.2, 1);
-  dir.normalize().setY(dir.y + 0.25).normalize();
+  dir
+    .normalize()
+    .setY(dir.y + 0.25)
+    .normalize();
 
   // Hold the current zoom level rather than flying to a fixed framing
   // distance; only back off as far as needed to keep every direct

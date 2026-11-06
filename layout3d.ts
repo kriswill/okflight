@@ -3,7 +3,11 @@
 // layout3d computes server-side and the UI never simulates). ~100 nodes needs
 // no Barnes-Hut; plain O(n²) repulsion converges in milliseconds.
 
-export interface P3 { x: number; y: number; z: number }
+export interface P3 {
+  x: number;
+  y: number;
+  z: number;
+}
 
 export function layout3d(ids: string[], edges: { s: string; t: string }[]): Map<string, P3> {
   const n = ids.length;
@@ -32,12 +36,16 @@ export function layout3d(ids: string[], edges: { s: string; t: string }[]): Map<
   // satellites cluster tightly around their hub, and each edge's pull lands
   // mostly on its lower-degree endpoint so hubs anchor while leaves travel.
   const deg = new Array<number>(n).fill(0);
-  for (const [a, b] of pairs) { deg[a]++; deg[b]++; }
+  for (const [a, b] of pairs) {
+    deg[a]++;
+    deg[b]++;
+  }
   const REST = 110;
   const springs = pairs.map(([a, b]) => {
     const lo = Math.min(deg[a], deg[b]);
     return {
-      a, b,
+      a,
+      b,
       k: 0.012 / Math.min(lo, 6),
       rest: REST * (0.5 + 0.18 * Math.min(lo, 5)),
       bias: deg[a] / (deg[a] + deg[b]),
@@ -57,9 +65,15 @@ export function layout3d(ids: string[], edges: { s: string; t: string }[]): Map<
         const d2 = dx * dx + dy * dy + dz * dz || 1;
         if (d2 < 400 * 400) {
           const f = (150 * mass[i] * mass[j]) / d2;
-          dx *= f; dy *= f; dz *= f;
-          vel[i * 3] += dx; vel[i * 3 + 1] += dy; vel[i * 3 + 2] += dz;
-          vel[j * 3] -= dx; vel[j * 3 + 1] -= dy; vel[j * 3 + 2] -= dz;
+          dx *= f;
+          dy *= f;
+          dz *= f;
+          vel[i * 3] += dx;
+          vel[i * 3 + 1] += dy;
+          vel[i * 3 + 2] += dz;
+          vel[j * 3] -= dx;
+          vel[j * 3 + 1] -= dy;
+          vel[j * 3 + 2] -= dz;
         }
       }
     }
@@ -69,9 +83,14 @@ export function layout3d(ids: string[], edges: { s: string; t: string }[]): Map<
       const dz = pos[b * 3 + 2] - pos[a * 3 + 2];
       const d = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
       const f = ((d - rest) * k) / d;
-      const fa = f * (1 - bias), fb = f * bias;
-      vel[a * 3] += dx * fa; vel[a * 3 + 1] += dy * fa; vel[a * 3 + 2] += dz * fa;
-      vel[b * 3] -= dx * fb; vel[b * 3 + 1] -= dy * fb; vel[b * 3 + 2] -= dz * fb;
+      const fa = f * (1 - bias),
+        fb = f * bias;
+      vel[a * 3] += dx * fa;
+      vel[a * 3 + 1] += dy * fa;
+      vel[a * 3 + 2] += dz * fa;
+      vel[b * 3] -= dx * fb;
+      vel[b * 3 + 1] -= dy * fb;
+      vel[b * 3 + 2] -= dz * fb;
     }
     for (let i = 0; i < n; i++) {
       vel[i * 3] -= pos[i * 3] * 0.004;
@@ -80,7 +99,9 @@ export function layout3d(ids: string[], edges: { s: string; t: string }[]): Map<
       pos[i * 3] += vel[i * 3] * alpha;
       pos[i * 3 + 1] += vel[i * 3 + 1] * alpha;
       pos[i * 3 + 2] += vel[i * 3 + 2] * alpha;
-      vel[i * 3] *= 0.6; vel[i * 3 + 1] *= 0.6; vel[i * 3 + 2] *= 0.6;
+      vel[i * 3] *= 0.6;
+      vel[i * 3 + 1] *= 0.6;
+      vel[i * 3 + 2] *= 0.6;
     }
     alpha = Math.max(alpha * 0.995, 0.01);
   }

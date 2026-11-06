@@ -58,8 +58,9 @@ if (typeof Bun !== "undefined") {
   // .bin shims as a fallback: nested (global installs) and flat layouts, the
   // flat one three levels up because this package is scoped
   // (node_modules/@kriswill/okflight/bin/).
-  const shims = ["../node_modules/.bin/bun", "../../../.bin/bun"]
-    .map((rel) => fileURLToPath(new URL(rel + (isWin ? ".cmd" : ""), import.meta.url)));
+  const shims = ["../node_modules/.bin/bun", "../../../.bin/bun"].map((rel) =>
+    fileURLToPath(new URL(rel + (isWin ? ".cmd" : ""), import.meta.url)),
+  );
   const local = placeholder ? [] : [...(pkgBun ? [pkgBun] : []), ...shims].filter((p) => existsSync(p));
   for (const bun of ["bun", ...local]) {
     // .cmd shims need a shell; node refuses to spawn them directly.

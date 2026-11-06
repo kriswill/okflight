@@ -17,14 +17,16 @@ const commands: Record<string, Cmd> = {
     file: "./init.ts",
     args: "[--dir=<dir>]",
     brief: "create a starter okflight.toml + skeleton here",
-    summary: "Bootstrap an okf workspace in the current directory: a commented starter okflight.toml (this directory becomes the workspace root) plus the bundle skeleton (<dir>/index.md declaring okf_version 0.2, <dir>/log.md). Never overwrites — re-running on an initialized workspace is a no-op. For the full guided integration (agent skill, scaffold scripts, gitignore) use setup.",
+    summary:
+      "Bootstrap an okf workspace in the current directory: a commented starter okflight.toml (this directory becomes the workspace root) plus the bundle skeleton (<dir>/index.md declaring okf_version 0.2, <dir>/log.md). Never overwrites — re-running on an initialized workspace is a no-op. For the full guided integration (agent skill, scaffold scripts, gitignore) use setup.",
     flags: [["--dir=<dir>", "bundle directory for the new workspace (default: knowledge)"]],
   },
   setup: {
     file: "./setup.ts",
     args: "[--dir=<dir>] [--yes] …",
     brief: "guided integration: config, skill, scaffolding",
-    summary: "Integrate okflight into the current directory, wizard-style (interactive on a TTY — Enter accepts defaults; every question also has a flag, so agents/CI run it non-interactively): everything init writes, plus the knowledge-bundle agent skill (<skills-dir>/knowledge-bundle/SKILL.md), a repo-owned scaffold-scripts starter (<dir>/_okflight/scripts/ wired into [scaffold] script), and a .gitignore entry for the generated viz. Never overwrites — re-running reports what already exists.",
+    summary:
+      "Integrate okflight into the current directory, wizard-style (interactive on a TTY — Enter accepts defaults; every question also has a flag, so agents/CI run it non-interactively): everything init writes, plus the knowledge-bundle agent skill (<skills-dir>/knowledge-bundle/SKILL.md), a repo-owned scaffold-scripts starter (<dir>/_okflight/scripts/ wired into [scaffold] script), and a .gitignore entry for the generated viz. Never overwrites — re-running reports what already exists.",
     flags: [
       ["--dir=<dir>", "bundle directory (default: knowledge)"],
       ["--title=<t>", 'viz display title (default: "OKF knowledge graph")'],
@@ -39,38 +41,51 @@ const commands: Record<string, Cmd> = {
     file: "./scaffold.ts",
     args: "[--force]",
     brief: "stub concept docs from the workspace sources",
-    summary: "Run the workspace's scaffold hooks from okflight.toml [scaffold]: a repo-owned script (dynamically imported with the ScaffoldContext API) and/or command (spawned with OKF_* env), then the declarative [[scaffold.collect]] entries (glob + templates). Idempotent: existing docs are never touched, so hand enrichment survives re-runs.",
+    summary:
+      "Run the workspace's scaffold hooks from okflight.toml [scaffold]: a repo-owned script (dynamically imported with the ScaffoldContext API) and/or command (spawned with OKF_* env), then the declarative [[scaffold.collect]] entries (glob + templates). Idempotent: existing docs are never touched, so hand enrichment survives re-runs.",
     flags: [["--force", "overwrite existing docs with fresh stubs (discards enrichment)"]],
   },
   index: {
     file: "./index-gen.ts",
     args: "",
     brief: "regenerate index.md listings",
-    summary: "Regenerate every index.md listing (OKF progressive disclosure). The hand-written blurb above the first heading is preserved; listings are rebuilt.",
+    summary:
+      "Regenerate every index.md listing (OKF progressive disclosure). The hand-written blurb above the first heading is preserved; listings are rebuilt.",
     flags: [],
   },
   validate: {
     file: "./validate.ts",
     args: "[--strict]",
     brief: "check conformance + links; exit 1 on errors",
-    summary: "Check OKF v0.2 + profile conformance: frontmatter, required fields, reserved files, link style, dangling links, and — when present — the trust, lifecycle, provenance and Attested Computation families (generated/verified actors and datetimes, status, stale_after, sources + footnote attribution, runtime/parameters/computation/executor/attester). v0.1 leftovers (timestamp, a body Citations list) warn and point at migrate. The profile policy comes from okflight.toml [profile]. Exits 1 on errors.",
-    flags: [["--strict", "treat warnings (missing recommended fields, dangling links, v0.1 leftovers, stale content) as errors"]],
+    summary:
+      "Check OKF v0.2 + profile conformance: frontmatter, required fields, reserved files, link style, dangling links, and — when present — the trust, lifecycle, provenance and Attested Computation families (generated/verified actors and datetimes, status, stale_after, sources + footnote attribution, runtime/parameters/computation/executor/attester). v0.1 leftovers (timestamp, a body Citations list) warn and point at migrate. The profile policy comes from okflight.toml [profile]. Exits 1 on errors.",
+    flags: [
+      [
+        "--strict",
+        "treat warnings (missing recommended fields, dangling links, v0.1 leftovers, stale content) as errors",
+      ],
+    ],
   },
   migrate: {
     file: "./migrate.ts",
     args: "[--write] [--actor=<actor>]",
     brief: "upgrade v0.1 docs to v0.2 (dry run; --write)",
-    summary: "Rewrite v0.1 concept docs in the OKF v0.2 shape (SPEC §13.1): frontmatter `timestamp` becomes `generated: { by: <actor>, at: <timestamp> }`, a body Citations list becomes `sources` entries (linked items only — revision hashes and prose stay put and are reported), and the root index.md okf_version is bumped. Idempotent and dry-run by default; unknown frontmatter keys are preserved. Run index + validate afterwards.",
+    summary:
+      "Rewrite v0.1 concept docs in the OKF v0.2 shape (SPEC §13.1): frontmatter `timestamp` becomes `generated: { by: <actor>, at: <timestamp> }`, a body Citations list becomes `sources` entries (linked items only — revision hashes and prose stay put and are reported), and the root index.md okf_version is bumped. Idempotent and dry-run by default; unknown frontmatter keys are preserved. Run index + validate afterwards.",
     flags: [
       ["--write", "apply the changes (default: print what would change)"],
-      ["--actor=<actor>", "generated.by for migrated docs (default: okflight.toml [scaffold] actor, else okflight/<version>)"],
+      [
+        "--actor=<actor>",
+        "generated.by for migrated docs (default: okflight.toml [scaffold] actor, else okflight/<version>)",
+      ],
     ],
   },
   viz: {
     file: "./viz.ts",
     args: "[--math] [--check] [--perf]",
     brief: "render the 3D graph at {viz-out}",
-    summary: "Render the bundle as a self-contained interactive 3D graph at {viz-out} (gitignored) — a Svelte 5 viewer around Three.js glow spheres with bloom, orbit camera with fly-to, frozen generation-time layout. Referenced source files are embedded with syntax highlighting; resource paths and file links open an in-panel preview, referenced directories open a browsable listing of their tracked files, and revision citations verified against the workspace link out to the forge (vcs.commit-url-template). LaTeX math in concept bodies (inline $…$ or \\(…\\), display $…$ or \\[…\\]) renders with KaTeX when display.math is on in okflight.toml or --math is passed — opt-in, since the renderer plus inlined fonts add ~1.3 MB to the page. Workspace strings and settings (header/title, facet filters, type taxonomy and legend groups, embed cap, bundle dir) come from the optional okflight.toml; without it the viewer builds with generic fallbacks. Build-phase timings print on every run; the page records startup marks on window.__okf.perf.",
+    summary:
+      "Render the bundle as a self-contained interactive 3D graph at {viz-out} (gitignored) — a Svelte 5 viewer around Three.js glow spheres with bloom, orbit camera with fly-to, frozen generation-time layout. Referenced source files are embedded with syntax highlighting; resource paths and file links open an in-panel preview, referenced directories open a browsable listing of their tracked files, and revision citations verified against the workspace link out to the forge (vcs.commit-url-template). LaTeX math in concept bodies (inline $…$ or \\(…\\), display $…$ or \\[…\\]) renders with KaTeX when display.math is on in okflight.toml or --math is passed — opt-in, since the renderer plus inlined fonts add ~1.3 MB to the page. Workspace strings and settings (header/title, facet filters, type taxonomy and legend groups, embed cap, bundle dir) come from the optional okflight.toml; without it the viewer builds with generic fallbacks. Build-phase timings print on every run; the page records startup marks on window.__okf.perf.",
     flags: [
       ["--math", "render LaTeX math with KaTeX (overrides display.math; adds ~1.3 MB)"],
       ["--check", "typecheck the viewer app (bun check, then svelte-check) instead of building"],
@@ -108,8 +123,7 @@ function wrap(text: string, indent: number, width = 78): string {
 async function helpSubst(): Promise<(s: string) => string> {
   const { quietBundleInfo } = await import("./config-cli");
   const b = quietBundleInfo();
-  const sub = (s: string) =>
-    s.split("{viz-out}").join(`${b.dir}/${b.out}`).split("{bundle}").join(b.dir);
+  const sub = (s: string) => s.split("{viz-out}").join(`${b.dir}/${b.out}`).split("{bundle}").join(b.dir);
   (helpSubst as { profileDoc?: string | null }).profileDoc = b.profileDoc;
   return sub;
 }

@@ -148,7 +148,10 @@ try {
   p = await probe(page);
   check("selection recorded", p.selected === hubIdx);
   check("panel open shifts the projection right of center", p.viewOffsetX === 100, `got ${p.viewOffsetX}`);
-  check("fly lands the target on the node", Math.hypot(p.target.x - p.camPos.x, p.target.y - p.camPos.y) >= 0 && p.flying === false);
+  check(
+    "fly lands the target on the node",
+    Math.hypot(p.target.x - p.camPos.x, p.target.y - p.camPos.y) >= 0 && p.flying === false,
+  );
   const hubPx = await project(page, "hub");
   // Viewport 1400, sidebar 260, open panel 460 -> clear-strip center at
   // ((1400 + 260 - 460) / 2, 900 / 2). Same 600 the cards view converges on.

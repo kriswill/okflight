@@ -91,9 +91,7 @@ const firstMatch = (src: string, re: RegExp): string | null => {
 
 function leadingComment(src: string, marker: string | RegExp): string | null {
   const re =
-    typeof marker === "string"
-      ? new RegExp(`^${marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s?(.*)$`)
-      : marker;
+    typeof marker === "string" ? new RegExp(`^${marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s?(.*)$`) : marker;
   const lines: string[] = [];
   for (const line of src.split("\n")) {
     const m = line.match(re);

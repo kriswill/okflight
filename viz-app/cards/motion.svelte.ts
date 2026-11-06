@@ -160,8 +160,7 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
   const computeLimits = (layout: CardLayout) => {
     for (const side of ["in", "out"] as const) {
       let maxAbs = 0;
-      for (const c of layout.cards)
-        if (c.lane === side) maxAbs = Math.max(maxAbs, Math.abs(bandOf(c.x, c.y)));
+      for (const c of layout.cards) if (c.lane === side) maxAbs = Math.max(maxAbs, Math.abs(bandOf(c.x, c.y)));
       limits[side] = Math.max(0, maxAbs - fadeStart);
     }
   };
@@ -359,10 +358,12 @@ export function createCardMotion(opts?: { reducedMotion?: () => boolean }) {
       else if (s.effBand <= -(fadeEnd - 1e-6)) counts[s.lane].neg++;
     }
     overflow = (["in", "out"] as const).flatMap((lane) =>
-      ([
-        [-1, counts[lane].neg],
-        [1, counts[lane].pos],
-      ] as const)
+      (
+        [
+          [-1, counts[lane].neg],
+          [1, counts[lane].pos],
+        ] as const
+      )
         .filter(([, count]) => count > 0)
         .map(([dir, count]) => ({ key: `${lane}:${dir}`, lane, dir, count })),
     );

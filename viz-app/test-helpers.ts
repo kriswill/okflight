@@ -66,4 +66,3 @@ export const cfg = (over: Record<string, unknown> = {}) => ({
   },
   ...over,
 });
-

@@ -27,9 +27,11 @@ export function paintNodeColor(c: THREE.Color, rel: SelRel, dimmed: boolean, ctx
     }
     const brightness = (c.r + c.g + c.b) / 3;
     let boost = (1.2 + brightness * 0.8) * 1.875; // bloom feeds on the >1.0 excess
-    if (rel === "hero") boost *= 1.5;             // hero glow
-    else if (rel === "neighbor") boost *= 1.15;   // linked nodes brighten
-    else if (rel === "rest") boost *= 0.4;        // the rest recede
+    if (rel === "hero")
+      boost *= 1.5; // hero glow
+    else if (rel === "neighbor")
+      boost *= 1.15; // linked nodes brighten
+    else if (rel === "rest") boost *= 0.4; // the rest recede
     c.multiplyScalar(boost);
   } else {
     // Ink-on-paper: de-emphasis fades toward the page, never toward black.

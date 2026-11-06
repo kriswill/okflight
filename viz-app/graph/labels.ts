@@ -32,7 +32,11 @@ export function labelVisible(
   return !o.dimmed && (o.top.has(i) || i === o.selected || i === o.hover || o.isNeighbor);
 }
 
-export function makeLabelTexture(text: string, ink: string, stroke: string): { tex: THREE.CanvasTexture; aspect: number } {
+export function makeLabelTexture(
+  text: string,
+  ink: string,
+  stroke: string,
+): { tex: THREE.CanvasTexture; aspect: number } {
   const font = `600 44px system-ui, -apple-system, "Segoe UI", sans-serif`;
   const cv = document.createElement("canvas");
   const ctx = cv.getContext("2d")!;

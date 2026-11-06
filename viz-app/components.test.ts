@@ -30,7 +30,14 @@ const model = () =>
     edges: [{ s: "a", t: "b" }],
     cfg: cfg(),
     files: {
-      "flakes/okf/viz.ts": { html: "<span class=\"tok-k\">const</span>", lines: 3, size: 2048, date: "2026-01-01", lang: "ts", refs: ["a"] },
+      "flakes/okf/viz.ts": {
+        html: '<span class="tok-k">const</span>',
+        lines: 3,
+        size: 2048,
+        date: "2026-01-01",
+        lang: "ts",
+        refs: ["a"],
+      },
       "docs/notes.md": {
         html: "",
         md: "# Notes\nsee [beta](../knowledge/b.md) and [viz](../flakes/okf/viz.ts)",
@@ -652,7 +659,14 @@ describe("DetailPanel", () => {
       ],
       edges: [],
       files: {
-        "flakes/ccglass/flake.nix": { html: "", lines: 12, size: 512, date: "2026-01-02", lang: "nix", refs: ["packages/ccglass"] },
+        "flakes/ccglass/flake.nix": {
+          html: "",
+          lines: 12,
+          size: 512,
+          date: "2026-01-02",
+          lang: "nix",
+          refs: ["packages/ccglass"],
+        },
       },
       dirs: {
         "flakes/ccglass": {
@@ -731,7 +745,11 @@ describe("Sidebar", () => {
 
   test("header falls back to the configured fallback-name, else the generic one", () => {
     const configured = createVizState(
-      buildModel({ nodes: [node("a", "Decision", "Alpha")], edges: [], cfg: { display: { "fallback-name": "knowledge/" } } }),
+      buildModel({
+        nodes: [node("a", "Decision", "Alpha")],
+        edges: [],
+        cfg: { display: { "fallback-name": "knowledge/" } },
+      }),
     );
     mountC(Sidebar, { viz: configured });
     expect(document.querySelector("#side h1")!.textContent!.trim()).toBe("knowledge/");
@@ -802,7 +820,12 @@ const stats: BuildStats = {
 const licenses = [
   { name: "postprocessing", version: "6.0.0", license: "Zlib", text: "This software is provided 'as-is'…" },
   { name: "svelte", version: "5.0.0", license: "MIT", text: "Permission is hereby granted, free of charge…" },
-  { name: "three", version: "0.183.0", license: "MIT", text: "The MIT License\n\nCopyright © 2010-2026 three.js authors" },
+  {
+    name: "three",
+    version: "0.183.0",
+    license: "MIT",
+    text: "The MIT License\n\nCopyright © 2010-2026 three.js authors",
+  },
 ];
 const generator = {
   name: "OKFlight",
@@ -916,7 +939,10 @@ describe("AboutModal", () => {
   });
 
   test("an embed without license data (pre-licenses build) gets the untabbed info layout", () => {
-    mountC(AboutModal, { viz: createVizState(statsModel({ licenses: undefined, generator: undefined })), onClose: () => {} });
+    mountC(AboutModal, {
+      viz: createVizState(statsModel({ licenses: undefined, generator: undefined })),
+      onClose: () => {},
+    });
     expect(document.querySelector(".tabs")).toBeNull();
     expect(document.querySelector("details.lic")).toBeNull();
     expect(document.querySelector(".tool")).toBeNull(); // pre-generator: no Built-with line
@@ -955,21 +981,45 @@ describe("DetailPanel — OKF v0.2 families", () => {
             generated: { by: "reference_agent/gemini-2.5-pro", at: "2026-06-28T14:00:00Z" },
             verified: { by: "human:ahormati", at: "2026-06-25T09:00:00Z" },
             stale_after: "2026-06-15T00:00:00Z",
-            sources: [{ id: "rev-policy", resource: "https://wiki.acme/finance/revenue-recognition", title: "Revenue recognition policy" }],
+            sources: [
+              {
+                id: "rev-policy",
+                resource: "https://wiki.acme/finance/revenue-recognition",
+                title: "Revenue recognition policy",
+              },
+            ],
           },
           body: "# Computation\n\n    SELECT 1\n\nPer the policy.[^rev-policy]\n\n[^rev-policy]: Revenue recognition policy\n",
         }),
-        node("metrics/income", "Metric", "Income", { fm: { type: "Metric", title: "Income", status: "draft" }, body: "See [revenue](../computations/revenue.md)." }),
+        node("metrics/income", "Metric", "Income", {
+          fm: { type: "Metric", title: "Income", status: "draft" },
+          body: "See [revenue](../computations/revenue.md).",
+        }),
       ],
       edges: [{ s: "metrics/income", t: "computations/revenue" }],
       cfg: cfg({
         facets: [
-          { name: "status", values: ["draft", "stable", "deprecated"], ids: { "computations/revenue": "stable", "metrics/income": "draft" } },
-          { name: "trust", values: ["unverified", "machine-confirmed", "human-reviewed"], ids: { "computations/revenue": "human-reviewed", "metrics/income": "unverified" } },
+          {
+            name: "status",
+            values: ["draft", "stable", "deprecated"],
+            ids: { "computations/revenue": "stable", "metrics/income": "draft" },
+          },
+          {
+            name: "trust",
+            values: ["unverified", "machine-confirmed", "human-reviewed"],
+            ids: { "computations/revenue": "human-reviewed", "metrics/income": "unverified" },
+          },
         ],
       }),
       files: {
-        "knowledge/references/attesters/sql-equality.py": { html: "", lines: 1, size: 10, date: "2026-01-02", lang: "python", refs: ["computations/revenue"] },
+        "knowledge/references/attesters/sql-equality.py": {
+          html: "",
+          lines: 1,
+          size: 10,
+          date: "2026-01-02",
+          lang: "python",
+          refs: ["computations/revenue"],
+        },
       },
     });
 
@@ -978,21 +1028,41 @@ describe("DetailPanel — OKF v0.2 families", () => {
     state.selectConcept("computations/revenue");
     mountC(DetailPanel, { viz: state, stageEl: stage() });
     const panel = document.getElementById("panel")!;
-    const rows = Object.fromEntries([...panel.querySelectorAll("table.fm > tbody > tr")].map((tr) => [tr.children[0]!.textContent, tr.children[1]!]));
-    expect(Object.keys(rows)).toEqual(["status", "runtime", "parameters", "executor", "attester", "generated", "verified", "stale_after", "sources"]);
+    const rows = Object.fromEntries(
+      [...panel.querySelectorAll("table.fm > tbody > tr")].map((tr) => [tr.children[0]!.textContent, tr.children[1]!]),
+    );
+    expect(Object.keys(rows)).toEqual([
+      "status",
+      "runtime",
+      "parameters",
+      "executor",
+      "attester",
+      "generated",
+      "verified",
+      "stale_after",
+      "sources",
+    ]);
     expect(rows.status!.querySelector(".fam-chip.status-stable")!.textContent).toBe("stable");
     expect(rows.generated!.textContent).toBe("reference_agent/gemini-2.5-pro · 2026-06-28T14:00:00Z");
     expect(rows.verified!.querySelector(".fam-chip.tier-human-reviewed")).not.toBeNull();
     expect(rows.verified!.querySelector(".actor-human")!.textContent).toBe("humanahormati");
     expect(rows.stale_after!.querySelector(".fam-chip.stale")).not.toBeNull();
     expect(rows.parameters!.querySelector("table.params code")!.textContent).toBe("year");
-    expect(rows.attester!.querySelector('a[data-file="knowledge/references/attesters/sql-equality.py"]')).not.toBeNull();
+    expect(
+      rows.attester!.querySelector('a[data-file="knowledge/references/attesters/sql-equality.py"]'),
+    ).not.toBeNull();
     expect(rows.executor!.querySelector("code")!.textContent).toBe("references/skills/run-on-bq.md"); // not embedded: plain
-    expect(rows.sources!.querySelector('table.sources a[href="https://wiki.acme/finance/revenue-recognition"]')!.textContent).toBe("Revenue recognition policy");
+    expect(
+      rows.sources!.querySelector('table.sources a[href="https://wiki.acme/finance/revenue-recognition"]')!.textContent,
+    ).toBe("Revenue recognition policy");
     expect(panel.textContent).not.toContain("[object Object]");
     const sup = panel.querySelector('#body-md sup.fn a[data-fn="rev-policy"]')!;
     expect(sup.textContent).toBe("1");
-    expect(panel.querySelector('#body-md .footnotes li[data-fn-target="rev-policy"] a[href="https://wiki.acme/finance/revenue-recognition"]')).not.toBeNull();
+    expect(
+      panel.querySelector(
+        '#body-md .footnotes li[data-fn-target="rev-policy"] a[href="https://wiki.acme/finance/revenue-recognition"]',
+      ),
+    ).not.toBeNull();
     // Clicking the mark is an in-panel scroll, never a navigation.
     (sup as HTMLElement).click();
     flushSync();
@@ -1004,7 +1074,16 @@ describe("DetailPanel — OKF v0.2 families", () => {
     expect(state.model.facets.map((f) => f.name)).toEqual(["status", "trust"]);
     mountC(FacetControls, { viz: state });
     const segs = [...document.querySelectorAll(".facet .seg")].map((b) => b.textContent);
-    expect(segs).toEqual(["all", "draft", "stable", "deprecated", "all", "unverified", "machine-confirmed", "human-reviewed"]);
+    expect(segs).toEqual([
+      "all",
+      "draft",
+      "stable",
+      "deprecated",
+      "all",
+      "unverified",
+      "machine-confirmed",
+      "human-reviewed",
+    ]);
     state.setFacet("trust", "human-reviewed");
     expect(state.visibleSorted.map((n) => n.id)).toEqual(["computations/revenue"]);
   });

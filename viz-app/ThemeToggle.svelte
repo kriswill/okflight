@@ -27,8 +27,8 @@
   aria-label={label}
   title={label}
   style:right={rightPx + "px"}
-  onclick={() => viz.setTheme(isDark ? 0 : 1)}
->{isDark ? "☀" : "☾"}</button>
+  onclick={() => viz.setTheme(isDark ? 0 : 1)}>{isDark ? "☀" : "☾"}</button
+>
 
 <style>
   .theme-toggle {

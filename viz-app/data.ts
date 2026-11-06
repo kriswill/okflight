@@ -256,7 +256,11 @@ export function parsePackagePlatforms(nixSource: string, guards: Record<string, 
  * fall-through — the author explicitly tagged it) -> `types[type]` ->
  * undefined ("unresolved" — always visible for this facet).
  */
-export function facetValueOf(node: ConceptNode, facet: FacetConfig, classifyMap: Record<string, string>): string | undefined {
+export function facetValueOf(
+  node: ConceptNode,
+  facet: FacetConfig,
+  classifyMap: Record<string, string>,
+): string | undefined {
   const id = facet.ids[node.id];
   if (id !== undefined) return id;
   if (facet.classify && facet.classify.types.includes(node.type)) {
@@ -277,7 +281,9 @@ export function facetValueOf(node: ConceptNode, facet: FacetConfig, classifyMap:
  *  handled here too). Underivable shapes yield null; set display.name for
  *  those. */
 export function repoNameFromUrl(url: string | null): string | null {
-  return url?.match(/^(?:https?:\/\/|ssh:\/\/(?:[^@/]+@)?|[^@/:]+@)([^/:]+)(?::\d+)?[/:](.+?)(?:\.git)?\/?$/)?.[2] ?? null;
+  return (
+    url?.match(/^(?:https?:\/\/|ssh:\/\/(?:[^@/]+@)?|[^@/:]+@)([^/:]+)(?::\d+)?[/:](.+?)(?:\.git)?\/?$/)?.[2] ?? null
+  );
 }
 
 export function buildModel(raw: RawData): VizModel {

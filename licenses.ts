@@ -93,7 +93,9 @@ export function collectLicenses(dir: string, omit: Iterable<string> = []): DepLi
         .filter((f) => /^licen[cs]e([.-]|$)/i.test(f))
         .sort((a, b) => a.length - b.length || a.localeCompare(b))[0];
       if (!file)
-        throw new Error(`no license file found in node_modules/${name} — its notice must ship with the copy bundled into the page`);
+        throw new Error(
+          `no license file found in node_modules/${name} — its notice must ship with the copy bundled into the page`,
+        );
       return {
         name,
         version: meta.version ?? "",

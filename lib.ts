@@ -173,9 +173,16 @@ export function lenientScalars(block: string): string {
  *  would read a number, boolean, or date (`title: 2024`, `tags: [2024]`). */
 function coerceStringFields(fm: FM): FM {
   for (const k of ["type", "title", "description", "resource", "timestamp", "okf_version"])
-    if (fm[k] !== undefined && fm[k] !== null && typeof fm[k] !== "string" && !isPlainObject(fm[k]) && !Array.isArray(fm[k]))
+    if (
+      fm[k] !== undefined &&
+      fm[k] !== null &&
+      typeof fm[k] !== "string" &&
+      !isPlainObject(fm[k]) &&
+      !Array.isArray(fm[k])
+    )
       fm[k] = String(fm[k]);
-  if (Array.isArray(fm.tags)) fm.tags = fm.tags.map((t) => (typeof t === "string" || isPlainObject(t) || Array.isArray(t) ? t : String(t)));
+  if (Array.isArray(fm.tags))
+    fm.tags = fm.tags.map((t) => (typeof t === "string" || isPlainObject(t) || Array.isArray(t) ? t : String(t)));
   return fm;
 }
 
@@ -224,7 +231,9 @@ function yamlValueInline(v: unknown): string {
   if (v === null || v === undefined) return "null";
   if (Array.isArray(v)) return `[${v.map(yamlValueInline).join(", ")}]`;
   if (isPlainObject(v))
-    return `{ ${Object.entries(v).map(([k, x]) => `${k}: ${yamlValueInline(x)}`).join(", ")} }`;
+    return `{ ${Object.entries(v)
+      .map(([k, x]) => `${k}: ${yamlValueInline(x)}`)
+      .join(", ")} }`;
   return yamlScalar(String(v));
 }
 
@@ -332,7 +341,11 @@ export function resolvePathField(root: string, docRel: string, value: string): s
  *  own examples write `references/…` from inside `computations/` (Appendix
  *  A). Returns the bundle-relative path that exists, else the doc-relative
  *  candidate (or null if none). */
-export function resolvePathFieldLenient(root: string, docRel: string, value: string): { rel: string | null; exists: boolean } {
+export function resolvePathFieldLenient(
+  root: string,
+  docRel: string,
+  value: string,
+): { rel: string | null; exists: boolean } {
   const rel = resolvePathField(root, docRel, value);
   if (rel !== null && existsSync(join(root, rel))) return { rel, exists: true };
   if (pathKind(value) === "relative" && !value.startsWith(".")) {
@@ -349,7 +362,10 @@ export function resolvePathFieldLenient(root: string, docRel: string, value: str
 export function proseLines(body: string): string[] {
   let inFence = false;
   return body.split("\n").map((line) => {
-    if (FENCE_RE.test(line)) { inFence = !inFence; return ""; }
+    if (FENCE_RE.test(line)) {
+      inFence = !inFence;
+      return "";
+    }
     return inFence ? "" : line;
   });
 }
@@ -377,7 +393,8 @@ export function extractFootnoteRefs(body: string): string[] {
   for (const line of proseLines(body)) {
     if (FOOTNOTE_DEF_RE.test(line)) continue; // a definition, not a use
     // Code spans are literal text — the viewer skips them too (markdown.ts footnoteMarks).
-    for (const m of line.replace(/`[^`]*`/g, "").matchAll(/\[\^([^\]\s]+)\]/g)) if (!out.includes(m[1]!)) out.push(m[1]!);
+    for (const m of line.replace(/`[^`]*`/g, "").matchAll(/\[\^([^\]\s]+)\]/g))
+      if (!out.includes(m[1]!)) out.push(m[1]!);
   }
   return out;
 }
@@ -431,7 +448,10 @@ export function extractCitationsSection(body: string): { items: CitationItem[]; 
     };
     if (link) items.push({ resource: link[2]!, title: label(raw.slice(0, link.index), link[1]!) || link[2]!, raw });
     else if (bare) {
-      const after = raw.slice(bare.index + bare[0].length).replace(/^[\s:—–-]+/, "").trim();
+      const after = raw
+        .slice(bare.index + bare[0].length)
+        .replace(/^[\s:—–-]+/, "")
+        .trim();
       items.push({ resource: bare[1]!, title: label(raw.slice(0, bare.index), "") || after || bare[1]!, raw });
     } else items.push({ resource: null, title: raw, raw });
   }
@@ -448,7 +468,9 @@ export function sourceId(titleOrUrl: string): string {
       const u = new URL(s);
       s = u.hostname.replace(/^www\./, "") + u.pathname;
     }
-  } catch { /* not a URL */ }
+  } catch {
+    /* not a URL */
+  }
   return (
     s
       .toLowerCase()
@@ -464,7 +486,10 @@ export function extractLinks(body: string): string[] {
   const out: string[] = [];
   let inFence = false;
   for (const line of body.split("\n")) {
-    if (/^\s*(```|~~~)/.test(line)) { inFence = !inFence; continue; }
+    if (/^\s*(```|~~~)/.test(line)) {
+      inFence = !inFence;
+      continue;
+    }
     if (inFence) continue;
     for (const m of line.matchAll(/(?<!!)\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g)) out.push(m[1]);
   }
@@ -484,7 +509,13 @@ export function linkFieldValues(fm: FM | null, field: string): string[] {
   const items = Array.isArray(v) ? v : v === undefined || v === null ? [] : [v];
   return items
     .filter((x): x is string => typeof x === "string")
-    .map((x) => x.trim().replace(/^\[\[([^|]*)(?:\|.*)?\]\]$/, "$1").split("#")[0]!.trim())
+    .map((x) =>
+      x
+        .trim()
+        .replace(/^\[\[([^|]*)(?:\|.*)?\]\]$/, "$1")
+        .split("#")[0]!
+        .trim(),
+    )
     .filter(Boolean);
 }
 
@@ -549,7 +580,10 @@ export function resolveLink(root: string, docRel: string, target: string): strin
  *  preserves it across regenerations and parent listings show it as the
  *  directory's description, so it is the durable description source. */
 export function indexBlurb(body: string): string {
-  return body.replace(/^\s*# .*\n/, "").split(/^#{1,6} /m)[0]!.trim();
+  return body
+    .replace(/^\s*# .*\n/, "")
+    .split(/^#{1,6} /m)[0]!
+    .trim();
 }
 
 /** First ATX `# heading` text in a markdown body, skipping fenced code
@@ -558,7 +592,10 @@ export function indexBlurb(body: string): string {
 export function firstHeading(body: string): string | null {
   let inFence = false;
   for (const line of body.split("\n")) {
-    if (/^\s*(```|~~~)/.test(line)) { inFence = !inFence; continue; }
+    if (/^\s*(```|~~~)/.test(line)) {
+      inFence = !inFence;
+      continue;
+    }
     if (inFence) continue;
     const m = /^#\s+(\S.*)/.exec(line);
     if (m) return m[1]!.trimEnd();

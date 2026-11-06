@@ -156,23 +156,17 @@ export function createMd({
           return seg;
         }
         if (inA) return seg;
-        return seg.replace(
-          /(^|[\s(])((?:\.\/)?(?:[\w.-]+\/)+[\w.-]+\.[A-Za-z0-9]{1,6})/g,
-          (m, pre, p) => {
-            const rel = p.replace(/^\.\//, "");
-            return files[rel] ? `${pre}<a href="#" data-file="${rel}">${p}</a>` : m;
-          },
-        );
+        return seg.replace(/(^|[\s(])((?:\.\/)?(?:[\w.-]+\/)+[\w.-]+\.[A-Za-z0-9]{1,6})/g, (m, pre, p) => {
+          const rel = p.replace(/^\.\//, "");
+          return files[rel] ? `${pre}<a href="#" data-file="${rel}">${p}</a>` : m;
+        });
       })
       .join("");
   }
 
   const inlineRaw = (s: string, dir: string[]) =>
     esc(s)
-      .replace(
-        /&lt;(https?:\/\/(?:[^&\s]|&amp;)+)&gt;/g,
-        '<a href="$1" target="_blank" rel="noopener">$1</a>',
-      )
+      .replace(/&lt;(https?:\/\/(?:[^&\s]|&amp;)+)&gt;/g, '<a href="$1" target="_blank" rel="noopener">$1</a>')
       .replace(/`([^`]+)`/g, (_m, code) => {
         // Verified revision citations (`abc1234`) link out to the forge.
         const oid = commitUrl && commits[code];
@@ -284,9 +278,7 @@ export function createMd({
         flushPara();
         return;
       }
-      const align = sep.map((c) =>
-        c.startsWith(":") && c.endsWith(":") ? "center" : c.endsWith(":") ? "right" : "",
-      );
+      const align = sep.map((c) => (c.startsWith(":") && c.endsWith(":") ? "center" : c.endsWith(":") ? "right" : ""));
       const row = (tag: string, cells: string[]) =>
         cells
           .map((c, i) => `<${tag}${align[i] ? ` style="text-align:${align[i]}"` : ""}>${inline(c)}</${tag}>`)
@@ -387,7 +379,12 @@ export function createMd({
       const items = noted.map((id) => {
         const src = sources.find((s) => s.id === id);
         const res = src && typeof src.resource === "string" ? src.resource : null;
-        const text = fnDefs[id] !== undefined ? inline(fnDefs[id]!) : src && typeof src.title === "string" ? esc(src.title) : esc(id);
+        const text =
+          fnDefs[id] !== undefined
+            ? inline(fnDefs[id]!)
+            : src && typeof src.title === "string"
+              ? esc(src.title)
+              : esc(id);
         let link = "";
         if (res) {
           // `/`-rooted is bundle-relative (§6.1); relative is doc-relative,
@@ -397,7 +394,8 @@ export function createMd({
           if (/^https?:\/\//.test(res)) link = `<a href="${esc(res)}" target="_blank" rel="noopener">${esc(res)}</a>`;
           else if (nid) link = `<a href="#" data-node="${esc(nid)}">${esc(res)}</a>`;
           else if (p && files[p]) link = `<a href="#" data-file="${esc(p)}">${esc(res)}</a>`;
-          else if (files[bundlePrefix + res]) link = `<a href="#" data-file="${esc(bundlePrefix + res)}">${esc(res)}</a>`;
+          else if (files[bundlePrefix + res])
+            link = `<a href="#" data-file="${esc(bundlePrefix + res)}">${esc(res)}</a>`;
           else if (files[res]) link = `<a href="#" data-file="${esc(res)}">${esc(res)}</a>`;
           else link = `<span class="dim">${esc(res)}</span>`;
         }

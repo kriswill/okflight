@@ -129,7 +129,7 @@ export class VizConfigError extends Error {}
 export const DEFAULT_BUNDLE_DIR = "knowledge";
 
 const GENERIC_ABOUT =
-  'A navigable map of this repository’s OKF knowledge bundle — concepts authored in the ' +
+  "A navigable map of this repository’s OKF knowledge bundle — concepts authored in the " +
   '<a href="https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md" ' +
   'target="_blank" rel="noopener">Open Knowledge Format</a> and cross-linked into a graph. ' +
   "Click a node to read its document.";
@@ -229,43 +229,138 @@ export function normalizeVizConfig(raw: unknown, opts?: { strict?: boolean; warn
       // has no null, so "" is the natural way to say "derive it".
       const stripSlash = (v: string) => v.replace(/\/+$/, "");
       section("bundle", (s) => {
-        field(s, "bundle", "dir", asStr((v) => (cfg.bundle.dir = stripSlash(v))));
-        field(s, "bundle", "out", asStr((v) => (cfg.bundle.out = stripSlash(v))));
-        field(s, "bundle", "include", asStrArr((a) => (cfg.bundle.include = a)));
-        field(s, "bundle", "exclude", asStrArr((a) => (cfg.bundle.exclude = a)));
-        field(s, "bundle", "linkFields", asStrArr((a) => (cfg.bundle.linkFields = a)));
+        field(
+          s,
+          "bundle",
+          "dir",
+          asStr((v) => (cfg.bundle.dir = stripSlash(v))),
+        );
+        field(
+          s,
+          "bundle",
+          "out",
+          asStr((v) => (cfg.bundle.out = stripSlash(v))),
+        );
+        field(
+          s,
+          "bundle",
+          "include",
+          asStrArr((a) => (cfg.bundle.include = a)),
+        );
+        field(
+          s,
+          "bundle",
+          "exclude",
+          asStrArr((a) => (cfg.bundle.exclude = a)),
+        );
+        field(
+          s,
+          "bundle",
+          "linkFields",
+          asStrArr((a) => (cfg.bundle.linkFields = a)),
+        );
       });
       section("display", (s) => {
-        field(s, "display", "title", asStr((v) => (cfg.display.title = v)));
-        field(s, "display", "badge", asStr((v) => (cfg.display.badge = v)));
-        field(s, "display", "fallbackName", asStr((v) => (cfg.display.fallbackName = v)));
-        field(s, "display", "name", asStr((v) => (cfg.display.name = v || null)));
-        field(s, "display", "aboutHtml", asStr((v) => (cfg.display.aboutHtml = v)));
+        field(
+          s,
+          "display",
+          "title",
+          asStr((v) => (cfg.display.title = v)),
+        );
+        field(
+          s,
+          "display",
+          "badge",
+          asStr((v) => (cfg.display.badge = v)),
+        );
+        field(
+          s,
+          "display",
+          "fallbackName",
+          asStr((v) => (cfg.display.fallbackName = v)),
+        );
+        field(
+          s,
+          "display",
+          "name",
+          asStr((v) => (cfg.display.name = v || null)),
+        );
+        field(
+          s,
+          "display",
+          "aboutHtml",
+          asStr((v) => (cfg.display.aboutHtml = v)),
+        );
         field(s, "display", "dateFormat", (v, path) =>
           typeof v === "string" && (DATE_FORMATS as readonly string[]).includes(v)
             ? (cfg.display.dateFormat = v as DateFormat)
             : bad(path, `expected one of: ${DATE_FORMATS.join(", ")}`),
         );
-        field(s, "display", "math", asBool((v) => (cfg.display.math = v)));
+        field(
+          s,
+          "display",
+          "math",
+          asBool((v) => (cfg.display.math = v)),
+        );
       });
       section("embed", (s) => {
-        field(s, "embed", "maxBytes", asNum((v) => (cfg.embed.maxBytes = v)));
+        field(
+          s,
+          "embed",
+          "maxBytes",
+          asNum((v) => (cfg.embed.maxBytes = v)),
+        );
       });
       section("taxonomy", (s) => {
-        field(s, "taxonomy", "types", asStrArr((v) => (cfg.taxonomy.types = v)));
-        field(s, "taxonomy", "dirGroups", asStrMap((v) => (cfg.taxonomy.dirGroups = v)));
-        field(s, "taxonomy", "groupOrder", asStrArr((v) => (cfg.taxonomy.groupOrder = v)));
-        field(s, "taxonomy", "other", asStr((v) => (cfg.taxonomy.other = v)));
+        field(
+          s,
+          "taxonomy",
+          "types",
+          asStrArr((v) => (cfg.taxonomy.types = v)),
+        );
+        field(
+          s,
+          "taxonomy",
+          "dirGroups",
+          asStrMap((v) => (cfg.taxonomy.dirGroups = v)),
+        );
+        field(
+          s,
+          "taxonomy",
+          "groupOrder",
+          asStrArr((v) => (cfg.taxonomy.groupOrder = v)),
+        );
+        field(
+          s,
+          "taxonomy",
+          "other",
+          asStr((v) => (cfg.taxonomy.other = v)),
+        );
       });
       // Legacy [repo] url — the pre-[vcs] spelling; normalizes into vcs.url
       // so old embeds and copied configs keep working. Processed first so a
       // config carrying both spellings resolves to the canonical [vcs].
       section("repo", (s) => {
-        field(s, "repo", "url", asStr((v) => (cfg.vcs.url = v || null)));
+        field(
+          s,
+          "repo",
+          "url",
+          asStr((v) => (cfg.vcs.url = v || null)),
+        );
       });
       section("vcs", (s) => {
-        field(s, "vcs", "url", asStr((v) => (cfg.vcs.url = v || null)));
-        field(s, "vcs", "commitUrlTemplate", asStr((v) => (cfg.vcs.commitUrlTemplate = v)));
+        field(
+          s,
+          "vcs",
+          "url",
+          asStr((v) => (cfg.vcs.url = v || null)),
+        );
+        field(
+          s,
+          "vcs",
+          "commitUrlTemplate",
+          asStr((v) => (cfg.vcs.commitUrlTemplate = v)),
+        );
       });
 
       // Facets: name-keyed [facet.<name>] TOML tables, or this file's own
@@ -294,10 +389,30 @@ export function normalizeVizConfig(raw: unknown, opts?: { strict?: boolean; warn
         const s = { ...fraw };
         const path = `facet.${name || "?"}`;
         const f: FacetConfig = { name, values: [], types: {}, ids: {}, frontmatter: null, classify: null };
-        field(s, path, "values", asStrArr((v) => (f.values = v)));
-        field(s, path, "types", asStrMap((v) => (f.types = v)));
-        field(s, path, "ids", asStrMap((v) => (f.ids = v)));
-        field(s, path, "frontmatter", asStr((v) => (f.frontmatter = v || null)));
+        field(
+          s,
+          path,
+          "values",
+          asStrArr((v) => (f.values = v)),
+        );
+        field(
+          s,
+          path,
+          "types",
+          asStrMap((v) => (f.types = v)),
+        );
+        field(
+          s,
+          path,
+          "ids",
+          asStrMap((v) => (f.ids = v)),
+        );
+        field(
+          s,
+          path,
+          "frontmatter",
+          asStr((v) => (f.frontmatter = v || null)),
+        );
         // `legacyProvider` set = the old [facet.<n>.nix-packages] spelling,
         // which implies the nix-optional-attrs provider and has no provider key.
         const parseClassify = (v: unknown, p: string, legacyProvider: "nix-optional-attrs" | null) => {
@@ -314,10 +429,30 @@ export function normalizeVizConfig(raw: unknown, opts?: { strict?: boolean; warn
               if (x === "nix-optional-attrs" || x === "command") provider = x;
               else bad(pp, 'expected "nix-optional-attrs" or "command"');
             });
-          field(cl, p, "file", asStr((x) => (file = stripSlash(x) || null)));
-          field(cl, p, "guards", asStrMap((x) => (guards = x)));
-          field(cl, p, "command", asStrArr((x) => (command = x)));
-          field(cl, p, "types", asStrArr((x) => (types = x)));
+          field(
+            cl,
+            p,
+            "file",
+            asStr((x) => (file = stripSlash(x) || null)),
+          );
+          field(
+            cl,
+            p,
+            "guards",
+            asStrMap((x) => (guards = x)),
+          );
+          field(
+            cl,
+            p,
+            "command",
+            asStrArr((x) => (command = x)),
+          );
+          field(
+            cl,
+            p,
+            "types",
+            asStrArr((x) => (types = x)),
+          );
           field(cl, p, "key", (x, pp) => {
             if (x === "basename" || x === "id") key = x;
             else bad(pp, 'expected "basename" or "id"');
@@ -377,7 +512,9 @@ export function normalizeVizConfig(raw: unknown, opts?: { strict?: boolean; warn
           errors.push(`${path}.classify.command: required`);
       }
       if (vals.length && !Object.keys(f.types).length && !Object.keys(f.ids).length && !f.classify && !f.frontmatter)
-        warn(`${path}: has values but no resolution rule (types/ids/classify/frontmatter) — every concept unresolved, filter is a no-op`);
+        warn(
+          `${path}: has values but no resolution rule (types/ids/classify/frontmatter) — every concept unresolved, filter is a no-op`,
+        );
     }
     const pathFields: [string, string][] = [
       [cfg.bundle.dir, "bundle.dir"],
@@ -388,11 +525,16 @@ export function normalizeVizConfig(raw: unknown, opts?: { strict?: boolean; warn
     ];
     for (const [p, why] of pathFields) {
       if (!p) errors.push(`${why}: must not be empty`);
-      else if (p.split("/").includes("..") || p.startsWith("/")) errors.push(`${why}: must be a relative path without ".."`);
+      else if (p.split("/").includes("..") || p.startsWith("/"))
+        errors.push(`${why}: must be a relative path without ".."`);
     }
-    for (const [globs, why] of [[cfg.bundle.include, "bundle.include"], [cfg.bundle.exclude, "bundle.exclude"]] as const)
+    for (const [globs, why] of [
+      [cfg.bundle.include, "bundle.include"],
+      [cfg.bundle.exclude, "bundle.exclude"],
+    ] as const)
       for (const g of globs)
-        if (!g || g.startsWith("/") || g.split("/").includes("..")) errors.push(`${why}: '${g}' must be a bundle-relative glob without ".."`);
+        if (!g || g.startsWith("/") || g.split("/").includes(".."))
+          errors.push(`${why}: '${g}' must be a bundle-relative glob without ".."`);
     for (const f of cfg.bundle.linkFields) if (!f.trim()) errors.push("bundle.link-fields: entries must not be empty");
     for (const [list, label] of [
       [cfg.taxonomy.types, "taxonomy.types"],
@@ -402,10 +544,11 @@ export function normalizeVizConfig(raw: unknown, opts?: { strict?: boolean; warn
     for (const [d, g] of Object.entries(cfg.taxonomy.dirGroups))
       if (!cfg.taxonomy.groupOrder.includes(g))
         errors.push(`taxonomy.dir-groups."${d}": "${g}" is not in taxonomy.group-order`);
-    if (!cfg.vcs.commitUrlTemplate.includes("{hash}"))
-      errors.push('vcs.commit-url-template: must contain "{hash}"');
+    if (!cfg.vcs.commitUrlTemplate.includes("{hash}")) errors.push('vcs.commit-url-template: must contain "{hash}"');
     if (cfg.taxonomy.types.length > SLOT_COUNT)
-      warn(`taxonomy.types: ${cfg.taxonomy.types.length} entries but only ${SLOT_COUNT} palette slots — overflow types get generated colors`);
+      warn(
+        `taxonomy.types: ${cfg.taxonomy.types.length} entries but only ${SLOT_COUNT} palette slots — overflow types get generated colors`,
+      );
     if (errors.length) throw new VizConfigError("invalid okflight.toml:\n  " + errors.join("\n  "));
   }
 

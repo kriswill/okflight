@@ -106,64 +106,63 @@ describe("generatorInfo", () => {
 describe("okf viz output", () => {
   /** Build a tiny bundle with `okf viz <flags>`; returns the page + its #data blob. */
   const build = (...flags: string[]) => {
-      const root = mkdtempSync(join(tmpdir(), "okf-viz-"));
-      writeFileSync(join(root, "okflight.toml"), '[vcs]\nprovider = "none"\n');
-      mkdirSync(join(root, "knowledge"));
-      writeFileSync(join(root, "knowledge", "index.md"), "# Index\n");
-      writeFileSync(
-        join(root, "knowledge", "alpha.md"),
-        "---\ntype: Decision\ntitle: Alpha\ndescription: a\n---\n\nSee [beta](beta.md).\n",
-      );
-      writeFileSync(join(root, "knowledge", "beta.md"), "---\ntype: Pattern\ntitle: Beta\ndescription: b\n---\n\nBody $E = mc^2$.\n");
+    const root = mkdtempSync(join(tmpdir(), "okf-viz-"));
+    writeFileSync(join(root, "okflight.toml"), '[vcs]\nprovider = "none"\n');
+    mkdirSync(join(root, "knowledge"));
+    writeFileSync(join(root, "knowledge", "index.md"), "# Index\n");
+    writeFileSync(
+      join(root, "knowledge", "alpha.md"),
+      "---\ntype: Decision\ntitle: Alpha\ndescription: a\n---\n\nSee [beta](beta.md).\n",
+    );
+    writeFileSync(
+      join(root, "knowledge", "beta.md"),
+      "---\ntype: Pattern\ntitle: Beta\ndescription: b\n---\n\nBody $E = mc^2$.\n",
+    );
 
-      const r = Bun.spawnSync([process.execPath, join(okflight, "viz.ts"), ...flags], { cwd: root, stdout: "pipe", stderr: "pipe" });
-      if (r.exitCode !== 0) throw new Error(`viz.ts failed (${r.exitCode}):\n${r.stdout}\n${r.stderr}`);
-      const html = readFileSync(join(root, "knowledge", "viz.html"), "utf8");
-      // Structure: the notices ride the #data blob the viewer boots from
-      // (`<\/` is the valid JSON escape of `/`, so the blob parses verbatim).
-      const blob = html.match(/<script id="data" type="application\/json">(.*?)<\/script>/s)![1]!;
-      return { html, data: JSON.parse(blob) };
+    const r = Bun.spawnSync([process.execPath, join(okflight, "viz.ts"), ...flags], {
+      cwd: root,
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    if (r.exitCode !== 0) throw new Error(`viz.ts failed (${r.exitCode}):\n${r.stdout}\n${r.stderr}`);
+    const html = readFileSync(join(root, "knowledge", "viz.html"), "utf8");
+    // Structure: the notices ride the #data blob the viewer boots from
+    // (`<\/` is the valid JSON escape of `/`, so the blob parses verbatim).
+    const blob = html.match(/<script id="data" type="application\/json">(.*?)<\/script>/s)![1]!;
+    return { html, data: JSON.parse(blob) };
   };
   const pkg = JSON.parse(readFileSync(join(okflight, "package.json"), "utf8"));
   const embedded = Object.keys(pkg.dependencies).filter((d: string) => !BUILD_ONLY.has(d));
 
-  test(
-    "the generated page embeds every runtime dep's license notice (--math: katex included)",
-    () => {
-      const { html, data } = build("--math");
-      const licenses: { name: string; text: string }[] = data.licenses;
-      expect(licenses.map((l) => l.name)).toEqual(embedded.sort());
-      expect(html).toContain("KaTeX_Main"); // the stylesheet + inlined fonts shipped too
-      for (const l of licenses) expect(l.text).toContain("Copyright");
+  test("the generated page embeds every runtime dep's license notice (--math: katex included)", () => {
+    const { html, data } = build("--math");
+    const licenses: { name: string; text: string }[] = data.licenses;
+    expect(licenses.map((l) => l.name)).toEqual(embedded.sort());
+    expect(html).toContain("KaTeX_Main"); // the stylesheet + inlined fonts shipped too
+    for (const l of licenses) expect(l.text).toContain("Copyright");
 
-      // Compliance: the notice texts are physically present in the shipped file.
-      expect(html).toContain("three.js authors"); // three (MIT)
-      expect(html).toContain("Permission is hereby granted"); // MIT grant (three + svelte)
-      expect(html).toContain("Raoul van Rüschen"); // postprocessing (zlib)
+    // Compliance: the notice texts are physically present in the shipped file.
+    expect(html).toContain("three.js authors"); // three (MIT)
+    expect(html).toContain("Permission is hereby granted"); // MIT grant (three + svelte)
+    expect(html).toContain("Raoul van Rüschen"); // postprocessing (zlib)
 
-      // The page identifies its generator: project link + license + copyright
-      // (the embedded viewer app is okflight code).
-      const gen = data.generator;
-      expect(gen.url).toBe("https://github.com/kriswill/okflight");
-      expect(gen.license).toBe("MIT");
-      expect(gen.copyright).toBe("© 2026 Kris Williams");
-      expect(html).toContain("Copyright (c) 2026 Kris Williams"); // full own-LICENSE text embedded
-    },
-    30_000, // spawns a full Bun.build of the viewer
-  );
+    // The page identifies its generator: project link + license + copyright
+    // (the embedded viewer app is okflight code).
+    const gen = data.generator;
+    expect(gen.url).toBe("https://github.com/kriswill/okflight");
+    expect(gen.license).toBe("MIT");
+    expect(gen.copyright).toBe("© 2026 Kris Williams");
+    expect(html).toContain("Copyright (c) 2026 Kris Williams"); // full own-LICENSE text embedded
+  }, 30_000); // spawns a full Bun.build of the viewer
 
-  test(
-    "display.math off (the default) leaves KaTeX out: no code, CSS, fonts, or notice",
-    () => {
-      const { html, data } = build();
-      const licenses: { name: string }[] = data.licenses;
-      expect(licenses.map((l) => l.name)).toEqual(embedded.filter((d) => !(d in OPTIONAL_DEPS)).sort());
-      expect(data.cfg.display.math).toBe(false);
-      expect(html).not.toContain("KaTeX_Main");
-      expect(html).not.toContain("katex-display");
-      // A body with math is left literal rather than typeset.
-      expect(html).toContain("$E = mc^2$");
-    },
-    30_000,
-  );
+  test("display.math off (the default) leaves KaTeX out: no code, CSS, fonts, or notice", () => {
+    const { html, data } = build();
+    const licenses: { name: string }[] = data.licenses;
+    expect(licenses.map((l) => l.name)).toEqual(embedded.filter((d) => !(d in OPTIONAL_DEPS)).sort());
+    expect(data.cfg.display.math).toBe(false);
+    expect(html).not.toContain("KaTeX_Main");
+    expect(html).not.toContain("katex-display");
+    // A body with math is left literal rather than typeset.
+    expect(html).toContain("$E = mc^2$");
+  }, 30_000);
 });

@@ -124,12 +124,15 @@ describe("normalizeVizConfig", () => {
   });
 
   test("bundle link-fields: a list of frontmatter keys", () => {
-    expect(normalizeVizConfig({ bundle: { "link-fields": ["related", "see-also"] } }, { strict: true }).bundle.linkFields).toEqual([
-      "related",
-      "see-also",
-    ]);
-    expect(() => normalizeVizConfig({ bundle: { "link-fields": "related" } }, { strict: true })).toThrow(VizConfigError);
-    expect(() => normalizeVizConfig({ bundle: { "link-fields": [" "] } }, { strict: true })).toThrow(/bundle\.link-fields/);
+    expect(
+      normalizeVizConfig({ bundle: { "link-fields": ["related", "see-also"] } }, { strict: true }).bundle.linkFields,
+    ).toEqual(["related", "see-also"]);
+    expect(() => normalizeVizConfig({ bundle: { "link-fields": "related" } }, { strict: true })).toThrow(
+      VizConfigError,
+    );
+    expect(() => normalizeVizConfig({ bundle: { "link-fields": [" "] } }, { strict: true })).toThrow(
+      /bundle\.link-fields/,
+    );
   });
 
   test("strict: type mismatches error; lenient keeps defaults", () => {
@@ -165,9 +168,9 @@ describe("normalizeVizConfig", () => {
   });
 
   test("strict: facet.values duplicates/empty rejected", () => {
-    expect(() =>
-      normalizeVizConfig({ facet: { platform: { values: ["macos", "macos"] } } }, { strict: true }),
-    ).toThrow(/facet\.platform\.values: duplicate/);
+    expect(() => normalizeVizConfig({ facet: { platform: { values: ["macos", "macos"] } } }, { strict: true })).toThrow(
+      /facet\.platform\.values: duplicate/,
+    );
     expect(() => normalizeVizConfig({ facet: { platform: { values: ["macos", ""] } } }, { strict: true })).toThrow(
       /facet\.platform\.values: empty string/,
     );
@@ -176,9 +179,7 @@ describe("normalizeVizConfig", () => {
   test("strict: facet name must match ^[a-z][a-z0-9-]*$", () => {
     expect(() => normalizeVizConfig({ facet: { Platform: {} } }, { strict: true })).toThrow(/name must match/);
     expect(() => normalizeVizConfig({ facet: { "1nvalid": {} } }, { strict: true })).toThrow(/name must match/);
-    expect(() => normalizeVizConfig({ facet: { "with_underscore": {} } }, { strict: true })).toThrow(
-      /name must match/,
-    );
+    expect(() => normalizeVizConfig({ facet: { with_underscore: {} } }, { strict: true })).toThrow(/name must match/);
   });
 
   test("strict: reserved facet names rejected (hash-param collisions)", () => {
@@ -206,7 +207,11 @@ describe("normalizeVizConfig", () => {
           values: ["macos", "linux"],
           types: {} as Record<string, string>,
           ids: {} as Record<string, string>,
-          "nix-packages": { file: "modules/packages.nix", guards: {} as Record<string, string>, types: ["Nix Package"] },
+          "nix-packages": {
+            file: "modules/packages.nix",
+            guards: {} as Record<string, string>,
+            types: ["Nix Package"],
+          },
         },
       },
     });
@@ -269,10 +274,7 @@ describe("normalizeVizConfig", () => {
     );
     expect(c.facets[0]!.classify).toEqual({ provider: "command", command: ["bun", "x.ts"], types: ["T"], key: "id" });
     expect(() =>
-      normalizeVizConfig(
-        { facet: { p: { classify: { provider: "command", types: ["T"] } } } },
-        { strict: true },
-      ),
+      normalizeVizConfig({ facet: { p: { classify: { provider: "command", types: ["T"] } } } }, { strict: true }),
     ).toThrow(/classify\.command: required/);
     expect(() =>
       normalizeVizConfig(
@@ -281,10 +283,7 @@ describe("normalizeVizConfig", () => {
       ),
     ).toThrow(/file\/guards only apply/);
     expect(() =>
-      normalizeVizConfig(
-        { facet: { p: { classify: { provider: "wasm", types: ["T"] } } } },
-        { strict: true },
-      ),
+      normalizeVizConfig({ facet: { p: { classify: { provider: "wasm", types: ["T"] } } } }, { strict: true }),
     ).toThrow(/expected "nix-optional-attrs" or "command"/);
     expect(() =>
       normalizeVizConfig(
@@ -386,9 +385,9 @@ describe("normalizeVizConfig", () => {
   });
 
   test("strict: commit-url-template without {hash} fails", () => {
-    expect(() =>
-      normalizeVizConfig({ vcs: { "commit-url-template": "{url}/commit/" } }, { strict: true }),
-    ).toThrow(/vcs\.commit-url-template: must contain "\{hash\}"/);
+    expect(() => normalizeVizConfig({ vcs: { "commit-url-template": "{url}/commit/" } }, { strict: true })).toThrow(
+      /vcs\.commit-url-template: must contain "\{hash\}"/,
+    );
   });
 });
 

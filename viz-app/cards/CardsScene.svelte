@@ -219,16 +219,12 @@
   // Look-at center: the panel inset rides screen-x; the occupied-extent
   // cross center rides whichever world axis the rings extend along, so a
   // one-sided node balances instead of hugging the stage center.
-  const cxTarget = $derived(
-    (rightInset - SIDEBAR_W) / 2 / fit.zoom + (viz.cardFlow === "h" ? fit.cross : 0),
-  );
+  const cxTarget = $derived((rightInset - SIDEBAR_W) / 2 / fit.zoom + (viz.cardFlow === "h" ? fit.cross : 0));
   const cyTarget = $derived(viz.cardFlow === "v" ? fit.cross : 0);
   // The visible half-extent along the band axis (world units at the target
   // zoom): the motion store fades cards out BEFORE the screen edge and
   // surfaces the hidden remainder as overflow chips.
-  const halfBandTarget = $derived(
-    ((viz.cardFlow === "v" ? stageW : stageH) / 2 - 24) / fit.zoom,
-  );
+  const halfBandTarget = $derived(((viz.cardFlow === "v" ? stageW : stageH) / 2 - 24) / fit.zoom);
   $effect(() => {
     motion.setViewTargets(fit.zoom, cxTarget, cyTarget);
     motion.setWindow(halfBandTarget);
@@ -251,8 +247,7 @@
   // bundle stays neutral) — the same hue the legend gives those concepts.
   const bundleColor = (path: string): string => {
     const counts = new Map<string, number>();
-    for (const n of viz.model.nodes)
-      if (n.id.startsWith(path + "/")) counts.set(n.type, (counts.get(n.type) ?? 0) + 1);
+    for (const n of viz.model.nodes) if (n.id.startsWith(path + "/")) counts.set(n.type, (counts.get(n.type) ?? 0) + 1);
     let best = "";
     for (const t of [...counts.keys()].sort()) if (counts.get(t)! > (counts.get(best) ?? 0)) best = t;
     return best ? viz.colorOf(best) : NEUTRAL;
@@ -292,8 +287,7 @@
   /** Chip pose: pinned just inside the fade edge on its band's ring-1 line
    *  (shared by the template render and the pointer hit test). */
   const chipPose = (o: Chip) => {
-    const cross =
-      motion.flow === "v" ? (o.lane === "in" ? 1 : -1) * BAND_Y[1] : (o.lane === "in" ? -1 : 1) * BAND_X[1];
+    const cross = motion.flow === "v" ? (o.lane === "in" ? 1 : -1) * BAND_Y[1] : (o.lane === "in" ? -1 : 1) * BAND_X[1];
     return cylPose(o.dir * (motion.window.fadeEnd - 40), cross, 6, motion.flow);
   };
 
@@ -373,8 +367,7 @@
         if (dragSide) {
           // Direct manipulation: the band's content follows the pointer.
           const zoom = cam?.zoom ?? 1;
-          const worldD =
-            motion.flow === "v" ? (e.clientX - last.x) / zoom : -(e.clientY - last.y) / zoom;
+          const worldD = motion.flow === "v" ? (e.clientX - last.x) / zoom : -(e.clientY - last.y) / zoom;
           motion.scrollBy(dragSide, -worldD);
           applyFrame(true);
           invalidate();
@@ -387,12 +380,7 @@
       // id may be the root card's "" — null-check, never truthiness.
       const c = id != null ? motion.renderList.find((r) => r.id === id) : null;
       setHovered(c && clickableKinds.has(c.kind) ? id : null);
-      el.style.cursor =
-        hovered != null || pickChip(e)
-          ? "pointer"
-          : sideAt(e.clientX, e.clientY)
-            ? "grab"
-            : "default";
+      el.style.cursor = hovered != null || pickChip(e) ? "pointer" : sideAt(e.clientX, e.clientY) ? "grab" : "default";
     };
     const up = (e: PointerEvent) => {
       const wasDragging = dragging;

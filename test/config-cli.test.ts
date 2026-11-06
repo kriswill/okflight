@@ -59,11 +59,15 @@ describe("splitCliSections: [profile]", () => {
 
   test("unknown key fails with its path", () => {
     expect(() => splitCliSections({ profile: { "reserved-file": ["x.md"] } })).toThrow(OkfConfigError);
-    expect(() => splitCliSections({ profile: { "reserved-file": ["x.md"] } })).toThrow(/profile\.reserved-file: unknown key/);
+    expect(() => splitCliSections({ profile: { "reserved-file": ["x.md"] } })).toThrow(
+      /profile\.reserved-file: unknown key/,
+    );
   });
 
   test("bad enum value fails with the allowed set", () => {
-    expect(() => splitCliSections({ profile: { "repo-links": "verify" } })).toThrow(/expected one of: check, ignore, forbid/);
+    expect(() => splitCliSections({ profile: { "repo-links": "verify" } })).toThrow(
+      /expected one of: check, ignore, forbid/,
+    );
     expect(() => splitCliSections({ profile: { "rooted-links": true } })).toThrow(/expected one of: error, allow/);
   });
 
@@ -111,7 +115,9 @@ describe("splitCliSections: [vcs] (mixed section)", () => {
   });
 
   test("bad provider / bad ignore fail with paths", () => {
-    expect(() => splitCliSections({ vcs: { provider: "p4" } })).toThrow(/vcs\.provider: expected one of: auto, git, none/);
+    expect(() => splitCliSections({ vcs: { provider: "p4" } })).toThrow(
+      /vcs\.provider: expected one of: auto, git, none/,
+    );
     expect(() => splitCliSections({ vcs: { ignore: "dist" } })).toThrow(/vcs\.ignore/);
   });
 

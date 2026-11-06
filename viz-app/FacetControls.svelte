@@ -8,10 +8,8 @@
   <div class="facet">
     <span class="hint">{facet.name}</span>
     {#each ["all", ...facet.values] as v (v)}
-      <button
-        class="seg"
-        class:active={viz.facetSel[facet.name] === v}
-        onclick={() => viz.setFacet(facet.name, v)}>{v}</button
+      <button class="seg" class:active={viz.facetSel[facet.name] === v} onclick={() => viz.setFacet(facet.name, v)}
+        >{v}</button
       >
     {/each}
   </div>

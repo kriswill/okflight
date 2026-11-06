@@ -23,9 +23,7 @@ w.put(`${dir}/index.md`, starterIndex(dir));
 w.put(`${dir}/log.md`, starterLog("okf init"));
 
 if (!w.created.length) {
-  console.log(
-    `init: already initialized (${CONFIG_FILE}, ${dir}/index.md, ${dir}/log.md all exist) — nothing written`,
-  );
+  console.log(`init: already initialized (${CONFIG_FILE}, ${dir}/index.md, ${dir}/log.md all exist) — nothing written`);
 } else {
   const prog = process.env.OKF_PROG ?? "bun okf.ts";
   console.log(

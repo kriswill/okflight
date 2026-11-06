@@ -168,8 +168,7 @@ export interface TrackSample {
 /** Sample a track at eased progress `e` in flat space. The caller maps the
  *  result through the cylinder and multiplies the scroll-window fade. */
 export function sampleTrack(t: CardTrack, e: number): TrackSample {
-  const opacity =
-    t.kind === "exit" ? t.o0 * (1 - Math.min(1, e / 0.8)) : t.o0 + (t.o1 - t.o0) * e;
+  const opacity = t.kind === "exit" ? t.o0 * (1 - Math.min(1, e / 0.8)) : t.o0 + (t.o1 - t.o0) * e;
   return {
     x: t.x0 + (t.x1 - t.x0) * e,
     y: t.y0 + (t.y1 - t.y0) * e,

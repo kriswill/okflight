@@ -243,14 +243,11 @@ bun okf.ts help
 **Dev-tree only** (not available from the nix-built package):
 
 - `okf viz --perf` — needs a locally installed Chrome (puppeteer-core).
-- `okf viz --check` — typechecks with tsgo (`@typescript/native-preview`)
-  through svelte-check's `--tsgo-experimental-api`; tsgo's per-platform
-  native binary is an optionalDependency, which the nix package's vendored
-  `node_modules` omits (`--omit=optional`), so the check needs a dev-tree
-  `bun install`.
 
-Plain-TS iteration is fastest with tsgo directly:
-`bunx tsgo --noEmit -p tsconfig.json` (checks everything but `.svelte` files).
-Known upstream gap: svelte-check 4.7.1's non-API `--tsgo` flag points at
-`bin/tsgo.js`, which current native-preview builds no longer ship — it exits 0
-without checking anything; don't use it.
+`okf viz --check` typechecks the project with `bun check` (bun ≥ 1.4.3), then
+runs svelte-check over the `.svelte` components, which `bun check` doesn't
+read. svelte-check only runs once `bun check` is clean. Both are available in
+the dev tree and the nix-built package.
+
+For plain-TS iteration, run `bun check` on its own (about 50 ms; checks
+everything but `.svelte` files).

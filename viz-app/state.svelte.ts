@@ -61,9 +61,7 @@ export function createVizState(model: VizModel) {
   // (inline :root vars beat the media block); otherwise follow the scheme.
   const storedTheme = typeof localStorage === "undefined" ? null : localStorage.getItem(THEME_KEY);
   let themeIndex = $state(
-    storedTheme != null && +storedTheme >= 0 && +storedTheme < THEMES.length
-      ? +storedTheme
-      : defaultThemeIndex(dark),
+    storedTheme != null && +storedTheme >= 0 && +storedTheme < THEMES.length ? +storedTheme : defaultThemeIndex(dark),
   );
   if (storedTheme != null) applyThemeVars(themeIndex);
 

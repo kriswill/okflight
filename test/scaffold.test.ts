@@ -55,9 +55,9 @@ describe("splitCliSections: [scaffold]", () => {
     expect(() => splitCliSections({ scaffold: { collect: [{ type: "T", output: "x.md" }] } })).toThrow(
       /collect\[0\]\.glob: required/,
     );
-    expect(() =>
-      splitCliSections({ scaffold: { collect: [{ glob: "*", type: "T", output: "../x.md" }] } }),
-    ).toThrow(/output: must be a relative path/);
+    expect(() => splitCliSections({ scaffold: { collect: [{ glob: "*", type: "T", output: "../x.md" }] } })).toThrow(
+      /output: must be a relative path/,
+    );
   });
 
   test("unknown placeholders in templates are config errors", () => {

@@ -79,8 +79,8 @@ try {
   check("bare hash on load (all defaults)", await page.evaluate(() => location.hash === ""));
   check(
     "hops control offers 2-hop then 1-hop, no off",
-    await page.evaluate(() =>
-      [...document.querySelectorAll("#hops .seg")].map((b) => b.textContent!.trim()).join(",") === "2-hop,1-hop",
+    await page.evaluate(
+      () => [...document.querySelectorAll("#hops .seg")].map((b) => b.textContent!.trim()).join(",") === "2-hop,1-hop",
     ),
   );
   check(
@@ -138,7 +138,10 @@ try {
     })(),
     JSON.stringify(l.cards.map((c) => [c.id, c.kind])),
   );
-  check("root view has no in-row", l.cards.every((c) => c.lane !== "in"));
+  check(
+    "root view has no in-row",
+    l.cards.every((c) => c.lane !== "in"),
+  );
 
   console.log("2a. the focused index.md reads in the details panel");
   check(
@@ -209,7 +212,7 @@ try {
   await settleMotion(page);
   l = (await layout(page))!;
   check(
-    "focus-card click is a no-op (the falsy \"\" id must not route to clearSelection)",
+    'focus-card click is a no-op (the falsy "" id must not route to clearSelection)',
     l.rootFocus === true && l.cards.filter((c) => c.ring === 2).length === ring2Count,
   );
   await page.evaluate(() => {
@@ -259,30 +262,52 @@ try {
   );
   check("island never appears", !l.byId["island"]);
   const twoWay = l.arrows.filter((a) => a.twoWay);
-  check("mutual link: one two-headed arrow in the in-row", twoWay.length === 1 && twoWay[0]!.fromId === "both-e" && twoWay[0]!.tailHead !== null);
-  check("every arrow head points down (wings above tip)", l.arrows.every((a) => a.head.left.y > a.head.tip.y));
+  check(
+    "mutual link: one two-headed arrow in the in-row",
+    twoWay.length === 1 && twoWay[0]!.fromId === "both-e" && twoWay[0]!.tailHead !== null,
+  );
+  check(
+    "every arrow head points down (wings above tip)",
+    l.arrows.every((a) => a.head.left.y > a.head.tip.y),
+  );
 
   console.log("4. hops honored: 2-hop adds the directional second ring");
   await page.evaluate(() => {
-    [...document.querySelectorAll("#hops .seg")].find((b) => b.textContent!.trim() === "2-hop")!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    [...document.querySelectorAll("#hops .seg")]
+      .find((b) => b.textContent!.trim() === "2-hop")!
+      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
   });
   await settleMotion(page);
   l = (await layout(page))!;
-  check("2 hops is the default: isolate drops from the hash", await page.evaluate(() => !location.hash.includes("isolate") && !location.hash.includes("view=")));
+  check(
+    "2 hops is the default: isolate drops from the hash",
+    await page.evaluate(() => !location.hash.includes("isolate") && !location.hash.includes("view=")),
+  );
   check(
     "ring 2 above: in-of-in under its ring-1 parent",
-    eq(l.cards.filter((c) => c.ring === 2 && c.lane === "in").map((c) => [c.id, c.parentId]), [["in2-f", "in-a"]]),
+    eq(
+      l.cards.filter((c) => c.ring === 2 && c.lane === "in").map((c) => [c.id, c.parentId]),
+      [["in2-f", "in-a"]],
+    ),
   );
   check(
     "ring 2 below: out-of-out under its ring-1 parent",
-    eq(l.cards.filter((c) => c.ring === 2 && c.lane === "out").map((c) => [c.id, c.parentId]), [["out2-g", "out-c"]]),
+    eq(
+      l.cards.filter((c) => c.ring === 2 && c.lane === "out").map((c) => [c.id, c.parentId]),
+      [["out2-g", "out-c"]],
+    ),
   );
   await page.evaluate(() => {
-    [...document.querySelectorAll("#hops .seg")].find((b) => b.textContent!.trim() === "1-hop")!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    [...document.querySelectorAll("#hops .seg")]
+      .find((b) => b.textContent!.trim() === "1-hop")!
+      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
   });
   await settleMotion(page);
   l = (await layout(page))!;
-  check("1 hop: back to one ring", l.cards.every((c) => c.ring < 2));
+  check(
+    "1 hop: back to one ring",
+    l.cards.every((c) => c.ring < 2),
+  );
   check("hash carries isolate=1", await page.evaluate(() => location.hash.includes("isolate=1")));
 
   console.log("5. type filter drops cards (deep-link path)");
@@ -291,7 +316,14 @@ try {
   });
   await settleMotion(page);
   l = (await layout(page))!;
-  check("hidden type's card gone", !l.byId["out-c"] && eq(l.cards.filter((c) => c.lane === "out").map((c) => c.id), ["out-d"]));
+  check(
+    "hidden type's card gone",
+    !l.byId["out-c"] &&
+      eq(
+        l.cards.filter((c) => c.lane === "out").map((c) => c.id),
+        ["out-d"],
+      ),
+  );
   await page.evaluate(() => {
     location.hash = "#c/hub?isolate=1&flow=v";
   });
@@ -303,7 +335,10 @@ try {
   await settleMotion(page);
   l = (await layout(page))!;
   check("clicked card is the new focus", l.focusId === "in-a");
-  check("old focus flows out of the new one", l.cards.some((c) => c.id === "hub" && c.lane === "out"));
+  check(
+    "old focus flows out of the new one",
+    l.cards.some((c) => c.id === "hub" && c.lane === "out"),
+  );
   check("hash follows the refocus", await page.evaluate(() => location.hash === "#c/in-a?isolate=1&flow=v"));
   check(
     "cards that rolled out are gone after settle",
@@ -326,10 +361,20 @@ try {
   });
   await settleMotion(page);
   l = (await layout(page))!;
-  check("mega-hub keeps every in-link on one scrollable band (no grid)", l.cards.filter((c) => c.lane === "in" && c.ring === 1).length === 29);
-  check("focus keeps full scale on the mega-hub (zoom pinned at 1)", (await okf(page, "window.__okf.cards.zoom")) === 1);
+  check(
+    "mega-hub keeps every in-link on one scrollable band (no grid)",
+    l.cards.filter((c) => c.lane === "in" && c.ring === 1).length === 29,
+  );
+  check(
+    "focus keeps full scale on the mega-hub (zoom pinned at 1)",
+    (await okf(page, "window.__okf.cards.zoom")) === 1,
+  );
   const faces0 = await okf<number>(page, "window.__okf.cards.faceCount");
-  check("face textures are lazy: only window cards are textured on a hub", faces0 > 0 && faces0 <= 12, `faces=${faces0} of ${l.cards.length}`);
+  check(
+    "face textures are lazy: only window cards are textured on a hub",
+    faces0 > 0 && faces0 <= 12,
+    `faces=${faces0} of ${l.cards.length}`,
+  );
   await page.evaluate(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (window as any).__okf.cards.scrollBy("in", 1e9); // slam to the far end
@@ -345,10 +390,7 @@ try {
     const cards = (window as any).__okf.cards;
     cards.scrollBy("in", -cards.scroll.in); // back to dead center
   });
-  const chipPx = await okf<{ lane: string; dir: number; x: number; y: number }[]>(
-    page,
-    "window.__okf.cards.chips()",
-  );
+  const chipPx = await okf<{ lane: string; dir: number; x: number; y: number }[]>(page, "window.__okf.cards.chips()");
   const posChip = chipPx.find((c) => c.lane === "in" && c.dir === 1)!;
   await page.mouse.click(posChip.x, posChip.y);
   await settle(page);
@@ -376,7 +418,11 @@ try {
   const ovf = await okf<Ovf>(page, "window.__okf.cards.overflow");
   const neg0 = ovf.find((o) => o.lane === "in" && o.dir === -1)?.count ?? 0;
   const pos0 = ovf.find((o) => o.lane === "in" && o.dir === 1)?.count ?? 0;
-  check("overflow chips flag hidden cards on both band edges", neg0 > 0 && pos0 > 0 && neg0 + pos0 < 29, JSON.stringify(ovf));
+  check(
+    "overflow chips flag hidden cards on both band edges",
+    neg0 > 0 && pos0 > 0 && neg0 + pos0 < 29,
+    JSON.stringify(ovf),
+  );
   await page.evaluate(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (window as any).__okf.cards.scrollBy("in", 232); // exactly one card pitch
@@ -400,7 +446,10 @@ try {
   check("wheel over the in-band scrolls it", Math.abs(afterWheel.in) > 50);
   check("wheel never scrolls the other band", afterWheel.out === 0);
   const focusAfter = await okf<{ x: number; y: number }>(page, 'window.__okf.cards.project("services/core-platform")');
-  check("the focus card never moves while scrolling", Math.hypot(focusAfter.x - focusBefore.x, focusAfter.y - focusBefore.y) < 1);
+  check(
+    "the focus card never moves while scrolling",
+    Math.hypot(focusAfter.x - focusBefore.x, focusAfter.y - focusBefore.y) < 1,
+  );
   // Drag the in-band: content follows the pointer; a drag never selects.
   await page.mouse.move(focusBefore.x, focusBefore.y - 220);
   await page.mouse.down();
@@ -419,9 +468,7 @@ try {
       (c: { lane: string; ring: number }) => c.lane === "in" && c.ring === 1,
     );
     const scrolled = okf.cards.scroll.in;
-    inCards.sort(
-      (a: { x: number }, b: { x: number }) => Math.abs(a.x - scrolled) - Math.abs(b.x - scrolled),
-    );
+    inCards.sort((a: { x: number }, b: { x: number }) => Math.abs(a.x - scrolled) - Math.abs(b.x - scrolled));
     const id = inCards[0].id;
     return { id, px: okf.cards.project(id) };
   });
@@ -458,7 +505,10 @@ try {
       l.cards.filter((c) => c.lane === "out").every((c) => c.x > 0) &&
       l.byId[l.focusId]!.x === 0,
   );
-  check("horizontal is the default: flow param drops from the hash", await page.evaluate(() => !location.hash.includes("flow")));
+  check(
+    "horizontal is the default: flow param drops from the hash",
+    await page.evaluate(() => !location.hash.includes("flow")),
+  );
   await page.evaluate(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (window as any).__okf.setFlow("v");
@@ -505,10 +555,7 @@ try {
   await waitInteractive(page);
   await settleMotion(page);
   l = (await layout(page))!;
-  check(
-    "bundle focus survives reload",
-    (await okf(page, "window.__okf.view")) === "cards" && l.focusId === "notes",
-  );
+  check("bundle focus survives reload", (await okf(page, "window.__okf.view")) === "cards" && l.focusId === "notes");
 
   console.log("8. toggle back to the 3D graph");
   await page.evaluate(() => {

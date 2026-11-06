@@ -69,8 +69,24 @@ describe("pickCard3 — flat bridge (identity quats)", () => {
   test("overlapping cards: nearest along the ray wins (focus lift beats z=0)", () => {
     const f = layout.byId["f"]!;
     const items: PickItem[] = [
-      { id: "behind", kind: "card", pos: new THREE.Vector3(f.x, f.y, 0), quat: new THREE.Quaternion(), w: CARD_W, h: CARD_H, opacity: 1 },
-      { id: "front", kind: "card", pos: new THREE.Vector3(f.x, f.y, FOCUS_Z), quat: new THREE.Quaternion(), w: CARD_W, h: CARD_H, opacity: 1 },
+      {
+        id: "behind",
+        kind: "card",
+        pos: new THREE.Vector3(f.x, f.y, 0),
+        quat: new THREE.Quaternion(),
+        w: CARD_W,
+        h: CARD_H,
+        opacity: 1,
+      },
+      {
+        id: "front",
+        kind: "card",
+        pos: new THREE.Vector3(f.x, f.y, FOCUS_Z),
+        quat: new THREE.Quaternion(),
+        w: CARD_W,
+        h: CARD_H,
+        opacity: 1,
+      },
     ];
     expect(pickCard3({ x: 0, y: 0 }, camera(false), items)).toBe("front");
   });
@@ -78,7 +94,15 @@ describe("pickCard3 — flat bridge (identity quats)", () => {
   test("dir cards pick like concept cards", () => {
     const a = layout.byId["a"]!;
     const items: PickItem[] = [
-      { id: "dir", kind: "dir", pos: new THREE.Vector3(a.x, a.y, 0), quat: new THREE.Quaternion(), w: a.w, h: a.h, opacity: 1 },
+      {
+        id: "dir",
+        kind: "dir",
+        pos: new THREE.Vector3(a.x, a.y, 0),
+        quat: new THREE.Quaternion(),
+        w: a.w,
+        h: a.h,
+        opacity: 1,
+      },
     ];
     const cam = camera(false);
     expect(pickCard3(ndcOf(new THREE.Vector3(a.x, a.y, 0), cam), cam, items)).toBe("dir");

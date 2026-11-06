@@ -15,7 +15,7 @@ const md = createMd(ctx);
 const from = "decisions/foo"; // bundle-relative concept id
 
 describe("esc", () => {
-  test("escapes & < > \"", () => {
+  test('escapes & < > "', () => {
     expect(esc(`a & <b> "c"`)).toBe("a &amp; &lt;b&gt; &quot;c&quot;");
   });
 });
@@ -119,9 +119,7 @@ describe("inline rendering", () => {
     expect(shadowed.mdToHtml("[here](index.md)", "decisions/foo")).toBe(
       '<p><a href="#" data-bundle="decisions">here</a></p>',
     );
-    expect(b.mdToHtml("[deep](deep/index.md)", from)).toBe(
-      '<p><a href="#" data-bundle="decisions/deep">deep</a></p>',
-    );
+    expect(b.mdToHtml("[deep](deep/index.md)", from)).toBe('<p><a href="#" data-bundle="decisions/deep">deep</a></p>');
     expect(b.mdToHtml("[root](../index.md)", from)).toBe('<p><a href="#" data-bundle="">root</a></p>');
   });
 
@@ -235,9 +233,9 @@ describe("math (KaTeX)", () => {
 
   test("inline $…$ renders KaTeX markup inside the paragraph", () => {
     const out = html("energy is $E = mc^2$ exactly");
-    expect(out).toStartWith("<p>energy is <span class=\"katex\">");
+    expect(out).toStartWith('<p>energy is <span class="katex">');
     expect(out).toEndWith(" exactly</p>");
-    expect(out).toContain("<annotation encoding=\"application/x-tex\">E = mc^2</annotation>");
+    expect(out).toContain('<annotation encoding="application/x-tex">E = mc^2</annotation>');
   });
 
   test("inline \\(…\\) is an equivalent delimiter", () => {
@@ -299,7 +297,8 @@ describe("math (KaTeX)", () => {
 
 describe("footnotes (OKF §5.1 per-claim attribution)", () => {
   test("marks number in first-reference order; definitions lift to a footnotes list", () => {
-    const body = "Sharded daily.[^ga4] Also[^two] and again.[^ga4]\n\n[^ga4]: GA4 export schema\n[^two]: Second *note*\n";
+    const body =
+      "Sharded daily.[^ga4] Also[^two] and again.[^ga4]\n\n[^ga4]: GA4 export schema\n[^two]: Second *note*\n";
     const html = md.mdToHtml(body, from);
     expect(html).toBe(
       '<p>Sharded daily.<sup class="fn"><a href="#" data-fn="ga4" title="ga4">1</a></sup> Also<sup class="fn"><a href="#" data-fn="two" title="two">2</a></sup> and again.<sup class="fn"><a href="#" data-fn="ga4" title="ga4">1</a></sup></p>' +
@@ -315,20 +314,29 @@ describe("footnotes (OKF §5.1 per-claim attribution)", () => {
       { id: "scope", resource: "all queries in project X" },
       { id: "untitled", resource: "https://x/y" },
     ];
-    const body = "a[^pol] b[^arch] c[^man] d[^scope] e[^untitled]\n\n[^pol]: The policy\n[^arch]: Arch\n[^man]: Manual\n[^scope]: Scope\n";
+    const body =
+      "a[^pol] b[^arch] c[^man] d[^scope] e[^untitled]\n\n[^pol]: The policy\n[^arch]: Arch\n[^man]: Manual\n[^scope]: Scope\n";
     const html = md.mdToHtml(body, from);
-    expect(html).not.toContain("footnotes\"><ol><li data-fn-target=\"pol\">The policy —"); // sources not passed: no links
+    expect(html).not.toContain('footnotes"><ol><li data-fn-target="pol">The policy —'); // sources not passed: no links
     const linked = md.mdToHtml(body, from, { sources });
-    expect(linked).toContain('<li data-fn-target="pol">The policy — <a href="https://wiki.acme/policy" target="_blank" rel="noopener">https://wiki.acme/policy</a></li>');
-    expect(linked).toContain('<li data-fn-target="arch">Arch — <a href="#" data-node="wiki/architecture">../wiki/architecture.md</a></li>');
+    expect(linked).toContain(
+      '<li data-fn-target="pol">The policy — <a href="https://wiki.acme/policy" target="_blank" rel="noopener">https://wiki.acme/policy</a></li>',
+    );
+    expect(linked).toContain(
+      '<li data-fn-target="arch">Arch — <a href="#" data-node="wiki/architecture">../wiki/architecture.md</a></li>',
+    );
     expect(linked).toContain('<li data-fn-target="man">Manual — <span class="dim">/svelt/manual.md</span></li>');
-    expect(linked).toContain('<li data-fn-target="scope">Scope — <span class="dim">all queries in project X</span></li>');
+    expect(linked).toContain(
+      '<li data-fn-target="scope">Scope — <span class="dim">all queries in project X</span></li>',
+    );
     // No definition line: the source title (or id) stands in.
     expect(linked).toContain('<li data-fn-target="untitled">untitled — <a href="https://x/y"');
   });
 
   test("marks inside code spans and fences stay literal", () => {
-    expect(md.mdToHtml("use `[^x]` here\n\n```\n[^y]: nope\n```\n", from)).toBe("<p>use <code>[^x]</code> here</p><pre><code>[^y]: nope</code></pre>");
+    expect(md.mdToHtml("use `[^x]` here\n\n```\n[^y]: nope\n```\n", from)).toBe(
+      "<p>use <code>[^x]</code> here</p><pre><code>[^y]: nope</code></pre>",
+    );
   });
 });
 

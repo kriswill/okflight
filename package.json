@@ -65,10 +65,9 @@
     "@happy-dom/global-registrator": "^21.0.4",
     "@types/bun": "^1.4.4",
     "@types/three": "^0.185.0",
-    "@typescript/native-preview": "^7.0.0-dev.20260704.1",
     "happy-dom": "^21.0.4",
     "puppeteer-core": "^25.16.0",
-    "svelte-check": "^4.7.1",
+    "svelte-check": "^4.7.8",
     "typescript": "~6.0.3"
   }
 }

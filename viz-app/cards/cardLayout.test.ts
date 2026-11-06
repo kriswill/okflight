@@ -367,7 +367,10 @@ describe("horizontal flow", () => {
 
   test("large sets stay one scrollable column", () => {
     const many = buildModel({
-      nodes: [node("f", "Decision", "Focus"), ...Array.from({ length: 9 }, (_, i) => node(`n${i}`, "Pattern", `N${i}`))],
+      nodes: [
+        node("f", "Decision", "Focus"),
+        ...Array.from({ length: 9 }, (_, i) => node(`n${i}`, "Pattern", `N${i}`)),
+      ],
       edges: Array.from({ length: 9 }, (_, i) => ({ s: `n${i}`, t: "f" })),
       cfg: cfg(),
     });

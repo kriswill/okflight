@@ -104,12 +104,7 @@ export function edgeHead(
  *  linear gradient along the path from the source card's color to the
  *  target's. Ring-major vertex order — (rings+1) rings of (radial+1)
  *  vertices — mirrors three's generator, so index i's ring is i/(radial+1). */
-export function tubeGradient(
-  from: THREE.Color,
-  to: THREE.Color,
-  rings: number,
-  radial: number,
-): Float32Array {
+export function tubeGradient(from: THREE.Color, to: THREE.Color, rings: number, radial: number): Float32Array {
   const perRing = radial + 1;
   const out = new Float32Array((rings + 1) * perRing * 3);
   const c = new THREE.Color();

@@ -28,9 +28,18 @@ for (const rel of walkMd(bundle, bundleFilter(cfg.viz.bundle.include, cfg.viz.bu
     continue;
   }
   if (reserved.has(base)) {
-    if (rel === "index.md" && doc.fm && doc.fm.okf_version !== undefined && String(doc.fm.okf_version) !== OKF_VERSION) {
+    if (
+      rel === "index.md" &&
+      doc.fm &&
+      doc.fm.okf_version !== undefined &&
+      String(doc.fm.okf_version) !== OKF_VERSION
+    ) {
       const fm: FM = { ...doc.fm, okf_version: OKF_VERSION };
-      changes.push({ rel, notes: [`okf_version ${String(doc.fm.okf_version)} -> ${OKF_VERSION}`], next: fmToYaml(fm) + doc.body });
+      changes.push({
+        rel,
+        notes: [`okf_version ${String(doc.fm.okf_version)} -> ${OKF_VERSION}`],
+        next: fmToYaml(fm) + doc.body,
+      });
     }
     continue;
   }

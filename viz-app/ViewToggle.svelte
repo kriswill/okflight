@@ -16,10 +16,20 @@
   {#if viz.viewMode === "cards"}
     <div class="row" id="flow">
       <span class="hint">flow</span>
-      <button class="seg" class:active={viz.cardFlow === "h"} title="left-right flow" onclick={() => viz.setCardFlow("h")}>
+      <button
+        class="seg"
+        class:active={viz.cardFlow === "h"}
+        title="left-right flow"
+        onclick={() => viz.setCardFlow("h")}
+      >
         →
       </button>
-      <button class="seg" class:active={viz.cardFlow === "v"} title="top-down flow" onclick={() => viz.setCardFlow("v")}>
+      <button
+        class="seg"
+        class:active={viz.cardFlow === "v"}
+        title="top-down flow"
+        onclick={() => viz.setCardFlow("v")}
+      >
         ↓
       </button>
     </div>

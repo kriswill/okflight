@@ -1,2 +1,18 @@
 [test]
 preload = ["./test/setup/happy-dom.ts", "./test/setup/svelte-loader.ts"]
+
+# `bun fmt`, set to match the existing style. Double quotes, semicolons,
+# 2-space indent, trailing commas and parenthesized arrow params are already
+# Prettier's defaults; only the width differs. 99% of lines fit in 120, and
+# wider settings barely shrink the diff.
+[fmt]
+printWidth = 120
+# Markdown keeps its compact hand-written tables. test/fixtures holds test
+# inputs, some of them generated, so formatting would change what is tested.
+ignorePatterns = ["*.md", "test/fixtures/"]
+# Components: "strict" stops the formatter adding or removing whitespace
+# around text and inline tags. It can still turn an existing space into a
+# line break, which renders the same but shows up in textContent.
+[[fmt.overrides]]
+files = ["*.svelte"]
+options = { htmlWhitespaceSensitivity = "strict" }

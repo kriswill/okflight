@@ -81,7 +81,9 @@ describe("elbowPath3", () => {
     // Fine sampling: end segments align with the requested tangents.
     const fine = elbowPath3(from, fromTan, to, toTan, { segments: 2000 });
     const d0 = fine[1]!.clone().sub(fine[0]!).normalize();
-    const d1 = fine[fine.length - 1]!.clone().sub(fine[fine.length - 2]!).normalize();
+    const d1 = fine[fine.length - 1]!.clone()
+      .sub(fine[fine.length - 2]!)
+      .normalize();
     expect(d0.dot(fromTan)).toBeGreaterThan(0.999);
     // Entering along -toTan (the path flows INTO the edge the tangent leaves).
     expect(d1.dot(toTan.clone().negate())).toBeGreaterThan(0.999);

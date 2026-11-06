@@ -82,7 +82,12 @@ describe("parseFrontmatter", () => {
       "---\ntype: Decision\ntags: [a, b]\ntimestamp: '2026-05-28T22:53:05+00:00'\nrefs:\n  - x\n  - y\n---\nbody\n",
     );
     expect(fmError).toBeNull();
-    expect(fm).toEqual({ type: "Decision", tags: ["a", "b"], timestamp: "2026-05-28T22:53:05+00:00", refs: ["x", "y"] });
+    expect(fm).toEqual({
+      type: "Decision",
+      tags: ["a", "b"],
+      timestamp: "2026-05-28T22:53:05+00:00",
+      refs: ["x", "y"],
+    });
   });
 
   test("no frontmatter, unterminated, invalid, and non-mapping blocks", () => {
@@ -94,7 +99,9 @@ describe("parseFrontmatter", () => {
   });
 
   test("CRLF files parse at both fences; the body keeps its line endings", () => {
-    const { fm, fmError, body } = parseFrontmatter("---\r\ntype: X\r\ntags: [a, b]\r\ntitle: 'Issue: 42'\r\n---\r\nbody\r\n");
+    const { fm, fmError, body } = parseFrontmatter(
+      "---\r\ntype: X\r\ntags: [a, b]\r\ntitle: 'Issue: 42'\r\n---\r\nbody\r\n",
+    );
     expect(fmError).toBeNull();
     expect(fm).toEqual({ type: "X", tags: ["a", "b"], title: "Issue: 42" });
     expect(body).toBe("body\r\n");
@@ -132,7 +139,9 @@ describe("fmToYaml", () => {
     expect(yaml).toContain("generated: { by: reference_agent/gemini-2.5-pro, at: 2026-06-20T22:53:05Z }");
     expect(yaml).toContain("parameters:\n  - { name: year, type: integer, required: true }");
     expect(yaml).toContain("sources:\n  - id: rev-policy\n    resource: https://wiki.acme/finance/revenue-recognition");
-    expect(yaml).toContain("executor:\n  resource: references/skills/run-on-bq.md\n  receipt: [job_id, executed_sql, result]");
+    expect(yaml).toContain(
+      "executor:\n  resource: references/skills/run-on-bq.md\n  receipt: [job_id, executed_sql, result]",
+    );
     expect(parseFrontmatter(yaml + "\n").fm).toEqual(fm);
   });
 
@@ -154,7 +163,9 @@ describe("fmToYaml", () => {
       n: true,
     };
     const yaml = fmToYaml(fm);
-    expect(yaml).toContain("a: human:k\nb: https://x.y/z\nc: 2026-06-28T14:00:00Z\nd: 'Revenue: FY'\ne: 'x # y'\nf: '5000'\ng: 'yes'\nh: 'it''s'\ni: ''\nj: '1e3'\nk: '-x'\nl: [a b, 'c, d']\nm: 5000\nn: true");
+    expect(yaml).toContain(
+      "a: human:k\nb: https://x.y/z\nc: 2026-06-28T14:00:00Z\nd: 'Revenue: FY'\ne: 'x # y'\nf: '5000'\ng: 'yes'\nh: 'it''s'\ni: ''\nj: '1e3'\nk: '-x'\nl: [a b, 'c, d']\nm: 5000\nn: true",
+    );
     expect(parseFrontmatter(yaml + "\n").fm).toEqual(fm);
   });
 
@@ -166,7 +177,10 @@ describe("fmToYaml", () => {
 describe("trust / lifecycle readers", () => {
   test("asVerifiedList: bare mapping is a one-element list (§5.2)", () => {
     expect(asVerifiedList({ by: "human:a", at: "x" })).toEqual([{ by: "human:a", at: "x" }]);
-    expect(asVerifiedList([{ by: "process:p" }, "junk", { by: "human:a" }])).toEqual([{ by: "process:p" }, { by: "human:a" }]);
+    expect(asVerifiedList([{ by: "process:p" }, "junk", { by: "human:a" }])).toEqual([
+      { by: "process:p" },
+      { by: "human:a" },
+    ]);
     expect(asVerifiedList(undefined)).toEqual([]);
     expect(asVerifiedList("human:a")).toEqual([]);
   });
@@ -194,8 +208,12 @@ describe("trust / lifecycle readers", () => {
   });
 
   test("generatedAt falls back to the v0.1 timestamp (§13.1)", () => {
-    expect(generatedAt({ generated: { by: "human:k", at: "2026-01-01T00:00:00Z" }, timestamp: "old" })).toBe("2026-01-01T00:00:00Z");
-    expect(generatedAt({ generated: { by: "human:k" }, timestamp: "2025-01-01T00:00:00+00:00" })).toBe("2025-01-01T00:00:00+00:00");
+    expect(generatedAt({ generated: { by: "human:k", at: "2026-01-01T00:00:00Z" }, timestamp: "old" })).toBe(
+      "2026-01-01T00:00:00Z",
+    );
+    expect(generatedAt({ generated: { by: "human:k" }, timestamp: "2025-01-01T00:00:00+00:00" })).toBe(
+      "2025-01-01T00:00:00+00:00",
+    );
     expect(generatedAt({})).toBeUndefined();
   });
 
@@ -268,8 +286,16 @@ x
 `;
     const c = extractCitationsSection(b)!;
     expect(c.items).toEqual([
-      { resource: "https://wiki.acme/finance/fpa-handbook", title: "FP&A handbook", raw: "[FP&A handbook](https://wiki.acme/finance/fpa-handbook)" },
-      { resource: "https://wiki.acme/finance/cost-allocation", title: "https://wiki.acme/finance/cost-allocation", raw: "<https://wiki.acme/finance/cost-allocation>" },
+      {
+        resource: "https://wiki.acme/finance/fpa-handbook",
+        title: "FP&A handbook",
+        raw: "[FP&A handbook](https://wiki.acme/finance/fpa-handbook)",
+      },
+      {
+        resource: "https://wiki.acme/finance/cost-allocation",
+        title: "https://wiki.acme/finance/cost-allocation",
+        raw: "<https://wiki.acme/finance/cost-allocation>",
+      },
       { resource: "https://example.com/x", title: "the x doc", raw: "https://example.com/x - the x doc" },
       { resource: null, title: "Commits `abc1234`", raw: "Commits `abc1234`" },
     ]);
@@ -302,12 +328,26 @@ describe("code-review follow-ups", () => {
   });
 
   test("string-typed keys keep bare numbers/booleans as text", () => {
-    const { fm } = parseFrontmatter("---\ntype: 2024\ntitle: 2024\ndescription: true\ntags: [2024, foo]\nokf_version: 0.2\ncount: 3\n---\n");
-    expect(fm).toEqual({ type: "2024", title: "2024", description: "true", tags: ["2024", "foo"], okf_version: "0.2", count: 3 });
+    const { fm } = parseFrontmatter(
+      "---\ntype: 2024\ntitle: 2024\ndescription: true\ntags: [2024, foo]\nokf_version: 0.2\ncount: 3\n---\n",
+    );
+    expect(fm).toEqual({
+      type: "2024",
+      title: "2024",
+      description: "true",
+      tags: ["2024", "foo"],
+      okf_version: "0.2",
+      count: 3,
+    });
   });
 
   test("multi-line strings serialize as block scalars and round-trip", () => {
-    const fm = { type: "X", description: "first line\nsecond line\n", note: "no trailing\nnewline", generated: { by: "human:k", at: "a\nb" } };
+    const fm = {
+      type: "X",
+      description: "first line\nsecond line\n",
+      note: "no trailing\nnewline",
+      generated: { by: "human:k", at: "a\nb" },
+    };
     const yaml = fmToYaml(fm);
     expect(yaml).toContain("description: |\n  first line\n  second line\nnote: |-\n  no trailing\n  newline\n");
     expect(yaml).toContain('generated: { by: human:k, at: "a\\nb" }');
@@ -328,20 +368,25 @@ describe("code-review follow-ups", () => {
 
 describe("extractCitationsSection — prefixed items (dotfiles shapes)", () => {
   test("first link/URL anywhere in the item is the source; prose before it joins the title", () => {
-    const b = "## Citations\n\n- nix-darwin homebrew options — <https://nix-darwin.github.io/manual>\n- Fork supervision layer: [nix/tools/README.md](https://gh/x/README.md)\n- Manual: [`docs/helium.md`](../../docs/helium.md) — dated learned-behaviour\n- Commits `abc` (PR #22)\n";
+    const b =
+      "## Citations\n\n- nix-darwin homebrew options — <https://nix-darwin.github.io/manual>\n- Fork supervision layer: [nix/tools/README.md](https://gh/x/README.md)\n- Manual: [`docs/helium.md`](../../docs/helium.md) — dated learned-behaviour\n- Commits `abc` (PR #22)\n";
     expect(extractCitationsSection(b)!.items.map(({ resource, title }) => [resource, title])).toEqual([
       ["https://nix-darwin.github.io/manual", "nix-darwin homebrew options"],
       ["https://gh/x/README.md", "Fork supervision layer: nix/tools/README.md"],
       ["../../docs/helium.md", "Manual: docs/helium.md"],
       [null, "Commits `abc` (PR #22)"],
     ]);
-    expect(sourceId("How the Open Knowledge Format can improve data sharing")).toBe("how-the-open-knowledge-format-can-improve-data");
+    expect(sourceId("How the Open Knowledge Format can improve data sharing")).toBe(
+      "how-the-open-knowledge-format-can-improve-data",
+    );
   });
 });
 
 describe("footnote refs ignore inline code (viewer parity)", () => {
   test("a [^id] inside backticks is prose about footnotes, not a citation", () => {
-    expect(extractFootnoteRefs("write `…documented.[^manual]` to cite; real one here[^real]\n\n[^real]: r\n")).toEqual(["real"]);
+    expect(extractFootnoteRefs("write `…documented.[^manual]` to cite; real one here[^real]\n\n[^real]: r\n")).toEqual([
+      "real",
+    ]);
   });
 });
 
@@ -382,7 +427,11 @@ describe("[bundle] include / exclude", () => {
       const f = bundleFilter(["wiki/**", "sources/**"]);
       const seen: string[] = [];
       const spy = { doc: f.doc, dir: (rel: string) => (seen.push(rel), f.dir(rel)) };
-      expect(walkMd(dir, spy).map((r) => r.split("\\").join("/"))).toEqual(["sources/web/c.md", "wiki/a.md", "wiki/sub/b.md"]);
+      expect(walkMd(dir, spy).map((r) => r.split("\\").join("/"))).toEqual([
+        "sources/web/c.md",
+        "wiki/a.md",
+        "wiki/sub/b.md",
+      ]);
       expect(seen.map((r) => r.split("\\").join("/"))).not.toContain("projects/p");
       expect(walkMd(dir)).toHaveLength(5);
     } finally {
@@ -393,7 +442,12 @@ describe("[bundle] include / exclude", () => {
 
 describe("frontmatter link fields", () => {
   test("linkFieldValues: scalar or list, [[wikilink]] wrappers and #fragments dropped", () => {
-    expect(linkFieldValues({ related: ["a", "[[b]]", "[[c|C]]", "d#Heading", 7, ""] }, "related")).toEqual(["a", "b", "c", "d"]);
+    expect(linkFieldValues({ related: ["a", "[[b]]", "[[c|C]]", "d#Heading", 7, ""] }, "related")).toEqual([
+      "a",
+      "b",
+      "c",
+      "d",
+    ]);
     expect(linkFieldValues({ related: "solo" }, "related")).toEqual(["solo"]);
     expect(linkFieldValues({}, "related")).toEqual([]);
     expect(linkFieldValues(null, "related")).toEqual([]);
@@ -442,9 +496,15 @@ describe("markdown regexes stay linear on hostile input (CodeQL js/polynomial-re
     expect(lenientScalars("title: Issue: 42")).toBe("title: 'Issue: 42'");
     expect(timed(() => linkFieldValues({ r: "[[" + "|".repeat(big) }, "r"))).toEqual(["[[" + "|".repeat(big)]);
     expect(linkFieldValues({ r: "[[a|b|c]]" }, "r")).toEqual(["a"]);
-    const items = timed(() => extractCitationsSection("## Citations\n- " + "[".repeat(big) + "\n- " + "\t".repeat(big) + "x\n"));
+    const items = timed(() =>
+      extractCitationsSection("## Citations\n- " + "[".repeat(big) + "\n- " + "\t".repeat(big) + "x\n"),
+    );
     expect(items?.items.map((i) => i.resource)).toEqual([null, null]);
-    expect(extractCitationsSection("## Citations\n- Manual — : [T](http://x) gloss\n- see <https://y> — after\n")?.items.map((i) => [i.resource, i.title])).toEqual([
+    expect(
+      extractCitationsSection("## Citations\n- Manual — : [T](http://x) gloss\n- see <https://y> — after\n")?.items.map(
+        (i) => [i.resource, i.title],
+      ),
+    ).toEqual([
       ["http://x", "Manual: T"],
       ["https://y", "see"],
     ]);

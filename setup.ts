@@ -138,8 +138,8 @@ if (!w.created.length && !notes.length) {
     steps.push(
       "",
       `  ${c.dim("flake.nix detected — consume okf as an input:")}`,
-      `    ${c.dim("inputs.okf.url = \"github:kriswill/okflight\";")}`,
-      `    ${c.dim("inputs.okf.inputs.nixpkgs.follows = \"nixpkgs\";  # then expose inputs.okf.packages.<system>.okf")}`,
+      `    ${c.dim('inputs.okf.url = "github:kriswill/okflight";')}`,
+      `    ${c.dim('inputs.okf.inputs.nixpkgs.follows = "nixpkgs";  # then expose inputs.okf.packages.<system>.okf')}`,
     );
   console.log(["", `Workspace set up at ${cwd}`, "", "Next steps:", ...steps].join("\n"));
 }

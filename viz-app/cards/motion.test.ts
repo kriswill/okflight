@@ -69,9 +69,7 @@ describe("first layout & settled state", () => {
     m.setLayout(layoutF());
     for (const a of m.arrowStates()) {
       const from = m.sample(a.fromId)!;
-      const anchorWorld = new THREE.Vector3(a.fromLocal.x, a.fromLocal.y, 0)
-        .applyQuaternion(from.quat)
-        .add(from.pos);
+      const anchorWorld = new THREE.Vector3(a.fromLocal.x, a.fromLocal.y, 0).applyQuaternion(from.quat).add(from.pos);
       expect(a.path[0]!.distanceTo(anchorWorld)).toBeLessThan(1e-9);
       close(a.opacity, 0.85);
     }

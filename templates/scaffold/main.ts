@@ -12,7 +12,9 @@
 import type { ScaffoldContext } from "./scaffold-api";
 
 export default async function scaffold(ctx: ScaffoldContext) {
-  ctx.log(`scaffold pass for ${ctx.bundleDir}/ — nothing configured yet (edit ${ctx.bundleDir}/_okflight/scripts/main.ts)`);
+  ctx.log(
+    `scaffold pass for ${ctx.bundleDir}/ — nothing configured yet (edit ${ctx.bundleDir}/_okflight/scripts/main.ts)`,
+  );
 
   // Emit one concept doc per source component the bundle should catalog, e.g.:
   //

@@ -19,11 +19,7 @@ export interface Head {
 
 /** Sampled S-curve between two edge anchors. `bend` scales how far the
  *  axis-aligned tangents extend (fraction of the along-flow drop). */
-export function elbowPath(
-  from: Pt,
-  to: Pt,
-  opts?: { segments?: number; bend?: number; axis?: "y" | "x" },
-): Pt[] {
+export function elbowPath(from: Pt, to: Pt, opts?: { segments?: number; bend?: number; axis?: "y" | "x" }): Pt[] {
   const segments = opts?.segments ?? 24;
   const bend = opts?.bend ?? 0.4;
   const c1 = { ...from };

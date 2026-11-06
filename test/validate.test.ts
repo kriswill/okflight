@@ -9,13 +9,23 @@ const OKF = join(import.meta.dir, "..", "okf.ts");
 const SPEC_FIXTURE = join(import.meta.dir, "fixtures", "spec-v02");
 
 function run(cwd: string, ...args: string[]) {
-  const r = Bun.spawnSync([process.execPath, OKF, "validate", ...args], { cwd, env: { ...process.env, NO_COLOR: "1" } });
+  const r = Bun.spawnSync([process.execPath, OKF, "validate", ...args], {
+    cwd,
+    env: { ...process.env, NO_COLOR: "1" },
+  });
   const out = r.stdout.toString() + r.stderr.toString();
-  return { code: r.exitCode, out, errors: out.split("\n").filter((l) => l.startsWith("ERROR:")), warnings: out.split("\n").filter((l) => l.startsWith("warn:")) };
+  return {
+    code: r.exitCode,
+    out,
+    errors: out.split("\n").filter((l) => l.startsWith("ERROR:")),
+    warnings: out.split("\n").filter((l) => l.startsWith("warn:")),
+  };
 }
 
 const dirs: string[] = [];
-afterEach(() => { for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true }); });
+afterEach(() => {
+  for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+});
 
 /** A throwaway workspace: okflight.toml (no VCS) + kb/ with the given files. */
 function workspace(files: Record<string, string>, index = "---\nokf_version: '0.2'\n---\n\n# kb\n") {
@@ -94,7 +104,8 @@ describe("okf validate (OKF v0.2)", () => {
 
   test("Attested Computation contract (§10)", () => {
     const root = workspace({
-      "computations/none.md": "---\ntype: Attested Computation\ntitle: t\ndescription: d\ngenerated: { by: human:k }\n---\n# Computation\n\nprose only, no fence\n",
+      "computations/none.md":
+        "---\ntype: Attested Computation\ntitle: t\ndescription: d\ngenerated: { by: human:k }\n---\n# Computation\n\nprose only, no fence\n",
       "computations/shape.md": [
         "---",
         "type: Attested Computation",
@@ -130,8 +141,10 @@ describe("okf validate (OKF v0.2)", () => {
 
   test("v0.1 bundles consume with warnings only; --strict fails them; version nudge", () => {
     const legacy = {
-      "old.md": "---\ntype: Decision\ntitle: t\ndescription: d\ntimestamp: '2026-05-28T22:53:05+00:00'\n---\n## Context\n\nx\n\n## Citations\n\n- [Doc](https://example.com/doc)\n",
-      "new.md": "---\ntype: Decision\ntitle: t\ndescription: d\ngenerated: { by: human:k, at: 2026-05-28T22:53:05Z }\n---\nbody\n",
+      "old.md":
+        "---\ntype: Decision\ntitle: t\ndescription: d\ntimestamp: '2026-05-28T22:53:05+00:00'\n---\n## Context\n\nx\n\n## Citations\n\n- [Doc](https://example.com/doc)\n",
+      "new.md":
+        "---\ntype: Decision\ntitle: t\ndescription: d\ngenerated: { by: human:k, at: 2026-05-28T22:53:05Z }\n---\nbody\n",
     };
     const root = workspace(legacy, "---\nokf_version: '0.1'\n---\n\n# kb\n");
     const r = run(root);
@@ -143,7 +156,10 @@ describe("okf validate (OKF v0.2)", () => {
     expect(w).toContain("index.md: bundle declares okf_version '0.1' but concepts use v0.2 fields");
     expect(run(root, "--strict").code).toBe(1);
 
-    const unknown = workspace({ "a.md": "---\ntype: X\ntitle: t\ndescription: d\ngenerated: { by: human:k }\n---\nb\n" }, "---\nokf_version: '9.0'\n---\n\n# kb\n");
+    const unknown = workspace(
+      { "a.md": "---\ntype: X\ntitle: t\ndescription: d\ngenerated: { by: human:k }\n---\nb\n" },
+      "---\nokf_version: '9.0'\n---\n\n# kb\n",
+    );
     const u = run(unknown);
     expect(u.code).toBe(0);
     expect(u.warnings.join("\n")).toContain("okf_version '9.0' is not one this tooling knows");
@@ -151,8 +167,10 @@ describe("okf validate (OKF v0.2)", () => {
 
   test("path-valued fields: rooted is bundle-relative, dangling warns, repo escape follows repo-links", () => {
     const root = workspace({
-      "a.md": "---\ntype: X\ntitle: t\ndescription: d\ngenerated: { by: human:k }\nresource: /b.md\nsources:\n  - { id: s, resource: /nope.md }\n  - { id: d, resource: all queries in project X }\n---\nx[^s] y[^d]\n\n[^s]: s\n[^d]: d\n",
-      "b.md": "---\ntype: X\ntitle: t\ndescription: d\ngenerated: { by: human:k }\nresource: ../okflight.toml\n---\nb\n",
+      "a.md":
+        "---\ntype: X\ntitle: t\ndescription: d\ngenerated: { by: human:k }\nresource: /b.md\nsources:\n  - { id: s, resource: /nope.md }\n  - { id: d, resource: all queries in project X }\n---\nx[^s] y[^d]\n\n[^s]: s\n[^d]: d\n",
+      "b.md":
+        "---\ntype: X\ntitle: t\ndescription: d\ngenerated: { by: human:k }\nresource: ../okflight.toml\n---\nb\n",
       "c.md": "---\ntype: X\ntitle: t\ndescription: d\ngenerated: { by: human:k }\nresource: ../../outside\n---\nc\n",
     });
     const r = run(root);
@@ -167,8 +185,10 @@ describe("okf validate (OKF v0.2)", () => {
 describe("code-review follow-ups", () => {
   test("workspace-relative resource (what scaffold writes) resolves through the repo, not as a bundle miss", () => {
     const root = workspace({
-      "modules/foo.md": "---\ntype: Module\ntitle: t\ndescription: d\ngenerated: { by: human:k }\nresource: src/foo.py\n---\nbody\n",
-      "modules/bar.md": "---\ntype: Module\ntitle: t\ndescription: d\ngenerated: { by: human:k }\nresource: src/missing.py\nattester: { resource: ../../tools/attest.py }\nruntime: x\n---\nbody\n",
+      "modules/foo.md":
+        "---\ntype: Module\ntitle: t\ndescription: d\ngenerated: { by: human:k }\nresource: src/foo.py\n---\nbody\n",
+      "modules/bar.md":
+        "---\ntype: Module\ntitle: t\ndescription: d\ngenerated: { by: human:k }\nresource: src/missing.py\nattester: { resource: ../../tools/attest.py }\nruntime: x\n---\nbody\n",
     });
     mkdirSync(join(root, "src"));
     writeFileSync(join(root, "src/foo.py"), "");
@@ -176,16 +196,23 @@ describe("code-review follow-ups", () => {
     writeFileSync(join(root, "tools/attest.py"), "");
     const r = run(root, "--strict");
     expect(r.out).not.toContain("modules/foo.md");
-    expect(r.warnings.join("\n")).toContain("modules/bar.md: resource 'src/missing.py' does not resolve in the bundle or the repository");
+    expect(r.warnings.join("\n")).toContain(
+      "modules/bar.md: resource 'src/missing.py' does not resolve in the bundle or the repository",
+    );
     expect(r.out).not.toContain("attester.resource");
   });
 
   test("rooted body links with a #fragment resolve; Citations with only revision items never nag; migrated sources need no footnote", () => {
     const root = workspace({
-      "modules/x.md": "---\ntype: X\ntitle: t\ndescription: d\ngenerated: { by: human:k }\n---\nsee [y](/modules/y.md#sec) and [z](/modules/nope.md)\n\n## Citations\n\n- Commits `abc1234`\n",
-      "modules/y.md": "---\ntype: X\ntitle: t\ndescription: d\ngenerated: { by: human:k }\nsources:\n  - { id: doc, resource: https://x/doc }\n---\nno footnote here\n",
+      "modules/x.md":
+        "---\ntype: X\ntitle: t\ndescription: d\ngenerated: { by: human:k }\n---\nsee [y](/modules/y.md#sec) and [z](/modules/nope.md)\n\n## Citations\n\n- Commits `abc1234`\n",
+      "modules/y.md":
+        "---\ntype: X\ntitle: t\ndescription: d\ngenerated: { by: human:k }\nsources:\n  - { id: doc, resource: https://x/doc }\n---\nno footnote here\n",
     });
-    writeFileSync(join(root, "okflight.toml"), '[bundle]\ndir = "kb"\n[vcs]\nprovider = "none"\n[profile]\nrooted-links = "allow"\n');
+    writeFileSync(
+      join(root, "okflight.toml"),
+      '[bundle]\ndir = "kb"\n[vcs]\nprovider = "none"\n[profile]\nrooted-links = "allow"\n',
+    );
     const r = run(root, "--strict");
     expect(r.warnings).toEqual(["warn:  modules/x.md: dangling bundle link '/modules/nope.md'"]);
     expect(r.errors).toEqual([]);
@@ -203,7 +230,10 @@ describe("okf validate: [bundle] link-fields", () => {
       "e/dup.md": T + "---\n",
       "f.md": T + "related: { not: a list }\n---\n",
     });
-    writeFileSync(join(root, "okflight.toml"), '[bundle]\ndir = "kb"\nlink-fields = ["related"]\n[vcs]\nprovider = "none"\n');
+    writeFileSync(
+      join(root, "okflight.toml"),
+      '[bundle]\ndir = "kb"\nlink-fields = ["related"]\n[vcs]\nprovider = "none"\n',
+    );
     const r = run(root);
     expect(r.warnings).toContain("warn:  a.md: related 'ghost' does not resolve to a concept");
     expect(r.warnings).toContain("warn:  a.md: related 'dup' matches several concepts (d/dup, e/dup) — use a path");

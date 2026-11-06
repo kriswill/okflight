@@ -69,14 +69,29 @@ if (!existsSync(bundle)) {
 }
 
 /** The v0.2 keys whose presence marks a doc as post-v0.1 (for the version nudge). */
-const V02_KEYS = ["generated", "verified", "sources", "usage_window", "status", "stale_after", "runtime", "computation", "executor", "attester"];
+const V02_KEYS = [
+  "generated",
+  "verified",
+  "sources",
+  "usage_window",
+  "status",
+  "stale_after",
+  "runtime",
+  "computation",
+  "executor",
+  "attester",
+];
 let sawV02Fields = false;
 let declaredVersion: string | null = null;
 
 // "Empty" must cover every frontmatter value shape: "", [] and {} (arrays
 // and objects are truthy, so a bare falsy check silently passes them).
 const empty = (v: unknown) =>
-  v === undefined || v === null || v === "" || (Array.isArray(v) && !v.length) || (isPlainObject(v) && !Object.keys(v).length);
+  v === undefined ||
+  v === null ||
+  v === "" ||
+  (Array.isArray(v) && !v.length) ||
+  (isPlainObject(v) && !Object.keys(v).length);
 
 /** Resolve a path-valued frontmatter field (§6.2) the way body links are
  *  checked: inside the bundle it must exist (warn), escaping into the repo
@@ -113,7 +128,9 @@ function checkPathField(rel: string, field: string, value: unknown) {
 const checkActorAt = (rel: string, field: string, e: Record<string, unknown>, byRequired: boolean) => {
   if (byRequired && empty(e.by)) errors.push(`${rel}: ${field}.by is required (an actor, §7)`);
   else if (e.by !== undefined && !isActor(e.by))
-    errors.push(`${rel}: ${field}.by '${String(e.by)}' is not an actor (human:<id> | process:<id> | <producer>/<version>)`);
+    errors.push(
+      `${rel}: ${field}.by '${String(e.by)}' is not an actor (human:<id> | process:<id> | <producer>/<version>)`,
+    );
   if (e.at !== undefined && !isIsoDateTime(e.at))
     errors.push(`${rel}: ${field}.at '${String(e.at)}' is not an ISO 8601 datetime with a UTC offset`);
 };
@@ -155,7 +172,8 @@ function checkFamilies(rel: string, fm: FM, body: string) {
   if (fm.status !== undefined && !(STATUSES as readonly unknown[]).includes(fm.status))
     errors.push(`${rel}: status '${String(fm.status)}' must be one of ${STATUSES.join(" | ")}`);
   if (fm.stale_after !== undefined) {
-    if (!isIsoDateTime(fm.stale_after)) errors.push(`${rel}: stale_after '${String(fm.stale_after)}' is not an ISO 8601 datetime`);
+    if (!isIsoDateTime(fm.stale_after))
+      errors.push(`${rel}: stale_after '${String(fm.stale_after)}' is not an ISO 8601 datetime`);
     else if (isStale(fm, now)) warnings.push(`${rel}: stale since ${String(fm.stale_after)} (stale_after)`);
   }
   // §5.1 sources + usage_window
@@ -180,9 +198,12 @@ function checkFamilies(rel: string, fm: FM, body: string) {
           else ids.add(s.id);
         }
         if (s.author !== undefined && !(typeof s.author === "string" && AUTHOR_RE.test(s.author)))
-          warnings.push(`${rel}: ${f}.author '${String(s.author)}' is not actor-shaped (§7: human:<id>, process:<id>, team:<id>, <producer>/<version>)`);
+          warnings.push(
+            `${rel}: ${f}.author '${String(s.author)}' is not actor-shaped (§7: human:<id>, process:<id>, team:<id>, <producer>/<version>)`,
+          );
         if (s.usage_count !== undefined) {
-          if (typeof s.usage_count !== "number" || s.usage_count < 0) errors.push(`${rel}: ${f}.usage_count must be a non-negative number`);
+          if (typeof s.usage_count !== "number" || s.usage_count < 0)
+            errors.push(`${rel}: ${f}.usage_count must be a non-negative number`);
           else if (s.usage_window === undefined && sharedWindow === undefined)
             warnings.push(`${rel}: ${f}.usage_count has no usage_window framing it (§5.1)`);
         }
@@ -195,14 +216,14 @@ function checkFamilies(rel: string, fm: FM, body: string) {
   const refs = extractFootnoteRefs(body);
   const defs = extractFootnoteDefs(body);
   for (const label of refs) {
-    if (Array.isArray(src) && !ids.has(label))
-      errors.push(`${rel}: footnote [^${label}] has no matching sources[].id`);
+    if (Array.isArray(src) && !ids.has(label)) errors.push(`${rel}: footnote [^${label}] has no matching sources[].id`);
     else if (!Array.isArray(src)) warnings.push(`${rel}: footnote [^${label}] but no sources frontmatter to key into`);
     if (!(label in defs)) warnings.push(`${rel}: footnote [^${label}] has no definition line`);
   }
   // v0.1 leftovers (§13.1)
   if (fm.timestamp !== undefined) {
-    if (gen === undefined) warnings.push(`${rel}: 'timestamp' is superseded by generated.at in OKF v0.2 — run okf migrate`);
+    if (gen === undefined)
+      warnings.push(`${rel}: 'timestamp' is superseded by generated.at in OKF v0.2 — run okf migrate`);
     if (typeof fm.timestamp === "string" && fm.timestamp && Number.isNaN(Date.parse(fm.timestamp)))
       warnings.push(`${rel}: timestamp '${fm.timestamp}' is not ISO-8601 parseable`);
   }
@@ -218,10 +239,12 @@ function checkFamilies(rel: string, fm: FM, body: string) {
 function checkComputation(rel: string, fm: FM, body: string) {
   if (fm.type !== "Attested Computation") {
     for (const k of ["runtime", "parameters", "computation", "executor", "attester"])
-      if (fm[k] !== undefined) warnings.push(`${rel}: '${k}' is an Attested Computation field (§10) on a '${String(fm.type)}' concept`);
+      if (fm[k] !== undefined)
+        warnings.push(`${rel}: '${k}' is an Attested Computation field (§10) on a '${String(fm.type)}' concept`);
     return;
   }
-  if (empty(fm.runtime) || typeof fm.runtime !== "string") errors.push(`${rel}: Attested Computation requires 'runtime' (§10.2)`);
+  if (empty(fm.runtime) || typeof fm.runtime !== "string")
+    errors.push(`${rel}: Attested Computation requires 'runtime' (§10.2)`);
   const params = fm.parameters;
   if (params !== undefined) {
     if (!Array.isArray(params)) errors.push(`${rel}: parameters must be a list of { name, type, required }`);
@@ -230,18 +253,25 @@ function checkComputation(rel: string, fm: FM, body: string) {
         if (!isPlainObject(p) || typeof p.name !== "string" || !p.name)
           errors.push(`${rel}: parameters[${i}] needs a name (and type, required)`);
         else {
-          if (p.type !== undefined && typeof p.type !== "string") errors.push(`${rel}: parameters[${i}].type must be a string`);
-          if (p.required !== undefined && typeof p.required !== "boolean") errors.push(`${rel}: parameters[${i}].required must be a boolean`);
+          if (p.type !== undefined && typeof p.type !== "string")
+            errors.push(`${rel}: parameters[${i}].type must be a string`);
+          if (p.required !== undefined && typeof p.required !== "boolean")
+            errors.push(`${rel}: parameters[${i}].required must be a boolean`);
         }
       });
   }
   // §10.3: the computation is inline (a fence under # Computation) XOR a file.
   const fence = hasComputationFence(body);
   const file = str(fm, "computation");
-  if (fm.computation !== undefined && typeof fm.computation !== "string") errors.push(`${rel}: computation must be a path`);
+  if (fm.computation !== undefined && typeof fm.computation !== "string")
+    errors.push(`${rel}: computation must be a path`);
   else if (file) checkPathField(rel, "computation", file);
-  if (!file && !fence) errors.push(`${rel}: Attested Computation needs a 'computation' path or a code block under a Computation heading (§10.3)`);
-  else if (file && fence) warnings.push(`${rel}: both 'computation' and an inline Computation fence — the file wins (§10.3)`);
+  if (!file && !fence)
+    errors.push(
+      `${rel}: Attested Computation needs a 'computation' path or a code block under a Computation heading (§10.3)`,
+    );
+  else if (file && fence)
+    warnings.push(`${rel}: both 'computation' and an inline Computation fence — the file wins (§10.3)`);
   for (const k of ["executor", "attester"] as const) {
     const v = fm[k];
     if (v === undefined) continue;
@@ -292,7 +322,9 @@ for (const rel of files) {
       else {
         declaredVersion = String(v);
         if (!SUPPORTED_OKF_VERSIONS.includes(declaredVersion))
-          warnings.push(`${rel}: okf_version '${declaredVersion}' is not one this tooling knows (${SUPPORTED_OKF_VERSIONS.join(", ")}) — consuming best-effort (§12)`);
+          warnings.push(
+            `${rel}: okf_version '${declaredVersion}' is not one this tooling knows (${SUPPORTED_OKF_VERSIONS.join(", ")}) — consuming best-effort (§12)`,
+          );
       }
     }
   } else {
@@ -300,23 +332,32 @@ for (const rel of files) {
     else if (!doc.fm) errors.push(`${rel}: missing frontmatter (every concept needs at least 'type')`);
     else {
       for (const f of requiredFields) if (empty(doc.fm[f])) errors.push(`${rel}: empty or missing '${f}'`);
-      for (const f of recommendedFields) if (empty(doc.fm[f])) warnings.push(`${rel}: missing recommended field '${f}'`);
+      for (const f of recommendedFields)
+        if (empty(doc.fm[f])) warnings.push(`${rel}: missing recommended field '${f}'`);
       if (doc.fm.type !== undefined && typeof doc.fm.type !== "string") errors.push(`${rel}: 'type' must be a string`);
-      for (const f of ["title", "description"]) if (doc.fm[f] !== undefined && typeof doc.fm[f] !== "string") errors.push(`${rel}: '${f}' must be a string`);
+      for (const f of ["title", "description"])
+        if (doc.fm[f] !== undefined && typeof doc.fm[f] !== "string") errors.push(`${rel}: '${f}' must be a string`);
       const tags = list(doc.fm, "tags");
       if (doc.fm.tags !== undefined && (!tags || !tags.every((t) => typeof t === "string")))
         errors.push(`${rel}: 'tags' must be a list of strings`);
       for (const field of linkFields) {
         const raw = doc.fm[field];
-        if (raw !== undefined && raw !== null && typeof raw !== "string" && !(Array.isArray(raw) && raw.every((x) => typeof x === "string")))
+        if (
+          raw !== undefined &&
+          raw !== null &&
+          typeof raw !== "string" &&
+          !(Array.isArray(raw) && raw.every((x) => typeof x === "string"))
+        )
           errors.push(`${rel}: '${field}' must be a string or a list of strings (it is a link field)`);
         for (const v of linkFieldValues(doc.fm, field)) {
           const r = resolveConceptRef(v, rel, conceptIds, conceptsByBase);
-          if (r.ambiguous) warnings.push(`${rel}: ${field} '${v}' matches several concepts (${r.ambiguous.join(", ")}) — use a path`);
+          if (r.ambiguous)
+            warnings.push(`${rel}: ${field} '${v}' matches several concepts (${r.ambiguous.join(", ")}) — use a path`);
           else if (!r.id) warnings.push(`${rel}: ${field} '${v}' does not resolve to a concept`);
         }
       }
-      if (doc.fm.resource !== undefined && typeof doc.fm.resource !== "string") errors.push(`${rel}: 'resource' must be a URI or path`);
+      if (doc.fm.resource !== undefined && typeof doc.fm.resource !== "string")
+        errors.push(`${rel}: 'resource' must be a URI or path`);
       else checkPathField(rel, "resource", doc.fm.resource);
       if (V02_KEYS.some((k) => doc.fm![k] !== undefined)) sawV02Fields = true;
       checkFamilies(rel, doc.fm, doc.body);
@@ -331,7 +372,8 @@ for (const rel of files) {
         errors.push(`${rel}: /-rooted link '${target}' — profile requires file-relative links`);
       else {
         const rooted = resolvePathField(bundle, rel, target);
-        if (rooted === null || !existsSync(join(bundle, rooted))) warnings.push(`${rel}: dangling bundle link '${target}'`);
+        if (rooted === null || !existsSync(join(bundle, rooted)))
+          warnings.push(`${rel}: dangling bundle link '${target}'`);
       }
       continue;
     }
@@ -349,8 +391,15 @@ for (const rel of files) {
   }
 }
 
-if (sawV02Fields && declaredVersion !== null && declaredVersion !== OKF_VERSION && SUPPORTED_OKF_VERSIONS.includes(declaredVersion))
-  warnings.push(`index.md: bundle declares okf_version '${declaredVersion}' but concepts use v${OKF_VERSION} fields — run okf migrate to bump it`);
+if (
+  sawV02Fields &&
+  declaredVersion !== null &&
+  declaredVersion !== OKF_VERSION &&
+  SUPPORTED_OKF_VERSIONS.includes(declaredVersion)
+)
+  warnings.push(
+    `index.md: bundle declares okf_version '${declaredVersion}' but concepts use v${OKF_VERSION} fields — run okf migrate to bump it`,
+  );
 
 for (const w of warnings) console.log(`${c.yellow("warn:")}  ${w}`);
 for (const e of errors) console.log(`${c.red("ERROR:")} ${e}`);

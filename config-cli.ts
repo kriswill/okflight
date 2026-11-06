@@ -170,11 +170,26 @@ export function splitCliSections(raw: unknown): {
     else {
       const s = { ...prof };
       const field = fieldIn(s, "profile");
-      field("requiredFields", asStrArr((a) => (profile.requiredFields = a)));
-      field("recommendedFields", asStrArr((a) => (profile.recommendedFields = a)));
-      field("reservedFiles", asStrArr((a) => (profile.reservedFiles = a)));
-      field("rootedLinks", asEnum(["error", "allow"] as const, (e) => (profile.rootedLinks = e)));
-      field("repoLinks", asEnum(["check", "ignore", "forbid"] as const, (e) => (profile.repoLinks = e)));
+      field(
+        "requiredFields",
+        asStrArr((a) => (profile.requiredFields = a)),
+      );
+      field(
+        "recommendedFields",
+        asStrArr((a) => (profile.recommendedFields = a)),
+      );
+      field(
+        "reservedFiles",
+        asStrArr((a) => (profile.reservedFiles = a)),
+      );
+      field(
+        "rootedLinks",
+        asEnum(["error", "allow"] as const, (e) => (profile.rootedLinks = e)),
+      );
+      field(
+        "repoLinks",
+        asEnum(["check", "ignore", "forbid"] as const, (e) => (profile.repoLinks = e)),
+      );
       for (const k of Object.keys(s)) errors.push(`profile.${k}: unknown key`);
     }
   }
@@ -183,8 +198,14 @@ export function splitCliSections(raw: unknown): {
   if (isObj(vt)) {
     const s = { ...vt };
     const field = fieldIn(s, "vcs");
-    field("provider", asEnum(["auto", "git", "none"] as const, (e) => (vcs.provider = e)));
-    field("ignore", asStrArr((a) => (vcs.ignore = a)));
+    field(
+      "provider",
+      asEnum(["auto", "git", "none"] as const, (e) => (vcs.provider = e)),
+    );
+    field(
+      "ignore",
+      asStrArr((a) => (vcs.ignore = a)),
+    );
     // No unknown-key sweep here: the leftover viewer keys (url,
     // commit-url-template) are the viz normalizer's to validate.
     top["vcs"] = s;
@@ -228,7 +249,10 @@ export function splitCliSections(raw: unknown): {
           scaffold.script = clean || null;
         }),
       );
-      field("command", asStrArr((a) => (scaffold.command = a.length ? a : null)));
+      field(
+        "command",
+        asStrArr((a) => (scaffold.command = a.length ? a : null)),
+      );
       field("actor", (v, path) => {
         if (typeof v === "string" && ACTOR_RE.test(v)) scaffold.actor = v;
         else errors.push(`${path}: expected an OKF actor — human:<id>, process:<id>, or <producer>/<version>`);
@@ -257,14 +281,38 @@ export function splitCliSections(raw: unknown): {
             }
             const ec = { ...ev };
             const efield = fieldIn(ec, p);
-            efield("glob", asStr((v) => (e.glob = v)));
-            efield("type", asStr((v) => (e.type = v)));
-            efield("output", asStr((v) => (e.output = relPath(`${p}.output`)(v, `${p}.output`))));
-            efield("comment", asStr((v) => (e.comment = v || null)));
-            efield("description", asStr((v) => (e.description = v || null)));
-            efield("title", asStr((v) => (e.title = v || null)));
-            efield("tags", asStrArr((a) => (e.tags = a)));
-            efield("body", asStr((v) => (e.body = v || null)));
+            efield(
+              "glob",
+              asStr((v) => (e.glob = v)),
+            );
+            efield(
+              "type",
+              asStr((v) => (e.type = v)),
+            );
+            efield(
+              "output",
+              asStr((v) => (e.output = relPath(`${p}.output`)(v, `${p}.output`))),
+            );
+            efield(
+              "comment",
+              asStr((v) => (e.comment = v || null)),
+            );
+            efield(
+              "description",
+              asStr((v) => (e.description = v || null)),
+            );
+            efield(
+              "title",
+              asStr((v) => (e.title = v || null)),
+            );
+            efield(
+              "tags",
+              asStrArr((a) => (e.tags = a)),
+            );
+            efield(
+              "body",
+              asStr((v) => (e.body = v || null)),
+            );
             efield("frontmatter", (v, pp) => {
               if (isObj(v) && Object.values(v).every((x) => typeof x === "string"))
                 e.frontmatter = { ...(v as Record<string, string>) };
@@ -286,8 +334,7 @@ export function splitCliSections(raw: unknown): {
           });
       }
       for (const k of Object.keys(s)) errors.push(`scaffold.${k}: unknown key`);
-      if (scaffold.script && scaffold.command)
-        errors.push("scaffold: script and command are mutually exclusive");
+      if (scaffold.script && scaffold.command) errors.push("scaffold: script and command are mutually exclusive");
     }
   }
 
@@ -368,7 +415,9 @@ export function loadContext(): OkfContext {
     const gitHint = Bun.which("git")
       ? "not inside a git repository — cd into your project, or"
       : "git is not installed (or not on PATH), so the git-toplevel fallback is unavailable — install git, or";
-    console.error(`okf: no ${CONFIG_FILE} found in or above the current directory, and ${gitHint} create an ${CONFIG_FILE} at your project's root`);
+    console.error(
+      `okf: no ${CONFIG_FILE} found in or above the current directory, and ${gitHint} create an ${CONFIG_FILE} at your project's root`,
+    );
     process.exit(1);
   }
   let raw: unknown = {};

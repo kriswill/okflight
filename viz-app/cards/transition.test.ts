@@ -63,7 +63,11 @@ describe("buildTransition", () => {
   });
 
   test("horizontal flow rolls exits along the vertical band axis instead", () => {
-    const specH = buildTransition(snapshotOf(layoutCards(cardGraph(model, "f", 1, all)!, { flow: "h" })), layoutCards(cardGraph(model, "a", 1, all)!, { flow: "h" }), "h");
+    const specH = buildTransition(
+      snapshotOf(layoutCards(cardGraph(model, "f", 1, all)!, { flow: "h" })),
+      layoutCards(cardGraph(model, "a", 1, all)!, { flow: "h" }),
+      "h",
+    );
     const t = specH.tracks.find((x) => x.id === "b")!;
     close(t.x1, t.x0);
     close(Math.abs(t.y1 - t.y0), EXIT_DIST);

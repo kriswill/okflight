@@ -891,7 +891,10 @@ describe("AboutModal", () => {
     tabs()[1]!.click();
     flushSync();
     const details = [...document.querySelectorAll("details.lic")];
-    expect(details.map((d) => d.querySelector("summary")!.textContent!.trim())).toEqual([
+    // Collapse whitespace as the browser does: the label is what renders,
+    // not how the markup happens to wrap.
+    const label = (d: Element) => d.querySelector("summary")!.textContent!.replace(/\s+/g, " ").trim();
+    expect(details.map(label)).toEqual([
       "OKFlight 0.1.0 · MIT — this viewer",
       "postprocessing 6.0.0 · Zlib",
       "svelte 5.0.0 · MIT",

@@ -50,35 +50,22 @@ import { THEMES } from "./viz-app/themes";
 
 const argv = process.argv.slice(2);
 
-// --check: typecheck the viewer app (svelte-check) instead of building.
-// TS diagnostics come from tsgo (@typescript/native-preview) via svelte-check's
-// experimental API — in-process, no `node` spawn, no disk artifacts, ~2x faster
-// than the tsc path. Drop the flag to fall back to tsc (typescript stays a
-// devDependency: svelte-check requires it regardless).
+// --check: typecheck the viewer app instead of building. `bun check` checks the
+// TypeScript (tsc's errors, on every core), but it doesn't read .svelte files,
+// so svelte-check follows for the components, through the `typescript`
+// package's JS API. svelte-check only runs once `bun check` is clean, so a
+// .ts error isn't reported twice. Both run on the bun running okf.
 if (argv.includes("--check")) {
-  // tsgo's per-platform binary is an optionalDependency, omitted from the nix
-  // package's vendored node_modules (--omit=optional); without it svelte-check
-  // dies with an unhelpful "Cannot run with tsconfig path without LS/TSdoc
-  // resolver". Fail with a real explanation instead.
-  const tsgoBin = `@typescript/native-preview-${process.platform}-${process.arch}`;
-  try {
-    Bun.resolveSync(`${tsgoBin}/package.json`, import.meta.dir);
-  } catch {
-    console.error(
-      `okf viz --check: ${tsgoBin} is not installed — the nix-built package ` +
-        `omits optional deps; run from a dev checkout after \`bun install\`.`,
-    );
+  if (!Bun.semver.satisfies(Bun.version, ">=1.4.3")) {
+    console.error(`okf viz --check: needs bun >= 1.4.3 for \`bun check\` (this is bun ${Bun.version}).`);
     process.exit(1);
   }
-  const r = Bun.spawnSync(
-    ["bunx", "svelte-check", "--tsconfig", "./tsconfig.json", "--tsgo-experimental-api"],
-    {
-      cwd: import.meta.dir,
-      stdout: "inherit",
-      stderr: "inherit",
-    },
-  );
-  process.exit(r.exitCode ?? 1);
+  const run = (cmd: string[]) =>
+    Bun.spawnSync(cmd, { cwd: import.meta.dir, stdout: "inherit", stderr: "inherit" }).exitCode ?? 1;
+  // --no-script: run the checker itself even if a "check" script is ever added.
+  const ts = run([process.execPath, "check", "--no-script", "-p", "./tsconfig.json"]);
+  if (ts !== 0) process.exit(ts);
+  process.exit(run([process.execPath, "x", "svelte-check", "--tsconfig", "./tsconfig.json"]));
 }
 
 // Build-phase timings, printed with the summary on every run.

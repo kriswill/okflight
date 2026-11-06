@@ -65,17 +65,17 @@ let
 
   # The lock is pure JS — no os/cpu-conditional packages, no install scripts —
   # so one hash serves every platform; --cpu/--os="*" keeps that true if a
-  # future dep adds conditionals. --omit=optional: the only optional deps are
-  # the `bun` npm package (the npx/bunx fallback runtime — see bin/okf.mjs)
-  # and @typescript/native-preview's per-platform tsgo binaries (~26M each);
-  # the nix wrapper provides the real bun, and vendoring every platform's
-  # binaries into the store would be pure bloat. Consequence: the vendored
-  # tree cannot run the tsgo typecheck — `okf viz --check` needs a dev-tree
-  # `bun install` (which does fetch optionals). NOT --production:
-  # `okf viz` needs svelte (compiler + runtime) at CLI runtime, the tests
-  # happy-dom.
+  # future dep adds conditionals. --omit=optional: the only optional dep is
+  # the `bun` npm package (the npx/bunx fallback runtime — see bin/okf.mjs),
+  # whose per-platform binaries would be pure bloat in the store; the nix
+  # wrapper provides the real bun. NOT --production: `okf viz` needs svelte
+  # (compiler + runtime) at CLI runtime, `okf viz --check` needs svelte-check
+  # and typescript, and the tests need happy-dom.
   # Refresh the hash (bun.lock or nixpkgs bun changes): set lib.fakeHash, then
-  # `nix build ./flakes/okf#okf.node_modules` and copy the "got:" value.
+  # `nix build .#okf.node_modules` and copy the "got:" value. With the old
+  # hash in place, plain `nix build` won't notice it's stale if the old output
+  # is in the store or a cache; `nix build .#okf.node_modules --rebuild`
+  # re-runs the install and fails on a mismatch.
   node_modules = stdenvNoCC.mkDerivation {
     pname = "okf-node_modules";
     version = "0";
@@ -114,7 +114,7 @@ let
     # Fixup would patch shebangs into store paths — forbidden in a fixed-output
     # derivation.
     dontFixup = true;
-    outputHash = "sha256-ybWRQkZQuLgU2H9EYrsu5t9IxZ6Edfw5Ia21r+eyC+c=";
+    outputHash = "sha256-y+08c1RP5Ui5RLqCTumoArKBb0UOF4qIa+TA9cOhYoo=";
     outputHashAlgo = "sha256";
     outputHashMode = "recursive";
   };

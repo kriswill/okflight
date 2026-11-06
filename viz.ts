@@ -31,7 +31,8 @@ import {
   titleFromSlug,
   TRUST_TIERS,
   trustTier,
-  bundleFilter, walkMd,
+  bundleFilter,
+  walkMd,
 } from "./lib";
 import { layout3d } from "./layout3d";
 import { collectLicenses, generatorInfo, OPTIONAL_DEPS, packageDir } from "./licenses";
@@ -91,9 +92,15 @@ const reserved = new Set(okfCfg.profile.reservedFiles);
 const isoDate = (rel: string) => (vcs.lastModified(rel) ?? nowISO()).slice(0, 10);
 
 interface Node {
-  id: string; type: string; title: string; desc: string;
-  fm: Record<string, unknown>; body: string;
-  x?: number; y?: number; z?: number;
+  id: string;
+  type: string;
+  title: string;
+  desc: string;
+  fm: Record<string, unknown>;
+  body: string;
+  x?: number;
+  y?: number;
+  z?: number;
 }
 
 const nodes: Node[] = [];
@@ -165,7 +172,11 @@ const indexLinks = (body: string, rel: string): RootLink[] => {
 // Descriptions come from the index's hand-written blurb (the only prose
 // `okf index` preserves on sub-bundles), first sentence — the same string
 // parent listings display for the directory.
-const firstSentence = (s: string) => s.split(/(?<=\.)\s/)[0]!.replace(/\n/g, " ").trim();
+const firstSentence = (s: string) =>
+  s
+    .split(/(?<=\.)\s/)[0]!
+    .replace(/\n/g, " ")
+    .trim();
 
 let root: RootDoc | null = null;
 if (existsSync(join(bundle, "index.md"))) {
@@ -220,32 +231,52 @@ function linkifyUrls(s: string): string {
 }
 
 const LANG_BY_EXT: Record<string, string> = {
-  ".nix": "nix", ".ts": "ts", ".js": "ts", ".mjs": "ts", ".sh": "shell", ".zsh": "shell",
-  ".bash": "shell", ".md": "markdown", ".toml": "toml", ".yaml": "yaml", ".yml": "yaml",
-  ".json": "json", ".lua": "lua", ".conf": "conf",
+  ".nix": "nix",
+  ".ts": "ts",
+  ".js": "ts",
+  ".mjs": "ts",
+  ".sh": "shell",
+  ".zsh": "shell",
+  ".bash": "shell",
+  ".md": "markdown",
+  ".toml": "toml",
+  ".yaml": "yaml",
+  ".yml": "yaml",
+  ".json": "json",
+  ".lua": "lua",
+  ".conf": "conf",
 };
 
 const KEYWORDS: Record<string, string> = {
   nix: "let in if then else with inherit rec assert import or true false null",
   ts: "const let var function return if else for while of in new import export from await async type interface class extends throw try catch switch case default break continue true false null undefined",
-  shell: "if then else elif fi for while until do done case esac function local exec exit return set trap source alias export readonly echo shift",
+  shell:
+    "if then else elif fi for while until do done case esac function local exec exit return set trap source alias export readonly echo shift",
   lua: "local function end if then else elseif for while do return require true false nil",
-  toml: "true false", yaml: "true false null", json: "true false null",
+  toml: "true false",
+  yaml: "true false null",
+  json: "true false null",
 };
 
 function highlight(src: string, lang: string): string {
   const kw = new Set((KEYWORDS[lang] ?? "").split(" ").filter(Boolean));
   const NEVER = "(?!x)x";
   const comment =
-    lang === "ts" ? "\\/\\/[^\\n]*|\\/\\*[\\s\\S]*?\\*\\/"
-    : lang === "lua" ? "--\\[\\[[\\s\\S]*?\\]\\]|--[^\\n]*"
-    : lang === "nix" ? "#[^\\n]*|\\/\\*[\\s\\S]*?\\*\\/"
-    : ["shell", "toml", "yaml", "conf"].includes(lang) ? "#[^\\n]*"
-    : NEVER;
+    lang === "ts"
+      ? "\\/\\/[^\\n]*|\\/\\*[\\s\\S]*?\\*\\/"
+      : lang === "lua"
+        ? "--\\[\\[[\\s\\S]*?\\]\\]|--[^\\n]*"
+        : lang === "nix"
+          ? "#[^\\n]*|\\/\\*[\\s\\S]*?\\*\\/"
+          : ["shell", "toml", "yaml", "conf"].includes(lang)
+            ? "#[^\\n]*"
+            : NEVER;
   const str =
-    lang === "nix" ? `''(?:[^']|'[^'])*''|"(?:\\\\.|[^"\\\\])*"`
-    : lang === "markdown" || lang === "text" ? NEVER
-    : "`(?:\\\\.|[^`\\\\])*`|\"(?:\\\\.|[^\"\\\\\\n])*\"|'(?:\\\\.|[^'\\\\\\n])*'";
+    lang === "nix"
+      ? `''(?:[^']|'[^'])*''|"(?:\\\\.|[^"\\\\])*"`
+      : lang === "markdown" || lang === "text"
+        ? NEVER
+        : "`(?:\\\\.|[^`\\\\])*`|\"(?:\\\\.|[^\"\\\\\\n])*\"|'(?:\\\\.|[^'\\\\\\n])*'";
   const master = new RegExp(
     `(${comment})|(${str})|(\\b\\d[\\d._]*\\b)|(https?:\\/\\/[^\\s"'\`<>]+)|([A-Za-z_][\\w'-]*)`,
     "g",
@@ -265,7 +296,15 @@ function highlight(src: string, lang: string): string {
   return out + esc(src.slice(last));
 }
 
-interface Embedded { html: string; lang: string; lines: number; size: number; date: string; refs: string[]; md?: string }
+interface Embedded {
+  html: string;
+  lang: string;
+  lines: number;
+  size: number;
+  date: string;
+  refs: string[];
+  md?: string;
+}
 const files: Record<string, Embedded> = {};
 
 function addFile(rel: string, ref: string) {
@@ -298,7 +337,12 @@ function addFile(rel: string, ref: string) {
 // Referenced *directories* (sub-flakes, stow packages, plugin spec trees) get
 // a browsable listing: the dir's git-tracked children are recorded and every
 // descendant file is embedded via addFile (same size/binary caps).
-interface EmbeddedDir { files: string[]; dirs: string[]; date: string; refs: string[] }
+interface EmbeddedDir {
+  files: string[];
+  dirs: string[];
+  date: string;
+  refs: string[];
+}
 const dirs: Record<string, EmbeddedDir> = {};
 
 const childFiles = new Map<string, string[]>();
@@ -358,7 +402,8 @@ for (const n of nodes) {
       // Outside the bundle: doc-relative into the repo (as validate resolves
       // it), else workspace-relative like `resource`.
       const inRepo = resolveLink(repo, posix.join(cfg.bundle.dir, n.id + ".md"), value);
-      if (inRepo && !inRepo.startsWith(cfg.bundle.dir + "/") && existsSync(join(repo, inRepo))) addRepoPath(inRepo, n.id);
+      if (inRepo && !inRepo.startsWith(cfg.bundle.dir + "/") && existsSync(join(repo, inRepo)))
+        addRepoPath(inRepo, n.id);
       else addRepoPath(value, n.id);
     }
   }
@@ -383,7 +428,8 @@ for (const n of nodes) {
 const hashCandidates = new Set<string>();
 if (vcs.revisionPattern) {
   for (const n of nodes) for (const m of n.body.matchAll(vcs.revisionPattern)) hashCandidates.add(m[1]);
-  for (const f of Object.values(files)) if (f.md) for (const m of f.md.matchAll(vcs.revisionPattern)) hashCandidates.add(m[1]);
+  for (const f of Object.values(files))
+    if (f.md) for (const m of f.md.matchAll(vcs.revisionPattern)) hashCandidates.add(m[1]);
 }
 const repoUrl = cfg.vcs.url ?? vcs.remoteUrl();
 const commits = repoUrl ? vcs.resolveRevisions([...hashCandidates]) : {};
@@ -418,7 +464,12 @@ for (const f of cfg.facets) {
     console.error(`viz: facet.${f.name}.classify command did not print valid JSON: ${cl.command.join(" ")}`);
     process.exit(1);
   }
-  if (typeof map !== "object" || map === null || Array.isArray(map) || Object.values(map).some((v) => typeof v !== "string")) {
+  if (
+    typeof map !== "object" ||
+    map === null ||
+    Array.isArray(map) ||
+    Object.values(map).some((v) => typeof v !== "string")
+  ) {
     console.error(`viz: facet.${f.name}.classify command must print a JSON object of string values`);
     process.exit(1);
   }
@@ -448,7 +499,12 @@ for (const f of cfg.facets) {
 // leaves the stable default, and a `trust` facet when any concept carries
 // `verified`. Every concept resolves (absence has spec meaning), so they ride
 // the facet `ids` map. A workspace facet of the same name wins untouched.
-const builtinFacet = (name: string, values: readonly string[], valueOf: (fm: Record<string, unknown>) => string, dflt: string) => {
+const builtinFacet = (
+  name: string,
+  values: readonly string[],
+  valueOf: (fm: Record<string, unknown>) => string,
+  dflt: string,
+) => {
   if (cfg.facets.some((f) => f.name === name)) return;
   const ids: Record<string, string> = {};
   for (const n of nodes) ids[n.id] = valueOf(n.fm);
@@ -460,7 +516,10 @@ builtinFacet("trust", TRUST_TIERS, trustTier, "unverified");
 lap("sources");
 
 // --- Frozen 3D layout ---------------------------------------------------------
-const positions = layout3d(nodes.map((n) => n.id), dedupedEdges);
+const positions = layout3d(
+  nodes.map((n) => n.id),
+  dedupedEdges,
+);
 for (const n of nodes) Object.assign(n, positions.get(n.id));
 lap("layout");
 
@@ -534,18 +593,20 @@ appCss = appCss.replace(/<\/style/gi, "<\\/style");
 const katexCss = () => {
   const katexDir = packageDir("katex", import.meta.dir);
   return readFileSync(join(katexDir, "dist", "katex.min.css"), "utf8")
-    .replace(/src:([^;}]+)/g, (_m, src: string) =>
-      "src:" +
-      src
-        .split(/,(?=\s*url\()/)
-        .filter((part) => /\.woff2\)/.test(part))
-        .map((part) =>
-          part.replace(/url\((fonts\/[^)]+)\)/, (_u, rel: string) => {
-            const bytes = readFileSync(join(katexDir, "dist", rel));
-            return `url(data:font/woff2;base64,${bytes.toString("base64")})`;
-          }),
-        )
-        .join(","),
+    .replace(
+      /src:([^;}]+)/g,
+      (_m, src: string) =>
+        "src:" +
+        src
+          .split(/,(?=\s*url\()/)
+          .filter((part) => /\.woff2\)/.test(part))
+          .map((part) =>
+            part.replace(/url\((fonts\/[^)]+)\)/, (_u, rel: string) => {
+              const bytes = readFileSync(join(katexDir, "dist", rel));
+              return `url(data:font/woff2;base64,${bytes.toString("base64")})`;
+            }),
+          )
+          .join(","),
     )
     .replace(/<\/style/gi, "<\\/style");
 };
@@ -595,10 +656,22 @@ const themeCss = (name: string) =>
 
 const assemble = (totalBytes: number) => {
   const stats: BuildStats = { generatedAt, totalBytes, bytes: sectionBytes };
-  const data = JSON.stringify({ nodes, edges: dedupedEdges, files, dirs, repoUrl, commitUrl, commits, facetMaps, cfg, stats, licenses, generator, root, bundles }).replace(
-    /<\//g,
-    "<\\/",
-  );
+  const data = JSON.stringify({
+    nodes,
+    edges: dedupedEdges,
+    files,
+    dirs,
+    repoUrl,
+    commitUrl,
+    commits,
+    facetMaps,
+    cfg,
+    stats,
+    licenses,
+    generator,
+    root,
+    bundles,
+  }).replace(/<\//g, "<\\/");
   return `<!doctype html>
 <html lang="en">
 <head>

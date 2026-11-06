@@ -51,10 +51,7 @@
       // "none", so compose the encoded selection from cardsBundle — but a
       // live selection (a file/dir panel opened over the bundle) is what
       // the user is looking at and must win the URL.
-      sel:
-        viz.sel.kind === "none" && viz.cardsBundle
-          ? { kind: "bundle", path: viz.cardsBundle }
-          : viz.sel,
+      sel: viz.sel.kind === "none" && viz.cardsBundle ? { kind: "bundle", path: viz.cardsBundle } : viz.sel,
       filters: {
         hidden: [...viz.hidden],
         q: viz.query,

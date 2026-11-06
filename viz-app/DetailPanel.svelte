@@ -79,7 +79,9 @@
 
   /** The concept's `sources` entries, for footnote resolution in the body. */
   const sourcesOf = (fm: Record<string, unknown>) =>
-    Array.isArray(fm.sources) ? (fm.sources.filter((s) => s && typeof s === "object") as Record<string, unknown>[]) : [];
+    Array.isArray(fm.sources)
+      ? (fm.sources.filter((s) => s && typeof s === "object") as Record<string, unknown>[])
+      : [];
 
   const NONE = '<span style="color:var(--ink-muted)">none</span>';
   const linkList = (ids: string[]) =>
@@ -288,11 +290,7 @@
     width: min(460px, 85%);
     /* Inside (left, canvas edge) eases from 90% so the scene reads through
        faintly at the seam; outside (right, screen edge) is fully opaque. */
-    background: linear-gradient(
-      to right,
-      color-mix(in srgb, var(--surface-1) 90%, transparent),
-      var(--surface-1)
-    );
+    background: linear-gradient(to right, color-mix(in srgb, var(--surface-1) 90%, transparent), var(--surface-1));
     border-left: 1px solid var(--grid);
     padding: 0 18px 18px;
     overflow-y: auto;
@@ -532,7 +530,10 @@
     margin-bottom: 3px;
   }
   #body-md :global(code) {
-    font: 12px ui-monospace, Menlo, monospace;
+    font:
+      12px ui-monospace,
+      Menlo,
+      monospace;
     background: var(--page);
     border: 1px solid var(--grid);
     border-radius: 4px;
@@ -577,7 +578,10 @@
     list-style: none;
     padding: 0;
     margin-top: 12px;
-    font: 12.5px/1.6 ui-monospace, Menlo, monospace;
+    font:
+      12.5px/1.6 ui-monospace,
+      Menlo,
+      monospace;
   }
   .dir-list li {
     display: flex;
@@ -603,7 +607,10 @@
     overflow-x: auto;
     white-space: pre;
     margin-top: 12px;
-    font: 12px/1.55 ui-monospace, Menlo, monospace;
+    font:
+      12px/1.55 ui-monospace,
+      Menlo,
+      monospace;
     color: var(--ink-2);
   }
   .src :global(a) {

@@ -390,7 +390,11 @@
       const rect = el.getBoundingClientRect();
       // Clamp both ends: the right bound goes negative on canvases narrower
       // than the 330px tooltip, which used to fling it off the left edge.
-      viz.hover = { i, x: Math.max(0, Math.min(e.clientX - rect.left + 14, rect.width - 330)), y: e.clientY - rect.top + 14 };
+      viz.hover = {
+        i,
+        x: Math.max(0, Math.min(e.clientX - rect.left + 14, rect.width - 330)),
+        y: e.clientY - rect.top + 14,
+      };
     };
     // Grabbing the view cancels an in-flight fly-to instead of fighting it.
     const down = (e: PointerEvent) => {

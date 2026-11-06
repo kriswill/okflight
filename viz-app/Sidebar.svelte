@@ -50,11 +50,7 @@
     border-right: 1px solid var(--grid);
     /* Outside (left, screen edge) is fully opaque; inside (right, canvas
        edge) eases to 90% so the scene reads through faintly at the seam. */
-    background: linear-gradient(
-      to right,
-      var(--surface-1),
-      color-mix(in srgb, var(--surface-1) 90%, transparent)
-    );
+    background: linear-gradient(to right, var(--surface-1), color-mix(in srgb, var(--surface-1) 90%, transparent));
     display: flex;
     flex-direction: column;
     overflow: hidden;

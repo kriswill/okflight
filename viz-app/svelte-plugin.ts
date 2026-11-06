@@ -44,7 +44,12 @@ const defaultWarn = (w: Warning, path: string) => {
   console.warn(`svelte: ${path}${at} ${w.message}`);
 };
 
-export function sveltePlugin({ dev = false, css = "external", minify = true, onWarn = defaultWarn }: SveltePluginOptions = {}): BunPlugin {
+export function sveltePlugin({
+  dev = false,
+  css = "external",
+  minify = true,
+  onWarn = defaultWarn,
+}: SveltePluginOptions = {}): BunPlugin {
   /** Virtual CSS modules: import specifier -> a component's compiled styles. */
   const styles = new Map<string, string>();
   const ts = new Bun.Transpiler({ loader: "ts" });

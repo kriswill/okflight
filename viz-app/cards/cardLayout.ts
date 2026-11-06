@@ -151,11 +151,7 @@ function childLinks(
   if (e.kind === "dir")
     return ((Object.hasOwn(model.bundles, e.id) && model.bundles[e.id]?.links) || []).flatMap(
       (l): { id: string; kind: "card" | "dir" }[] =>
-        l.kind === "concept"
-          ? ok(l.id)
-            ? [{ id: l.id, kind: "card" }]
-            : []
-          : [{ id: l.path, kind: "dir" }],
+        l.kind === "concept" ? (ok(l.id) ? [{ id: l.id, kind: "card" }] : []) : [{ id: l.path, kind: "dir" }],
     );
   return [];
 }
@@ -443,8 +439,7 @@ export function layoutCards(g: CardGraph, opts?: { flow?: CardFlow }): CardLayou
         const n = kids.length;
         let path;
         if (flow === "v") {
-          const slot =
-            dir === "in" ? edgeSlot(p.x, p.y + p.h / 2, p.w, i, n) : edgeSlot(p.x, p.y - p.h / 2, p.w, i, n);
+          const slot = dir === "in" ? edgeSlot(p.x, p.y + p.h / 2, p.w, i, n) : edgeSlot(p.x, p.y - p.h / 2, p.w, i, n);
           path =
             dir === "in"
               ? elbowPath({ x: c.x, y: c.y - c.h / 2 }, slot)
@@ -498,13 +493,7 @@ export interface FitView {
  *  scroll or overflow affordance, so the whole cross extent (bounded by
  *  the two-ring design) must always fit — a clipped, unreachable row is
  *  worse than smaller cards on a short viewport. */
-export function fitView(
-  b: CardLayout["bounds"],
-  vw: number,
-  vh: number,
-  flow: CardFlow = "v",
-  pad = 0.85,
-): FitView {
+export function fitView(b: CardLayout["bounds"], vw: number, vh: number, flow: CardFlow = "v", pad = 0.85): FitView {
   const [lo, hi] = flow === "v" ? [b.minY, b.maxY] : [b.minX, b.maxX];
   const extent = hi - lo;
   const avail = flow === "v" ? vh : vw;

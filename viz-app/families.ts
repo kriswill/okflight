@@ -35,7 +35,10 @@ const dateOr = (ctx: FamilyCtx, v: unknown) => (v === undefined ? "" : esc(ctx.f
 
 /** `by · at` for one { by, at } event. */
 const eventHtml = (ctx: FamilyCtx, e: Record<string, unknown>) =>
-  [e.by !== undefined ? actorHtml(e.by) : "", e.at !== undefined ? `<span class="when">${dateOr(ctx, e.at)}</span>` : ""]
+  [
+    e.by !== undefined ? actorHtml(e.by) : "",
+    e.at !== undefined ? `<span class="when">${dateOr(ctx, e.at)}</span>` : "",
+  ]
     .filter(Boolean)
     .join(" · ");
 
@@ -93,7 +96,9 @@ export function familyRow(ctx: FamilyCtx, fm: FM, k: string, v: unknown): string
         : row(k, genericHtml(ctx, v));
     case "sources": {
       if (!Array.isArray(v) || !v.every(isPlainObject)) return row(k, genericHtml(ctx, v));
-      const cols = ["id", "resource", "author", "usage_count", "last_modified"].filter((c) => v.some((s) => s[c] !== undefined));
+      const cols = ["id", "resource", "author", "usage_count", "last_modified"].filter((c) =>
+        v.some((s) => s[c] !== undefined),
+      );
       const head = cols.map((c) => `<th>${esc(c === "usage_count" ? "usage" : c)}</th>`).join("");
       const body = v
         .map((s) => {
@@ -107,7 +112,8 @@ export function familyRow(ctx: FamilyCtx, fm: FM, k: string, v: unknown): string
             }
             if (c === "last_modified") return `<td>${dateOr(ctx, s[c])}</td>`;
             if (c === "author") return `<td>${s[c] === undefined ? "" : actorHtml(s[c])}</td>`;
-            if (c === "id") return `<td><code id="src-${esc(String(s.id ?? ""))}">${esc(s.id === undefined ? "" : String(s.id))}</code></td>`;
+            if (c === "id")
+              return `<td><code id="src-${esc(String(s.id ?? ""))}">${esc(s.id === undefined ? "" : String(s.id))}</code></td>`;
             return `<td>${s[c] === undefined ? "" : esc(String(s[c]))}</td>`;
           });
           const win = isPlainObject(s.usage_window)
@@ -134,7 +140,10 @@ export function familyRow(ctx: FamilyCtx, fm: FM, k: string, v: unknown): string
     case "attester": {
       if (!isPlainObject(v)) return row(k, genericHtml(ctx, v));
       const parts = [v.resource !== undefined ? pathHtml(ctx, v.resource) : ""];
-      if (Array.isArray(v.receipt)) parts.push(`<span class="dim">receipt:</span> ${v.receipt.map((r) => `<code>${esc(String(r))}</code>`).join(" ")}`);
+      if (Array.isArray(v.receipt))
+        parts.push(
+          `<span class="dim">receipt:</span> ${v.receipt.map((r) => `<code>${esc(String(r))}</code>`).join(" ")}`,
+        );
       const rest = Object.entries(v).filter(([kk]) => kk !== "resource" && kk !== "receipt");
       if (rest.length) parts.push(genericHtml(ctx, Object.fromEntries(rest)));
       return row(k, parts.filter(Boolean).join("<br>"));

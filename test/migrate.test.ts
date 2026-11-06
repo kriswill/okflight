@@ -23,7 +23,11 @@ describe("migrateDoc", () => {
   });
 
   test("existing generated wins; timestamp only fills a missing generated.at", () => {
-    const keep = migrateDoc({ type: "X", generated: { by: "human:k", at: "2026-01-01T00:00:00Z" }, timestamp: "2025-01-01" }, "", BY)!;
+    const keep = migrateDoc(
+      { type: "X", generated: { by: "human:k", at: "2026-01-01T00:00:00Z" }, timestamp: "2025-01-01" },
+      "",
+      BY,
+    )!;
     expect(keep.fm.generated).toEqual({ by: "human:k", at: "2026-01-01T00:00:00Z" });
     expect(keep.fm.timestamp).toBeUndefined();
     const fill = migrateDoc({ type: "X", generated: { by: "human:k" }, timestamp: "2025-01-01T00:00:00Z" }, "", BY)!;
@@ -47,7 +51,11 @@ x
 
 y
 `;
-    const m = migrateDoc({ type: "X", sources: [{ id: "known", resource: "https://wiki.acme/finance/known" }] }, body, BY)!;
+    const m = migrateDoc(
+      { type: "X", sources: [{ id: "known", resource: "https://wiki.acme/finance/known" }] },
+      body,
+      BY,
+    )!;
     expect(m.fm.sources).toEqual([
       { id: "known", resource: "https://wiki.acme/finance/known" },
       { id: "fp-a-handbook", resource: "https://wiki.acme/finance/fpa-handbook", title: "FP&A handbook" },
@@ -68,14 +76,22 @@ y
   });
 
   test("a v0.2 doc is a no-op (idempotent)", () => {
-    expect(migrateDoc({ type: "X", generated: { by: "human:k", at: "2026-01-01T00:00:00Z" }, sources: [] }, "body[^a]\n\n[^a]: a\n", BY)).toBeNull();
+    expect(
+      migrateDoc(
+        { type: "X", generated: { by: "human:k", at: "2026-01-01T00:00:00Z" }, sources: [] },
+        "body[^a]\n\n[^a]: a\n",
+        BY,
+      ),
+    ).toBeNull();
     expect(migrateDoc({ type: "X" }, "## Citations\n\n- Commits `abc`\n", BY)).toBeNull();
   });
 });
 
 describe("okf migrate (driver)", () => {
   const dirs: string[] = [];
-  afterEach(() => { for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true }); });
+  afterEach(() => {
+    for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+  });
 
   const run = (cwd: string, cmd: string, ...args: string[]) => {
     const r = Bun.spawnSync([process.execPath, OKF, cmd, ...args], { cwd, env: { ...process.env, NO_COLOR: "1" } });
@@ -85,12 +101,19 @@ describe("okf migrate (driver)", () => {
   test("dry run changes nothing; --write migrates, validates clean, and is idempotent", () => {
     const root = mkdtempSync(join(tmpdir(), "okf-migrate-"));
     dirs.push(root);
-    writeFileSync(join(root, "okflight.toml"), '[bundle]\ndir = "kb"\n[vcs]\nprovider = "none"\n[scaffold]\nactor = "human:kris"\n');
+    writeFileSync(
+      join(root, "okflight.toml"),
+      '[bundle]\ndir = "kb"\n[vcs]\nprovider = "none"\n[scaffold]\nactor = "human:kris"\n',
+    );
     mkdirSync(join(root, "kb/decisions"), { recursive: true });
     writeFileSync(join(root, "kb/index.md"), "---\nokf_version: '0.1'\n---\n\n# kb\n\nBlurb.\n");
-    const old = "---\ntype: Decision\ntitle: Old\ndescription: d\ntags: [x]\ntimestamp: '2026-05-28T22:53:05+00:00'\n---\n\n## Context\n\nx\n\n## Citations\n\n- [Doc](https://example.com/doc)\n";
+    const old =
+      "---\ntype: Decision\ntitle: Old\ndescription: d\ntags: [x]\ntimestamp: '2026-05-28T22:53:05+00:00'\n---\n\n## Context\n\nx\n\n## Citations\n\n- [Doc](https://example.com/doc)\n";
     writeFileSync(join(root, "kb/decisions/old.md"), old);
-    writeFileSync(join(root, "kb/new.md"), "---\ntype: Note\ntitle: New\ndescription: d\ngenerated: { by: human:k, at: 2026-05-28T22:53:05Z }\n---\nbody\n");
+    writeFileSync(
+      join(root, "kb/new.md"),
+      "---\ntype: Note\ntitle: New\ndescription: d\ngenerated: { by: human:k, at: 2026-05-28T22:53:05Z }\n---\nbody\n",
+    );
 
     const dry = run(root, "migrate");
     expect(dry.code).toBe(0);

@@ -5,12 +5,7 @@
 /** Greedy word wrap into at most `maxLines` lines of `maxWidth` (by
  *  `measure`); over-long words hard-break, overflow ellipsizes the last
  *  line. Whitespace-only input yields no lines. */
-export function wrapLines(
-  text: string,
-  maxWidth: number,
-  measure: (s: string) => number,
-  maxLines: number,
-): string[] {
+export function wrapLines(text: string, maxWidth: number, measure: (s: string) => number, maxLines: number): string[] {
   const words = text.trim().split(/\s+/).filter(Boolean);
   if (!words.length || maxLines <= 0) return [];
   const lines: string[] = [];

@@ -14,7 +14,8 @@
   // the info pane.
   let tab: "info" | "licenses" = $state("info");
 
-  const fmtBytes = (n: number) => (n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(2)} MB` : `${(n / 1024).toFixed(1)} KB`);
+  const fmtBytes = (n: number) =>
+    n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(2)} MB` : `${(n / 1024).toFixed(1)} KB`;
   const pct = (n: number, total: number) => {
     const p = (n / total) * 100;
     return p >= 1 ? `${p.toFixed(0)}%` : "<1%";
@@ -56,15 +57,33 @@
     </header>
     {#if m.licenses.length}
       <div class="tabs" role="tablist" aria-label="About sections">
-        <button class="seg" class:active={tab === "info"} role="tab" aria-selected={tab === "info"} onclick={() => (tab = "info")}>
+        <button
+          class="seg"
+          class:active={tab === "info"}
+          role="tab"
+          aria-selected={tab === "info"}
+          onclick={() => (tab = "info")}
+        >
           <!-- info circle -->
           <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" focusable="false">
             <circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.4" />
-            <path d="M8 7.4v3.4M8 5.15v.02" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+            <path
+              d="M8 7.4v3.4M8 5.15v.02"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.4"
+              stroke-linecap="round"
+            />
           </svg>
           About
         </button>
-        <button class="seg" class:active={tab === "licenses"} role="tab" aria-selected={tab === "licenses"} onclick={() => (tab = "licenses")}>
+        <button
+          class="seg"
+          class:active={tab === "licenses"}
+          role="tab"
+          aria-selected={tab === "licenses"}
+          onclick={() => (tab = "licenses")}
+        >
           <!-- scales of justice -->
           <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" focusable="false">
             <path
@@ -82,11 +101,15 @@
     {/if}
     {#if tab === "info"}
       <p class="about">{@html m.cfg.display.aboutHtml}</p>
-      <p class="counts">{m.nodes.length} concepts · {m.edges.length} links · {Object.keys(m.files).length} embedded files</p>
+      <p class="counts"
+        >{m.nodes.length} concepts · {m.edges.length} links · {Object.keys(m.files).length} embedded files</p
+      >
       {#if stats}
         <h3>What's in this file</h3>
         <table>
-          <thead><tr><th>Section</th><th class="num">Count</th><th class="num">Size</th><th class="num">%</th></tr></thead>
+          <thead
+            ><tr><th>Section</th><th class="num">Count</th><th class="num">Size</th><th class="num">%</th></tr></thead
+          >
           <tbody>
             {#each rows as r (r.label)}
               <tr>
@@ -101,7 +124,9 @@
             <tr><td>Total</td><td></td><td class="num">{fmtBytes(stats.totalBytes)}</td><td></td></tr>
           </tfoot>
         </table>
-        <p class="gen">Everything above is baked into this single HTML file — it works offline, straight from disk. Generated {generated}.</p>
+        <p class="gen"
+          >Everything above is baked into this single HTML file — it works offline, straight from disk. Generated {generated}.</p
+        >
       {/if}
       {#if m.generator}
         <p class="tool">
@@ -113,10 +138,16 @@
         </p>
       {/if}
     {:else}
-      <p class="lic-note">This page embeds the minified viewer app and these libraries; the notices below accompany them as their licenses require.</p>
+      <p class="lic-note"
+        >This page embeds the minified viewer app and these libraries; the notices below accompany them as their
+        licenses require.</p
+      >
       {#if m.generator?.text}
         <details class="lic">
-          <summary>{m.generator.name} {m.generator.version}{m.generator.license ? ` · ${m.generator.license}` : ""} — this viewer</summary>
+          <summary
+            >{m.generator.name}
+            {m.generator.version}{m.generator.license ? ` · ${m.generator.license}` : ""} — this viewer</summary
+          >
           <pre>{m.generator.text}</pre>
         </details>
       {/if}
@@ -288,7 +319,10 @@
   details.lic pre {
     margin: 6px 0 10px;
     padding: 8px 10px;
-    font: 10.5px/1.5 ui-monospace, Menlo, monospace;
+    font:
+      10.5px/1.5 ui-monospace,
+      Menlo,
+      monospace;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
     color: var(--ink-2);

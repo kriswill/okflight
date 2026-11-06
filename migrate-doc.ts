@@ -30,7 +30,9 @@ export function migrateDoc(fm: FM, body: string, by: string): { fm: FM; body: st
         else next[k] = v;
       }
       out = next;
-      notes.push(ts ? `timestamp -> generated { by: ${by}, at: ${ts} }` : `timestamp (empty) -> generated { by: ${by} }`);
+      notes.push(
+        ts ? `timestamp -> generated { by: ${by}, at: ${ts} }` : `timestamp (empty) -> generated { by: ${by} }`,
+      );
     } else if (typeof gen.at === "string" && gen.at) {
       delete out.timestamp;
       notes.push("timestamp dropped (generated.at already present)");
@@ -78,7 +80,9 @@ export function migrateDoc(fm: FM, body: string, by: string): { fm: FM; body: st
       const dropped = new Set(moved.map((i) => i.raw));
       const keptLines = lines.filter((l, i) => !(i > start && i < end && dropped.has(listItemText(l) ?? "")));
       nextBody = keptLines.join("\n");
-      notes.push(`${kept.length} Citations item(s) are not sources, left in place: ${kept.map((k) => `"${k}"`).join(", ")}`);
+      notes.push(
+        `${kept.length} Citations item(s) are not sources, left in place: ${kept.map((k) => `"${k}"`).join(", ")}`,
+      );
     } else if (!kept.length && (moved.length || cites.items.length === 0)) {
       // Nothing left to say under the heading: remove the section and the
       // blank lines around it.

@@ -85,8 +85,7 @@ function runCollect(entry: CollectEntry) {
     const commentText = entry.comment
       ? sctx.leadingComment(readFileSync(join(ctx.root, path), "utf8"), entry.comment)
       : null;
-    const rawDesc =
-      commentText ?? (entry.description ? expandTemplate(entry.description, env) : env.Title);
+    const rawDesc = commentText ?? (entry.description ? expandTemplate(entry.description, env) : env.Title);
     env.description = sctx.firstSentence(rawDesc);
     env["description-sentence"] = sctx.mdSafe(sctx.sentence(rawDesc));
     if (emitted.has(out)) {

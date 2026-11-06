@@ -8,8 +8,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 
 /** Same shape [scaffold] script/collect paths are held to at config load. */
-export const validRelDir = (dir: string): boolean =>
-  !!dir && !dir.startsWith("/") && !dir.split("/").includes("..");
+export const validRelDir = (dir: string): boolean => !!dir && !dir.startsWith("/") && !dir.split("/").includes("..");
 
 /** Escape a value for interpolation into a basic TOML string. */
 const tomlStr = (s: string) => s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');

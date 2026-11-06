@@ -113,7 +113,9 @@ describe("encodeViewHash", () => {
   });
 
   test("a facet rides behind '?' as its own name, always emittable (no selection gate)", () => {
-    expect(encodeViewHash({ sel: none, filters: f({ facets: { platform: "macos" } }) })).toBe("?view=graph&platform=macos");
+    expect(encodeViewHash({ sel: none, filters: f({ facets: { platform: "macos" } }) })).toBe(
+      "?view=graph&platform=macos",
+    );
     expect(
       encodeViewHash({ sel: { kind: "file", path: "docs/50%.md" }, filters: f({ facets: { platform: "linux" } }) }),
     ).toBe("f/docs/50%25.md?view=graph&platform=linux");
@@ -142,7 +144,14 @@ describe("encodeViewHash", () => {
 // The view is a filter-class hash param: selection-independent, "cards"
 // (the default) never emitted so default links stay bare.
 describe("view mode param", () => {
-  const f = (view: "graph" | "cards") => ({ hidden: [], q: "", isolate: 0 as const, facets: {}, view, flow: "h" as const });
+  const f = (view: "graph" | "cards") => ({
+    hidden: [],
+    q: "",
+    isolate: 0 as const,
+    facets: {},
+    view,
+    flow: "h" as const,
+  });
 
   test("view=graph encodes with or without a selection; cards adds nothing", () => {
     expect(encodeViewHash({ sel: { kind: "none" }, filters: f("graph") })).toBe("?view=graph");
@@ -156,7 +165,14 @@ describe("view mode param", () => {
     expect(
       encodeViewHash({
         sel: { kind: "concept", id: "wiki/architecture" },
-        filters: { hidden: ["Decision"], q: "arch", isolate: 1, facets: { platform: "macos" }, view: "graph", flow: "h" },
+        filters: {
+          hidden: ["Decision"],
+          q: "arch",
+          isolate: 1,
+          facets: { platform: "macos" },
+          view: "graph",
+          flow: "h",
+        },
       }),
     ).toBe("c/wiki/architecture?hide=Decision&q=arch&isolate=1&view=graph&platform=macos");
   });
@@ -199,19 +215,47 @@ describe("decodeViewHash", () => {
     for (const view of [
       {
         sel: { kind: "concept", id: "wiki/architecture" },
-        filters: { hidden: ["Alpha Module", "Decision"], q: "", isolate: 0, facets: { platform: "all", status: "all" }, view: "graph", flow: "v" },
+        filters: {
+          hidden: ["Alpha Module", "Decision"],
+          q: "",
+          isolate: 0,
+          facets: { platform: "all", status: "all" },
+          view: "graph",
+          flow: "v",
+        },
       },
       {
         sel: { kind: "none" },
-        filters: { hidden: [], q: "a?b&c=%", isolate: 0, facets: { platform: "macos", status: "all" }, view: "graph", flow: "v" },
+        filters: {
+          hidden: [],
+          q: "a?b&c=%",
+          isolate: 0,
+          facets: { platform: "macos", status: "all" },
+          view: "graph",
+          flow: "v",
+        },
       },
       {
         sel: { kind: "file", path: "docs/50%.md" },
-        filters: { hidden: ["Decision"], q: "tmux", isolate: 0, facets: { platform: "linux", status: "draft" }, view: "graph", flow: "v" },
+        filters: {
+          hidden: ["Decision"],
+          q: "tmux",
+          isolate: 0,
+          facets: { platform: "linux", status: "draft" },
+          view: "graph",
+          flow: "v",
+        },
       },
       {
         sel: { kind: "concept", id: "wiki/architecture" },
-        filters: { hidden: ["Decision"], q: "tmux", isolate: 1, facets: { platform: "macos", status: "all" }, view: "graph", flow: "v" },
+        filters: {
+          hidden: ["Decision"],
+          q: "tmux",
+          isolate: 1,
+          facets: { platform: "macos", status: "all" },
+          view: "graph",
+          flow: "v",
+        },
       },
     ] as const) {
       const decoded = decodeViewHash(encodeViewHash(view as never), model);

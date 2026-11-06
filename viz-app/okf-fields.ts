@@ -26,7 +26,6 @@ export const list = (fm: FM | null | undefined, key: string): unknown[] | undefi
   return Array.isArray(v) ? v : undefined;
 };
 
-
 // --- OKF v0.2 trust / lifecycle / provenance readers (SPEC §5, §7, §13) -------
 
 export type TrustTier = "unverified" | "machine-confirmed" | "human-reviewed";
@@ -75,7 +74,6 @@ export function generatedAt(fm: FM | null | undefined): string | undefined {
   if (typeof at === "string" && at) return at;
   return str(fm, "timestamp");
 }
-
 
 /** The v0.2 path-valued fields beyond `resource` (§6.2, §10.2): computation,
  *  executor.resource, attester.resource, and each sources[].resource — as

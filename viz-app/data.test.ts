@@ -202,7 +202,12 @@ describe("grouping", () => {
 
 describe("neighborsWithin", () => {
   const nRaw = {
-    nodes: [node("a", "Decision", "A"), node("b", "Pattern", "B"), node("c", "Pattern", "C"), node("d", "Pattern", "D")],
+    nodes: [
+      node("a", "Decision", "A"),
+      node("b", "Pattern", "B"),
+      node("c", "Pattern", "C"),
+      node("d", "Pattern", "D"),
+    ],
     edges: [
       { s: "a", t: "b" },
       { s: "b", t: "c" },

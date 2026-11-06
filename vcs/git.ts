@@ -58,7 +58,8 @@ export function gitProvider(root: string): VcsProvider {
     );
     let date = "";
     for (const line of (r.stdout ?? "").split("\n")) {
-      if (line.charCodeAt(0) === 0) date = line.slice(1); // NUL from %x00 marks a commit line
+      if (line.charCodeAt(0) === 0)
+        date = line.slice(1); // NUL from %x00 marks a commit line
       else if (line && !map.has(line)) map.set(line, date); // first hit = newest
     }
     return map;

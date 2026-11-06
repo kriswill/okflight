@@ -10,16 +10,31 @@
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { loadContext } from "./config-cli";
-import { fmToYaml, indexBlurb, OKF_VERSION, parseDoc, parseFrontmatter, statusOf, str, titleFromSlug, type FM } from "./lib";
+import {
+  fmToYaml,
+  indexBlurb,
+  OKF_VERSION,
+  parseDoc,
+  parseFrontmatter,
+  statusOf,
+  str,
+  titleFromSlug,
+  type FM,
+} from "./lib";
 
 const { bundle, cfg } = loadContext();
 const bundleName = basename(cfg.viz.bundle.dir);
 const reserved = new Set(cfg.profile.reservedFiles);
 
-interface DirInfo { rel: string; blurb: string; }
+interface DirInfo {
+  rel: string;
+  blurb: string;
+}
 
 function listDir(absDir: string) {
-  const entries = readdirSync(absDir).filter((e) => !e.startsWith(".") && !e.startsWith("_")).sort();
+  const entries = readdirSync(absDir)
+    .filter((e) => !e.startsWith(".") && !e.startsWith("_"))
+    .sort();
   const dirs = entries.filter((e) => statSync(join(absDir, e)).isDirectory());
   const mds = entries.filter((e) => e.endsWith(".md") && !reserved.has(e));
   return { dirs, mds };
@@ -50,7 +65,10 @@ function genDir(relDir: string): DirInfo {
   });
   const dirLines = children.map((c) => {
     const name = c.rel.split("/").pop()!;
-    const firstSentence = c.blurb.split(/(?<=\.)\s/)[0].replace(/\n/g, " ").trim();
+    const firstSentence = c.blurb
+      .split(/(?<=\.)\s/)[0]
+      .replace(/\n/g, " ")
+      .trim();
     return `* [${name}](${name}/index.md)${firstSentence ? ` - ${firstSentence}` : ""}`;
   });
 
@@ -60,7 +78,9 @@ function genDir(relDir: string): DirInfo {
     // The root frontmatter is preserved verbatim — if it won't parse, bail
     // rather than silently overwrite it with a stub.
     if (fmError) {
-      console.error(`index-gen: ${cfg.viz.bundle.dir}/index.md frontmatter is malformed (${fmError}); fix it and re-run`);
+      console.error(
+        `index-gen: ${cfg.viz.bundle.dir}/index.md frontmatter is malformed (${fmError}); fix it and re-run`,
+      );
       process.exit(1);
     }
     const rootFm: FM = fm ?? { okf_version: OKF_VERSION };

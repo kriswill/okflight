@@ -49,6 +49,21 @@ jobs:
       # so the thing consumers actually run gets cached too.
       - run: nix build .#okf -L
 
+  # Formatting runs in the flake's dev shell so CI uses the same pinned bun,
+  # and so the same formatter, as local `nix develop`. setup-bun installs the
+  # latest bun, whose output can drift. Not on Windows: autocrlf=true checks
+  # out CRLF, and bun fmt expects LF. Its own job, so a formatting failure
+  # doesn't hide the build and test results.
+  fmt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: DeterminateSystems/determinate-nix-action@96c5ee93a9dddf2830d31e1da6ec719077336c28 # v3.23.3
+
+      - run: nix develop -c bun fmt --check
+
   # Windows has no Nix runner, so it runs the same unit tests under plain bun
   # (npm-installed okf is the supported path there). The runner checks out
   # with core.autocrlf=true, so this also covers CRLF bundles.

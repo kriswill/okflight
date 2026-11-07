@@ -56,7 +56,7 @@
     "katex": "^0.18.5",
     "postprocessing": "^6.38.3",
     "svelte": "^5.56.4",
-    "three": "~0.185.1"
+    "three": "~0.187.0"
   },
   "optionalDependencies": {
     "bun": "^1.4.4"
@@ -64,7 +64,7 @@
   "devDependencies": {
     "@happy-dom/global-registrator": "^21.0.4",
     "@types/bun": "^1.4.4",
-    "@types/three": "^0.185.0",
+    "@types/three": "^0.187.0",
     "happy-dom": "^21.0.4",
     "puppeteer-core": "^25.16.0",
     "svelte-check": "^4.7.8",

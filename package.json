@@ -53,7 +53,7 @@
   },
   "dependencies": {
     "@threlte/core": "^8.5.16",
-    "katex": "^0.18.5",
+    "katex": "^0.19.1",
     "postprocessing": "^6.38.3",
     "svelte": "^5.56.4",
     "three": "~0.187.0"

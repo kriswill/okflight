@@ -39,7 +39,7 @@ jobs:
 
       - uses: DeterminateSystems/determinate-nix-action@92957199488000b908fdad19f63711000965d8f3 # v3.24.1
 
-      - uses: DeterminateSystems/flakehub-cache-action@5a904648441896ace9bab97c70b321339eb127ed # main 2026-07
+      - uses: DeterminateSystems/flakehub-cache-action@f00fba8dc0949d63cbbb7d33da7912417d588d75 # main 2026-07
 
       - run: nix flake check -L
 
